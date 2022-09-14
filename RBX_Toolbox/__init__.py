@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (1, 0),
+    "version": (1, 1),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -33,23 +33,25 @@ import sys
 import platform
 
 ## Toolbox vars ##
-ver = "v.1.0"
+ver = "v.1.1"
 lts_ver = ver
 
 mode = 1 #0 - Test Mode; 1 - Live mode
-wh = 0   #0 - W; 1 - H
+wh =1   #0 - W; 1 - H
 
 
 if mode == 0:
     if wh == 1:
-        my_path = ("")
+        my_path = ("E:\\G-Drive\\Blender\\Roblox\\0. Addon\\RBX_Toolbox")
+        ast_fldr = ("E:\\G-Drive\\Blender\\Roblox\\UGC\\UGC Files") 
     if wh == 0:
         my_path = ("D:\\Personal\\G-Drive\\Blender\\Roblox\\0. Addon\\RBX_Toolbox")
         ast_fldr = ("D:\\Personal\\G-Drive\\Blender\\Roblox\\UGC\\UGC Files")    
 else:
     my_path = (os.path.dirname(os.path.realpath(__file__)))
 
-bldr_path = (os.path.dirname(os.path.realpath('Blender.exe')))
+### For Blender HDRI ### 
+bldr_path = (os.path.dirname(bpy.app.binary_path))
 bldr_ver = bpy.app.version_string.split('.')
 bldr_fdr = bldr_ver[0] + '.' + bldr_ver[1]
     
@@ -165,6 +167,9 @@ class URL_HANDLER(bpy.types.Operator):
         if link == "update":
             webbrowser.open_new("https://github.com/Gl2imm/RBX_Toolbox/releases")
             
+        if link == "discord":
+            webbrowser.open_new("https://discord.gg/gFa4mY7")            
+            
         if link == "instructions":
             instructions = my_path + fbs + "Credits and Instructions.txt"
             with open(instructions) as f:
@@ -242,6 +247,7 @@ class BUTTON_HDRI(bpy.types.Operator):
                 hdri_img_path = bldr_hdri_path + hdri_name + '.exr'
                 hdri_image = bpy.data.images.load(hdri_img_path)
                 bpy.data.worlds['HDRI'].node_tree.nodes['Environment Texture'].image = hdri_image 
+                print(hdri_img_path)
 
         return {'FINISHED'}  
 
@@ -613,6 +619,12 @@ class TOOLBOX_MENU(bpy.types.Panel):
                         col = split.column(align = True)
                         col.label(text='')
                         split.operator('render.render', text = "Render", icon='RENDER_STILL')
+                        
+                        
+        row = layout.row()
+        row.label(text='          -------------------------------------  ') 
+        row = layout.row()  
+        row.operator('object.lgndtranslate_url', text = "Discord Support Server", icon='URL').link = "discord"  
 
 
     #CLASS REGISTER 

@@ -8,6 +8,7 @@ In order to have additional features (Now is only UGC boundaries), you must have
 If you want to have additional effects, templates, dummies, etc - pls share it in my support discord, i might add it to addon with a proper credits.
 Discord - https://discord.gg/gFa4mY7 (NYTV Gaming)
 
+- Download addon: https://github.com/Gl2imm/RBX_Toolbox/releases (Look for file named 'RBX_Toolbox_vX.X.zip)
 
 - HDRI:
 A tool to Append and set HDRI for renders

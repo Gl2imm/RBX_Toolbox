@@ -1,5 +1,7 @@
 # RBX_Toolbox
 
+![RBX](https://i.ibb.co/6P0Z3Rq/RBX-Toolbox.png)
+
 This tool was created to assist and simplify workflow for Roblox modeling in Blender. Here i collect and organize useful tools/addons/operations all in one place. 
 
 In order to have additional features (Now is only UGC boundaries), you must have the UGC blend file that you can download from UGC program (if you selected). Do not ask me for this file, i will not share, since it conflicts with UGC T&C. But if you already have that file - inside addon "Roblox UGC Files" tab simply specify the folder where it is located, additional features will be automatically unlocked. You only need to do it once.

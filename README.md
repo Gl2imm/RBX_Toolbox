@@ -32,4 +32,4 @@ Front, Back, Left, Right views
 Quick set each camera as active and preview it (adjust)
 Quick render selected view
 
-
+- Addon can be found on the right side N-panel (Click "N" for it to appear)

@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (1, 0),
+    "version": (1, 2),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -33,29 +33,31 @@ import sys
 import platform
 
 ## Toolbox vars ##
-ver = "v.1.0"
+ver = "v.1.2"
 lts_ver = ver
 
 mode = 1 #0 - Test Mode; 1 - Live mode
-wh = 0   #0 - W; 1 - H
+wh =0   #0 - W; 1 - H
 
 
 if mode == 0:
     if wh == 1:
-        my_path = ("")
+        rbx_my_path = ("E:\\G-Drive\\Blender\\Roblox\\0. Addon\\RBX_Toolbox")
+        rbx_ast_fldr = ("E:\\G-Drive\\Blender\\Roblox\\UGC\\UGC Files") 
     if wh == 0:
-        my_path = ("D:\\Personal\\G-Drive\\Blender\\Roblox\\0. Addon\\RBX_Toolbox")
-        ast_fldr = ("D:\\Personal\\G-Drive\\Blender\\Roblox\\UGC\\UGC Files")    
+        rbx_my_path = ("D:\\Personal\\G-Drive\\Blender\\Roblox\\0. Addon\\RBX_Toolbox")
+        rbx_ast_fldr = ("D:\\Personal\\G-Drive\\Blender\\Roblox\\UGC\\UGC Files")    
 else:
-    my_path = (os.path.dirname(os.path.realpath(__file__)))
+    rbx_my_path = (os.path.dirname(os.path.realpath(__file__)))
 
-bldr_path = (os.path.dirname(os.path.realpath('Blender.exe')))
+### For Blender HDRI ### 
+bldr_path = (os.path.dirname(bpy.app.binary_path))
 bldr_ver = bpy.app.version_string.split('.')
 bldr_fdr = bldr_ver[0] + '.' + bldr_ver[1]
     
 if platform.system() == 'Windows':
     fbs = '\\'
-    blend_file = ("\\RBX_Templates.blend")
+    rbx_blend_file = ("\\RBX_Templates.blend")
     ugc_bound_file = ("\\Bounds.blend")
     ap_node = ("\\NodeTree")
     ap_object = ("\\Object")
@@ -67,7 +69,7 @@ if platform.system() == 'Windows':
     bldr_hdri_path = (bldr_path + "\\" + bldr_fdr + "\\datafiles\\studiolights\\world\\")
 else:
     fbs = '/'   #forward/back slashes (MacOs)
-    blend_file = ("/RBX_Templates.blend")
+    rbx_blend_file = ("/RBX_Templates.blend")
     ugc_bound_file = ("/Bounds.blend")
     ap_node = ("/NodeTree")
     ap_object = ("/Object")
@@ -93,23 +95,21 @@ print("**********************************************")
 class RBXToolsPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__
  
-    asset_folder: bpy.props.StringProperty(name="Folder",
+    rbx_asset_folder: bpy.props.StringProperty(name="Folder",
                                         description="Select Assets folder",
                                         default="",
                                         maxlen=1024,
                                         subtype="DIR_PATH")
-                                                                              
-                                                                        
-                                        
+                                                                                                            
     if mode == 0:
-        asset_folder = ast_fldr
+        rbx_asset_folder = rbx_ast_fldr
         
              
 class PROPERTIES_RBX(bpy.types.PropertyGroup):
     
     name : bpy.props.StringProperty(name= "ver", default="", maxlen=40) #Not in use, key in data            
 
-    cust_enum_hdri : bpy.props.EnumProperty(
+    rbx_hdri_enum : bpy.props.EnumProperty(
         name = "HDRI",
         description = "Set HDRI",
         default='OP1',
@@ -124,6 +124,16 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
                  ('OP9', "Sunset", "")   
                 ]
         )
+        
+    rbx_sky_enum : bpy.props.EnumProperty(
+        name = "Sky",
+        description = "Set Sky",
+        default='OP1',
+        items = [('OP1', "Sky 1", ""),
+                 ('OP2', "Sky 2", ""),
+                 ('OP3', "Sky 3", "") 
+                ]
+        )        
     
     ## not in use ##
     bool : BoolProperty(
@@ -140,9 +150,9 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
                                         subtype="DIR_PATH")    
     
     ####   Check for update addon  ####
-    url = 'https://github.com/Gl2imm/RBX_Toolbox/releases.atom'
+    rbx_url = 'https://github.com/Gl2imm/RBX_Toolbox/releases.atom'
     try:
-        full_text = requests.get(url, allow_redirects=True).text
+        full_text = requests.get(rbx_url, allow_redirects=True).text
     except:
         pass
     else:
@@ -153,20 +163,23 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     
 ############   URL HANDLER OPERATOR   ##############    
 class URL_HANDLER(bpy.types.Operator):
-    bl_label = "BUTTON CUSTOM"
-    bl_idname = "object.lgndtranslate_url"
+    bl_label = "URL_HANDLER"
+    bl_idname = "object.url_handler"
     bl_options = {'REGISTER', 'UNDO'}
-    link : bpy.props.StringProperty(name= "Added")
+    rbx_link : bpy.props.StringProperty(name= "Added")
 
 
     def execute(self, context):
-        link = (self.link)
+        rbx_link = (self.rbx_link)
                     
-        if link == "update":
+        if rbx_link == "update":
             webbrowser.open_new("https://github.com/Gl2imm/RBX_Toolbox/releases")
             
-        if link == "instructions":
-            instructions = my_path + fbs + "Credits and Instructions.txt"
+        if rbx_link == "discord":
+            webbrowser.open_new("https://discord.gg/gFa4mY7")            
+            
+        if rbx_link == "instructions":
+            instructions = rbx_my_path + fbs + "Credits and Instructions.txt"
             with open(instructions) as f:
                 text = f.read()
             t = bpy.data.texts.new("Instructions")
@@ -176,8 +189,8 @@ class URL_HANDLER(bpy.types.Operator):
             bpy.context.space_data.text = bpy.data.texts['Instructions']
             bpy.ops.text.jump(line=1)            
             
-        if link == "version":
-            instructions = my_path + fbs + "Version_log.txt"
+        if rbx_link == "version":
+            instructions = rbx_my_path + fbs + "Version_log.txt"
             with open(instructions) as f:
                 text = f.read()
             t = bpy.data.texts.new("Version_log")
@@ -191,57 +204,74 @@ class URL_HANDLER(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class BUTTON_HDRI(bpy.types.Operator):
-    bl_label = "BUTTON_HDRIFULL"
-    bl_idname = "object.button_hdrifull"
+class RBX_BUTTON_HDRI(bpy.types.Operator):
+    bl_label = "RBX_BUTTON_HDRIFULL"
+    bl_idname = "object.rbx_button_hdrifull"
     bl_options = {'REGISTER', 'UNDO'}
-    hdri : bpy.props.StringProperty(name= "Added")
+    rbx_hdri : bpy.props.StringProperty(name= "Added")
 
     def execute(self, context):
         scene = context.scene
-        prefs = scene.my_prefs
-        hdri = (self.hdri)
+        rbx_prefs = scene.rbx_prefs
+        rbx_hdri = (self.rbx_hdri)
         
- 
- 
-        if prefs.cust_enum_hdri == 'OP1':
-            hdri_name = "World"                    
-        if prefs.cust_enum_hdri == 'OP2':
-            hdri_name = "City"                  
-        if prefs.cust_enum_hdri == 'OP3':
-            hdri_name = "Courtyard"
-        if prefs.cust_enum_hdri == 'OP4':
-            hdri_name = "Forest"
-        if prefs.cust_enum_hdri == 'OP5':
-            hdri_name = "Interior"
-        if prefs.cust_enum_hdri == 'OP6':
-            hdri_name = "Night"
-        if prefs.cust_enum_hdri == 'OP7':
-            hdri_name = "Studio"
-        if prefs.cust_enum_hdri == 'OP8':
-            hdri_name = "Sunrise"
-        if prefs.cust_enum_hdri == 'OP9':
-            hdri_name = "Sunset"
-                                                                                                                 
+        if rbx_hdri == 'sky':
+            if rbx_prefs.rbx_sky_enum == 'OP1':
+                rbx_hdri_name = "Sky-1_(From_unsplash).jpg"                    
+            if rbx_prefs.rbx_sky_enum == 'OP2':
+                rbx_hdri_name = "Sky-2_(From_unsplash).jpg"                  
+            if rbx_prefs.rbx_sky_enum == 'OP3':
+                rbx_hdri_name = "Sky-3_(From_unsplash).jpg"
+                            
+            if bpy.data.objects.get("Sky Sphere") == None:
+                bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_object, filename ='Sky Sphere')
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.context.view_layer.objects.active = None
+            bpy.data.objects['Sky Sphere'].select_set(True)
+            bpy.context.view_layer.objects.active = bpy.data.objects['Sky Sphere']
+            sky_img_path = rbx_my_path + fbs + 'img' + fbs + 'sky' + fbs + rbx_hdri_name
+            sky_image = bpy.data.images.load(sky_img_path)
+            bpy.data.objects['Sky Sphere'].active_material.node_tree.nodes['Image Texture'].image = sky_image 
+            
+            
+        if rbx_hdri == 'hdri':
+            if rbx_prefs.rbx_hdri_enum == 'OP1':
+                rbx_hdri_name = "World"                    
+            if rbx_prefs.rbx_hdri_enum == 'OP2':
+                rbx_hdri_name = "City"                  
+            if rbx_prefs.rbx_hdri_enum == 'OP3':
+                rbx_hdri_name = "Courtyard"
+            if rbx_prefs.rbx_hdri_enum == 'OP4':
+                rbx_hdri_name = "Forest"
+            if rbx_prefs.rbx_hdri_enum == 'OP5':
+                rbx_hdri_name = "Interior"
+            if rbx_prefs.rbx_hdri_enum == 'OP6':
+                rbx_hdri_name = "Night"
+            if rbx_prefs.rbx_hdri_enum == 'OP7':
+                rbx_hdri_name = "Studio"
+            if rbx_prefs.rbx_hdri_enum == 'OP8':
+                rbx_hdri_name = "Sunrise"
+            if rbx_prefs.rbx_hdri_enum == 'OP9':
+                rbx_hdri_name = "Sunset"
+                                                                                                                     
 
-
-        if hdri_name == 'World':
-            try:
-                hdri = bpy.data.worlds[hdri_name]
-            except:
-                bpy.ops.wm.append(directory =my_path + blend_file + ap_world, filename =hdri_name)
-                hdri = bpy.data.worlds[hdri_name]
-            scene.world = hdri
-            print(hdri_name + " has been Appended and applied to the World")
-        else:
-            if bpy.context.scene.world != 'HDRI':
-                if 'HDRI' not in bpy.data.worlds:
-                    bpy.ops.wm.append(directory =my_path + blend_file + ap_world, filename ='HDRI')
-                hdri = bpy.data.worlds['HDRI']
-                scene.world = hdri
-                hdri_img_path = bldr_hdri_path + hdri_name + '.exr'
-                hdri_image = bpy.data.images.load(hdri_img_path)
-                bpy.data.worlds['HDRI'].node_tree.nodes['Environment Texture'].image = hdri_image 
+            if rbx_hdri_name == 'World':
+                try:
+                    rbx_hdri = bpy.data.worlds[rbx_hdri_name]
+                except:
+                    bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_world, filename =rbx_hdri_name)
+                    rbx_hdri = bpy.data.worlds[rbx_hdri_name]
+                scene.world = rbx_hdri
+                print(rbx_hdri_name + " has been Appended and applied to the World")
+            else:
+                if bpy.context.scene.world != 'HDRI':
+                    if 'HDRI' not in bpy.data.worlds:
+                        bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_world, filename ='HDRI')
+                    rbx_hdri = bpy.data.worlds['HDRI']
+                    scene.world = rbx_hdri
+                    hdri_img_path = bldr_hdri_path + rbx_hdri_name + '.exr'
+                    hdri_image = bpy.data.images.load(hdri_img_path)
+                    bpy.data.worlds['HDRI'].node_tree.nodes['Environment Texture'].image = hdri_image 
 
         return {'FINISHED'}  
 
@@ -255,15 +285,8 @@ class BUTTON_DMMY(bpy.types.Operator):
 
     def execute(self, context):
         dmy = self.dmy
-        
-        dmy_items = {
-            'R15 Blocky': [
-                {'name': 'Dummy R15'}          
-            ]
-            }  
-            
 
-        bpy.ops.wm.append(directory =my_path + blend_file + ap_object, files =dmy_items.get(dmy))
+        bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_object, filename =dmy)
         print(dmy + " Spawned")
            
         
@@ -280,9 +303,9 @@ class BUTTON_BNDS(bpy.types.Operator):
     def execute(self, context):
         bnds = self.bnds
         if mode == 0:
-            asset_folder = ast_fldr
+            rbx_asset_folder = rbx_ast_fldr
         else:
-            asset_folder = bpy.context.preferences.addons['RBX_Toolbox'].preferences.asset_folder
+            rbx_asset_folder = bpy.context.preferences.addons['RBX_Toolbox'].preferences.rbx_asset_folder
             
         bnds_items = {
             'Hat': [
@@ -340,7 +363,7 @@ class BUTTON_BNDS(bpy.types.Operator):
             }  
                
         if bpy.data.objects.get(bnds) == None:
-            bpy.ops.wm.append(directory =asset_folder + ugc_bound_file + ap_object, files =bnds_items.get(bnds))
+            bpy.ops.wm.append(directory =rbx_asset_folder + ugc_bound_file + ap_object, files =bnds_items.get(bnds))
             print(bnds + " Boundary Spawned")
         else:
             print(bnds + " Boundary Already Exist")
@@ -356,14 +379,14 @@ class BUTTON_CMR(bpy.types.Operator):
 
     def execute(self, context):
         scene = context.scene
-        prefs = scene.my_prefs
+        rbx_prefs = scene.rbx_prefs
         cmr = self.cmr
         cmr_spl = cmr.rsplit('_',1)
         
         #### Apend Cameras ####
         if cmr == 'append':               
             if bpy.data.objects.get('Camera_F') == None:
-                bpy.ops.wm.append(directory =my_path + blend_file + ap_collection, filename ='Cameras')
+                bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_collection, filename ='Cameras')
                 bpy.context.scene.render.resolution_x = 1080
                 bpy.context.scene.render.resolution_y = 1080
                 bpy.context.scene.render.resolution_percentage = 100
@@ -390,7 +413,25 @@ class BUTTON_CMR(bpy.types.Operator):
                         bpy.ops.view3d.object_as_camera()
             except:
                 pass
-                                                                                            
+
+
+            
+        #### Add Animated Staging ####    
+        if cmr == 'staging':
+            bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_collection, filename='Staging')
+            print("Animated Staging Setup Appended")
+
+        #### Set Active (Staging cam) ####        
+        if cmr == 'staging-active':
+            cam = bpy.data.objects['Staging Camera']
+            bpy.data.scenes['Scene'].camera = cam
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.context.view_layer.objects.active = None
+            bpy.data.objects['Staging Camera'].select_set(True)
+            bpy.context.view_layer.objects.active = bpy.data.objects['Staging Camera']
+            print("'Staging Camera' Set as Active")
+            del cam            
+                                                                                                        
         return {'FINISHED'}      
 
  
@@ -409,40 +450,40 @@ class TOOLBOX_MENU(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        prefs = scene.my_prefs 
+        rbx_prefs = scene.rbx_prefs
         
         
         ######## Update Notifier ########
         if lts_ver > ver:
             box = layout.box()
             #box.label(text = "Addon Update Available: " + lts_ver, icon='IMPORT') 
-            box.operator('object.lgndtranslate_url', text = "Update Available: " + lts_ver, icon='IMPORT').link = "update"         
+            box.operator('object.url_handler', text = "Update Available: " + lts_ver, icon='IMPORT').rbx_link = "update"      
                
         ######## ASSETS ########                
         if mode == 0:
-            addon_assets = prefs
-            folder = 'recolor_folder'
+            addon_assets = rbx_prefs
+            rbx_folder = 'recolor_folder'
         else:
             addon_assets =bpy.context.preferences.addons['RBX_Toolbox'].preferences
-            folder = 'asset_folder'
+            rbx_folder = 'rbx_asset_folder'
         
         ######## Check if Asset Folder installed ######## 
         if mode == 0:
-            asset_folder = ast_fldr
-            asset_folder_set = asset_folder
+            rbx_asset_folder = rbx_ast_fldr
+            rbx_asset_folder_set = rbx_asset_folder
         else:
-            asset_folder_set =bpy.context.preferences.addons['RBX_Toolbox'].preferences.asset_folder
-        assets_set = 0
+            rbx_asset_folder_set =bpy.context.preferences.addons['RBX_Toolbox'].preferences.rbx_asset_folder
+        rbx_assets_set = 0
 
-        if os.path.exists(asset_folder_set) == True:
-            dir = os.listdir(asset_folder_set)
+        if os.path.exists(rbx_asset_folder_set) == True:
+            dir = os.listdir(rbx_asset_folder_set)
             for x in range(len(dir)):
                 if "Bounds.blend" in dir[x]:
                     #print("Found UGC 'Bounds.blend' file, related features unlocked")
-                    assets_set = 1
+                    rbx_assets_set = 1
                     break
                 else:
-                   assets_set = 2 
+                   rbx_assets_set = 2 
           
                         
         ######### Roblox UGC Files ###########
@@ -453,17 +494,17 @@ class TOOLBOX_MENU(bpy.types.Panel):
         # some data on the subpanel
         if context.scene.subpanel_readme:
             box = layout.box()
-            box.operator('object.lgndtranslate_url', text = "Read Instructions, Credits", icon='ARMATURE_DATA').link = "instructions"
-            box.operator('object.lgndtranslate_url', text = "Read Version Log", icon='CON_ARMATURE').link = "version" 
-            if assets_set != 1:
+            box.operator('object.url_handler', text = "Read Instructions, Credits", icon='ARMATURE_DATA').rbx_link = "instructions"
+            box.operator('object.url_handler', text = "Read Version Log", icon='CON_ARMATURE').rbx_link = "version" 
+            if rbx_assets_set != 1:
                 box.label(text = "To unlock additional features")
                 box.label(text = "Specify folder with UGC")
                 box.label(text = "blend file 'Bounds.blend'")
             row = layout.row()
-            box.prop(addon_assets, folder)
-            if assets_set == 1:
+            box.prop(addon_assets, rbx_folder)
+            if rbx_assets_set == 1:
                 box.label(text = "'Bounds.blend' linked to addon")
-            if assets_set == 2:
+            if rbx_assets_set == 2:
                 box.label(text = "'Bounds.blend' not found")
 
         ######### HDRI ###########
@@ -475,12 +516,12 @@ class TOOLBOX_MENU(bpy.types.Panel):
         # some data on the subpanel
         if context.scene.subpanel_hdri:
             box = layout.box()
-            box.label(text = "Blender built-in HDRIs")
-            box.prop(prefs, 'cust_enum_hdri')
+            box.label(text = "Blender built-in HDRIs", icon ='NODE_MATERIAL')
+            box.prop(rbx_prefs, 'rbx_hdri_enum')
             split = box.split(factor = 0.5)
             col = split.column(align = True)
             col.label(text = "")
-            split.operator("object.button_hdrifull", text = "Set as HDRI")
+            split.operator("object.rbx_button_hdrifull", text = "Set as HDRI").rbx_hdri = 'hdri'
             try:
                 wrld = bpy.context.scene.world.name
             except:
@@ -498,11 +539,34 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     split = box.split(factor = 0.5)
                     col = split.column(align = True)
                     col.label(text='Rotation:')
-                    split.prop(wrld_1, "default_value", text = "")                    
+                    split.prop(wrld_1, "default_value", text = "") 
+                    
+                    
+            #### Set Sky ####  
+            box = layout.box()      
+            box.label(text = "Simple Skybox", icon ='WORLD_DATA')
+            box.prop(rbx_prefs, 'rbx_sky_enum')
+            split = box.split(factor = 0.5)
+            col = split.column(align = True)
+            col.label(text = "")
+            split.operator("object.rbx_button_hdrifull", text = "Set Sky").rbx_hdri = 'sky'
+            try:
+                sky = bpy.data.objects['Sky Sphere']
+            except:
+                pass
+            else:
+                box.label(text='** Skybox Controls: **') 
+                sky_0 = bpy.data.objects['Sky Sphere'].active_material.node_tree.nodes['Mapping'].inputs['Location']
+                split = box.split(factor = 0.5)
+                col = split.column(align = True)
+                col.label(text='Rotation:')
+                split.prop(sky_0, 'default_value', text = "")
+            box.label(text='*You may setup your own')
+            box.label(text=' Skybox in Shading tab')                  
 
                                         
         ######### Bounds #########
-        if assets_set == 1:
+        if rbx_assets_set == 1:
             row = layout.row()
             icon = 'DOWNARROW_HLT' if context.scene.subpanel_bounds else 'RIGHTARROW'
             row.prop(context.scene, 'subpanel_bounds', icon=icon, icon_only=True)
@@ -534,19 +598,26 @@ class TOOLBOX_MENU(bpy.types.Panel):
         # some data on the subpanel
         if context.scene.subpanel_dummy:
             box = layout.box()
-            # Bounds
-            box.operator('object.button_dmmy', text = "R15 Blocky Dummy").dmy = "R15 Blocky"
+            # Dummies
+            box.operator('object.button_dmmy', text = "R15 Blocky").dmy = "R15 Blocky"
+            box.operator('object.button_dmmy', text = "R15 Boy").dmy = "R15 Boy"
+            box.operator('object.button_dmmy', text = "R15 Girl").dmy = "R15 Girl"
+            box.operator('object.button_dmmy', text = "R15 Woman").dmy = "R15 Woman"
+            box.operator('object.button_dmmy', text = "Rthro Boy").dmy = "Rthro Boy"
+            box.operator('object.button_dmmy', text = "Rthro Girl").dmy = "Rthro Girl"
+            box.operator('object.button_dmmy', text = "Rthro Normal").dmy = "Rthro Normal"
+            box.operator('object.button_dmmy', text = "Rthro Slender").dmy = "Rthro Slender"
                         
         
         ######### Cameras #########
         row = layout.row()
         icon = 'DOWNARROW_HLT' if context.scene.subpanel_cams else 'RIGHTARROW'
         row.prop(context.scene, 'subpanel_cams', icon=icon, icon_only=True)
-        row.label(text='Cameras', icon='CAMERA_DATA')
+        row.label(text='Cameras and Lights', icon='CAMERA_DATA')
         # some data on the subpanel
         if context.scene.subpanel_cams: 
             box = layout.box()                  
-            box.operator('object.button_cmr', text = "Add Cameras Setup", icon='OUTLINER_DATA_CAMERA').cmr = 'append' 
+            box.operator('object.button_cmr', text = "Add 4 Cameras Setup", icon='IMPORT').cmr = 'append' 
             try:
                 bpy.data.objects['Camera_F']
             except:
@@ -614,6 +685,35 @@ class TOOLBOX_MENU(bpy.types.Panel):
                         col.label(text='')
                         split.operator('render.render', text = "Render", icon='RENDER_STILL')
 
+            ##### Animated Staging #####
+            box.operator('object.button_cmr', text = "Add Animated Staging", icon='IMPORT').cmr = 'staging'                        
+            try:
+                bpy.data.objects['Staging Camera']
+            except:
+                pass
+            else:               
+                #box = layout.box()
+                split = box.split(factor = 0.5)
+                col = split.column(align = True)
+                col.label(text='Camera:')
+                split.operator('object.button_cmr', text = "Set Active").cmr = 'staging-active'
+            try:
+                bkdrp = bpy.data.objects['Floor Plane']
+            except:
+                pass
+            else:
+                bkdrp_0 = bpy.data.objects['Floor Plane'].active_material.node_tree.nodes['Principled BSDF'].inputs['Base Color']
+                split = box.split(factor = 0.5)
+                col = split.column(align = True)
+                col.label(text='Backdrop:')
+                split.prop(bkdrp_0, 'default_value', text = "")
+
+                        
+        row = layout.row()
+        row.label(text='          -------------------------------------  ') 
+        row = layout.row()  
+        row.operator('object.url_handler', text = "Discord Support Server", icon='URL').rbx_link = "discord"  
+
 
     #CLASS REGISTER 
 ##########################################
@@ -621,7 +721,7 @@ classes = (
         RBXToolsPreferences,
         PROPERTIES_RBX, 
         URL_HANDLER,
-        BUTTON_HDRI,
+        RBX_BUTTON_HDRI,
         BUTTON_DMMY, 
         BUTTON_BNDS,
         BUTTON_CMR, 
@@ -632,7 +732,7 @@ classes = (
 def register():
     for c in classes:
         bpy.utils.register_class(c)
-    bpy.types.Scene.my_prefs = bpy.props.PointerProperty(type= PROPERTIES_RBX)
+    bpy.types.Scene.rbx_prefs = bpy.props.PointerProperty(type= PROPERTIES_RBX)
     Scene.subpanel_readme = BoolProperty(default=False)
     Scene.subpanel_hdri = BoolProperty(default=False)
     Scene.subpanel_bounds = BoolProperty(default=False)
@@ -644,7 +744,7 @@ def register():
 def unregister():
     for c in classes:
         bpy.utils.unregister_class(c)
-    del bpy.types.Scene.my_prefs
+    del bpy.types.Scene.rbx_prefs
     del Scene.subpanel_readme
     del Scene.subpanel_hdri
     del Scene.subpanel_bounds

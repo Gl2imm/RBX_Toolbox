@@ -3,3 +3,15 @@
                                             ####################################
 
 v.1.0: Initial Release
+
+v.1.1:
+	Fixed HDRI adding Error
+	Added discord link
+	Restart Blender after update
+v.1.2:
+	Added:
+	Simple skybox with few images. Yes its not so professional, but serve as example and also can be used. I could add a proper one, but is hard to find equirectangular textures
+	More Dummies: R15 Boy, R15 Girl, R15 Woman, Rthro Boy, Rthro Girl, Rthro Normal, Rthro Slender
+	Animated Staging: Fully preset Animated Rotating Staging with camera and Lights (animation is cyclic)
+	Fixes:
+	Found some clashed with other addon, so renamed all variables into RBX addon specific names

@@ -26,6 +26,15 @@ HDRIs: city, courtyard, forest, interior, night, studio, sunrise, sunset
 Credits: All HDRI now is a Blender built-in. All HDRIs are licenses as CC0 (Creative common). These were created by Greg Zaal (HDRI Haven https://hdrihaven.com).
 
 
+####################################			
+              Skybox:
+####################################
+
+A tool to Append and set simple Skybox
+Currently there are 3 sample Sky. You may use them or change image to your own in the Shading tab
+Yes they are not so professional, but serve as example and also can be used. I could add a proper one, but is hard to find equirectangular textures
+Credits: Sample skies downloaded from https://unsplash.com.
+
 
 ####################################			
          Accessory Bounds:
@@ -42,9 +51,8 @@ Credits: Taken from UGC. I do not want expose the guy name here for his privacy.
 ####################################
 
 Quick spawn of Dummy template
-Dummies: R15 Blocky
+Dummies: R15 Blocky, R15 Boy, R15 Girl, R15 Woman, Rthro Boy, Rthro Girl, Rthro Normal, Rthro Slender
 For now i only have one, if you have other templates do hit me up, i will include them with credits to you. 
-
 
 
 
@@ -52,10 +60,13 @@ For now i only have one, if you have other templates do hit me up, i will includ
             Cameras:
 ####################################
 
-Quick spawn of 4 cameras that already preset to following:
-Front, Back, Left, Right views
-1080 x 1080 resolution (you can change that)
-Quick set each camera as active and preview it (adjust)
-Quick render selected view
+1. Quick spawn of 4 cameras that already preset to following:
+	Front, Back, Left, Right views
+	1080 x 1080 resolution (you can change that)
+	Quick set each camera as active and preview it (adjust)
+	Quick render selected view
+
+2. Quick spawn of Animated Staging: 
+	Fully preset Animated Rotating Staging with camera and Lights (animation is cyclic)
 
 

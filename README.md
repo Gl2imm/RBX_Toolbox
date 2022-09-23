@@ -10,13 +10,13 @@ If you want to have additional effects, templates, dummies, etc - pls share it i
 - Version log: https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/Version_log.txt
 
 ### Some item created with the help of this Toolbox - bones parenting, lights.. 
-<img src="https://i.ibb.co/nnV3CGJ/mc.png" width="768" height="432" />
+![Render](https://i.ibb.co/W6v0g64/RBX-1.png)
 
 ### Spawn Dummies and Their Armatures in 1 click
-<img src="https://i.ibb.co/ssMfk78/Dummies.png" width="768" height="370" />
+![Dummies](https://i.ibb.co/S5WNcrh/RBX-2.png)
 
 ### Below are the tools currently available in Toolbox
-<img src="https://i.ibb.co/QcSj675/RBX-Toolbox.png" width="768" height="543" />
+![Tools](https://i.ibb.co/McBc15V/RBX-3.png)
 
 - Accessory Bounds:  
 (This will only work if you have that 'Bounds.blend' from UGC)  

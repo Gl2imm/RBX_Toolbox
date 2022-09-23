@@ -1010,7 +1010,9 @@ class TOOLBOX_MENU(bpy.types.Panel):
             if bn_error:
                 if bn_error == 1:
                     box.label(text='Error, need rectify Mesh', icon='ERROR')
+                    bn_error == None
                 if bn_error == 2:
+                    bn_error == None
                     box.label(text='Parenting Done!', icon='CHECKMARK')
                     box.label(text='Step-6 (Optional):', icon=bn_icon)
                     box.label(text='You can also now export this')

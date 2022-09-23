@@ -4,8 +4,8 @@ First of all, you need to have ready meshes (characters) exported from Roblox St
 
 
 'Step-1 (Adding Bones):'
-Add the Armature from the list that match your character. If the character is resized in Game, then you will need to scale the bones a little.
-Click 'S' for scale then 'X' to scale on X axis or 'Z' to scale on Z axis. Align your character and the bones, so the bones are inside of it (dont protrude anywhere so much, if it is popping out a little - adjust it in Step-4 later)
+Add the Armature from the list that match your character. 
+Now Try to go from Step-5. If it works - you are done, if not - Undo the parenting and go to Step-2.
 
 
 'Step-2 (Preparing Mesh):'
@@ -19,7 +19,9 @@ Sadly you cannot avoid this, so bear with it. You can avoid if you know how to a
 
 
 'Step-4 (Adjusting bones):'
-Now if you have some bones protruding out of the mesh, you can Select the bones and press Tab for edit mode.
+If the character is resized in Game, then you will need to scale the bones a little.
+Click 'S' for scale then 'X' to scale on X axis or 'Z' to scale on Z axis. Align your character and the bones, so the bones are inside of it (dont protrude anywhere so much)
+Now if you have some bones protruding out of the mesh, you can press Tab for edit mode.
 Dont adjust bones in random 3D view, as it will shift them to random places.
 Instead:
 press Numpad-1 for Front view and adjust in current view.

@@ -1,0 +1,43 @@
+How to add Bones and Parent them:
+
+First of all, you need to have ready meshes (characters) exported from Roblox Studio. If you have no idea on how to do it - you can find one of many tutorials in Youtube, or just ask in the discord (button is at the bottom of this toolbox). You may also spawn a Dummy template to test out.
+
+
+'Step-1 (Adding Bones):'
+Add the Armature from the list that match your character. If the character is resized in Game, then you will need to scale the bones a little.
+Click 'S' for scale then 'X' to scale on X axis or 'Z' to scale on Z axis. Align your character and the bones, so the bones are inside of it (dont protrude anywhere so much, if it is popping out a little - adjust it in Step-4 later)
+
+
+'Step-2 (Preparing Mesh):'
+Select your character. Recalculate normals. This is need as sometimes model have flipped normals (some faces are faced inside), this option will make them all pointing Outside. (Bones might not attach to model because of wrong facing normals)
+
+
+'Step-3 (Remove doubles):'
+I think most of the time your Roblox exported models will have double vertices. Its when same part repeated twice, so it will have 2 vertices at each location, they are same. This option will show you how many Doubles this model have - click the button to remove them. 
+After the doubles cleaned - you might see changes in the texture, some might not look nice, you can try Smoothing option to see which way it will look better. 
+Sadly you cannot avoid this, so bear with it. You can avoid if you know how to assign a vertex Group to each part of the mesh, then you will need to manually assign each group to every bone in Armature. Automated tools cannot do it.
+
+
+'Step-4 (Adjusting bones):'
+Now if you have some bones protruding out of the mesh, you can Select the bones and press Tab for edit mode.
+Dont adjust bones in random 3D view, as it will shift them to random places.
+Instead:
+press Numpad-1 for Front view and adjust in current view.
+press Numpad-3 for Right view and adjust in current view.
+press Ctrl+Numpad-1 for Back view and adjust in current view.
+press Ctrl+Numpad-3 for Left view and adjust in current view.
+Press Tab again to exit out Edit Mode.
+
+
+'Step-5 (Parenting):'
+This step is simple - Select Bones and Mesh and Click parenting. Addon will do auto parent with Automatic Weights.
+(Just for your knowledge, when you doing it manually yourself - you have to select Mesh then Bones, sequence is important. But this addon will do correct sequence for you, even if you do it wrong, so no worries). 
+
+After this step you can try to select bones and Press 'Ctrl+Tab' for Pose mode and pose your character. 
+You may also export this model as 'FBX' and upload it to Mixamo.com for a custom animation, it will recognize the bones.
+
+
+'Issues you may face:'
+1. If you export model with Accessories - they might not be rotated same like in game (they might break into peaces), as they parented to the character separately. You may still try, it might work out for you.
+2. Some models have really extra large body parts which intersecting each other - this will create issues for auto parenting, because Blender see it as one item and do not know how to break them. If you know how to manually separate them - you can try and do it, move them apart from each other, adjust the bones manually (Step-4), it will work. After parenting done - you can move them back to their original places in 'Pose Mode' and apply all Bones as a 'Rest Pose'.
+3. Some meshes are really stubborn and will not let you do auto parenting or it have alot of Extra details/parts. Like the 'RTHRO Normal' Dummy - i had adjusted the bones i think 15 times, then only it let me parent it. Even now some parts of the mesh does not move with the bones, but you can manually attach them in 'Weight Paint' mode (Advanced).

@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (1, 2),
+    "version": (1, 3),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -31,9 +31,10 @@ import requests
 import webbrowser
 import sys
 import platform
+import bmesh
 
 ## Toolbox vars ##
-ver = "v.1.2"
+ver = "v.1.3"
 lts_ver = ver
 
 mode = 1 #0 - Test Mode; 1 - Live mode
@@ -81,7 +82,10 @@ else:
     bldr_hdri_path = (bldr_path + "/" + bldr_fdr + "/datafiles/studiolights/world/")            
 
 cams = ['Camera_F','Camera_B','Camera_L','Camera_R']
-
+bn_selection = None
+bn_error = None
+msh_selection = None
+msh_error = None
 
 
 print("**********************************************")
@@ -171,35 +175,34 @@ class URL_HANDLER(bpy.types.Operator):
 
     def execute(self, context):
         rbx_link = (self.rbx_link)
+        rbx_guides = ['Credits and Instructions','Version_log','Guide_Armature']
                     
         if rbx_link == "update":
             webbrowser.open_new("https://github.com/Gl2imm/RBX_Toolbox/releases")
             
         if rbx_link == "discord":
-            webbrowser.open_new("https://discord.gg/gFa4mY7")            
+            webbrowser.open_new("https://discord.gg/gFa4mY7")   
             
-        if rbx_link == "instructions":
-            instructions = rbx_my_path + fbs + "Credits and Instructions.txt"
-            with open(instructions) as f:
-                text = f.read()
-            t = bpy.data.texts.new("Instructions")
-            t.write("To switch back to normal view switch from 'TEXT EDITOR' to '3D Viewport'. Or just press 'Shift+F5' \n \n \n")
-            t.write(text)
-            bpy.context.area.ui_type = 'TEXT_EDITOR'
-            bpy.context.space_data.text = bpy.data.texts['Instructions']
-            bpy.ops.text.jump(line=1)            
-            
-        if rbx_link == "version":
-            instructions = rbx_my_path + fbs + "Version_log.txt"
-            with open(instructions) as f:
-                text = f.read()
-            t = bpy.data.texts.new("Version_log")
-            t.write("To switch back to normal view switch from 'TEXT EDITOR' to '3D Viewport'. Or just press 'Shift+F5' \n \n \n")
-            t.write(text)
-            bpy.context.area.ui_type = 'TEXT_EDITOR'
-            bpy.context.space_data.text = bpy.data.texts['Version_log']
-            bpy.ops.text.jump(line=1)  
-            
+        if rbx_link == "mixamo":
+            webbrowser.open_new("https://www.mixamo.com/")                       
+
+        for x in range(len(rbx_guides)):
+            if rbx_link == rbx_guides[x]:
+                texts_exist = bpy.data.texts.get(rbx_guides[x])
+                if texts_exist != None:
+                    bpy.context.area.ui_type = 'TEXT_EDITOR'
+                    bpy.context.space_data.text = bpy.data.texts[rbx_guides[x]]
+                else:
+                    instructions = rbx_my_path + fbs + rbx_guides[x] + ".txt"
+                    with open(instructions) as f:
+                        text = f.read()
+                    t = bpy.data.texts.new(rbx_guides[x])
+                    t.write("To switch back to normal view switch from 'TEXT EDITOR' to '3D Viewport'. Or just press 'Shift+F5' \n \n \n") 
+                    t.write(text)          
+                    bpy.context.area.ui_type = 'TEXT_EDITOR'
+                    bpy.context.space_data.text = bpy.data.texts[rbx_guides[x]]
+                    bpy.context.space_data.show_word_wrap = True
+                    bpy.ops.text.jump(line=1) 
 
         return {'FINISHED'}
 
@@ -435,6 +438,173 @@ class BUTTON_CMR(bpy.types.Operator):
         return {'FINISHED'}      
 
  
+ ######### Armature Buttons ###########    
+class BUTTON_BN(bpy.types.Operator):
+    bl_label = "BUTTON_BN"
+    bl_idname = "object.button_bn"
+    bl_options = {'REGISTER', 'UNDO'}
+    bn : bpy.props.StringProperty(name= "Added")
+
+    def execute(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs
+        bn = self.bn
+        global bn_selection
+        global bn_error
+        global msh_selection
+        global msh_error
+        bn_error = None
+        msh_error = None
+
+        bn_items = {
+            'R15 Blocky': [
+                {'name': 'Character_bones_blocky'}       
+            ],
+            'R15 Boy': [
+                {'name': 'Character_bones_r15_boy'}         
+            ], 
+            'R15 Girl': [
+                {'name': 'Character_bones_r15_girl'}         
+            ], 
+            'R15 Woman': [
+                {'name': 'Character_bones_r15_woman'}        
+            ], 
+            'Rthro Boy': [
+                {'name': 'Character_bones_rth_boy'}    
+            ],
+            'Rthro Girl': [
+                {'name': 'Character_bones_rth_girl'}         
+            ], 
+            'Rthro Normal': [
+                {'name': 'Character_bones_rth_normal'}          
+            ], 
+            'Rthro Slender': [
+                {'name': 'Character_bones_rth_slender'}          
+            ]                                                                                                                                                             
+            }          
+        
+        #### Apend Armature ####
+        bn_split = bn.rsplit('_')
+        print(bn_split)
+        
+        if bn_split[-1] == 'arma':
+            bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_object, files =bn_items.get(bn_split[0]))
+            bn_sel = bpy.context.selected_objects[0].name
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.context.view_layer.objects.active = None
+            bpy.data.objects[bn_sel].select_set(True)
+            bpy.context.view_layer.objects.active = bpy.data.objects[bn_sel]
+            print(bn_split[0] + " Armature Appended")
+ 
+        #### Recalculate Normals ####
+        if bn == 'normal':
+            bn_mesh = 0
+            sel = bpy.context.selected_objects
+            if len(sel) < 1:
+                print("Nothing Selected")
+                msh_selection = "Nothing Selected"                
+            else:
+                for x in sel:
+                    if x.type != 'MESH':
+                        print(x.type + " Selected. Pls Select Only Mesh")
+                        msh_selection = "Pls Select Only Mesh"
+                        bn_mesh = 0
+                    else:
+                        bn_mesh = 1
+                        msh_selection = None
+                if bn_mesh == 1:
+                    if bpy.context.mode == 'OBJECT':
+                        bpy.ops.object.editmode_toggle()
+                        bpy.ops.mesh.select_all(action='SELECT')                
+                    elif bpy.context.mode == 'EDIT_MESH':
+                        bpy.ops.mesh.select_all(action='SELECT')
+                    bpy.ops.mesh.normals_make_consistent(inside=False)
+                    bpy.ops.object.editmode_toggle()
+                    msh_error = 'done_nml'
+                    print("Normals Recalculated")
+            
+        #### Remove Duplicated Vertices ####
+        if bn == 'doubles':
+            bn_mesh = 0
+            sel = bpy.context.selected_objects
+            if len(sel) < 1:
+                print("Nothing Selected")
+                msh_selection = "Nothing Selected"
+            else:
+                for x in sel:
+                    if x.type != 'MESH':
+                        print(x.type + " Selected. Pls Select Only Mesh")
+                        msh_selection = "Pls Select Only Mesh"
+                        bn_mesh = 0
+                    else:
+                        bn_mesh = 1
+                        msh_selection = None
+                if bn_mesh == 1:
+                    if bpy.context.mode == 'OBJECT':
+                        bpy.ops.object.editmode_toggle()
+                        bpy.ops.mesh.select_all(action='SELECT')                
+                    elif bpy.context.mode == 'EDIT_MESH':
+                        bpy.ops.mesh.select_all(action='SELECT')
+                    bpy.ops.mesh.remove_doubles()
+                    bpy.ops.object.editmode_toggle()
+                    msh_error = 'done_vts'
+                    print("Doubles Removed")
+                        
+        #### Parent Armature ####
+        if bn == 'parent':
+            bn_arma = 0
+            bn_mesh = 0
+            
+            sel = bpy.context.selected_objects
+            if len(sel) < 1:
+                print("Nothing Selected")
+                bn_selection = "Nothing Selected"
+            else:
+                print(sel)
+                if len(sel) > 2:
+                    print("More than 2 Objects selected")
+                    bn_selection = "More than 2 Objects selected"
+                else:
+                    if len(sel) < 2:
+                        print("2 Objects Must be Selected")
+                        bn_selection = "Select 2 Objects"
+                    else:
+                        for x in sel:
+                            if x.type == 'ARMATURE':
+                                bn_arma = 1
+                                break
+                        if bn_arma == 0:
+                            print("No Bones Selected")
+                            bn_selection = "No Bones Selected"
+                        for x in sel:
+                            if x.type == 'MESH':
+                                bn_mesh = 1
+                                break
+                        if bn_mesh == 0:
+                            print("No Mesh Selected")
+                            bn_selection = "No Mesh Selected"
+                                
+            if bn_arma == 1 and bn_mesh == 1:
+                bn_selection = None
+                bn_active = bpy.context.view_layer.objects.active
+                if bn_active.type != 'ARMATURE':
+                    bpy.ops.object.select_all(action='DESELECT')
+                    bpy.context.view_layer.objects.active = None
+                    for x in sel:
+                        if x.type == 'ARMATURE':
+                            bpy.data.objects[x.name].select_set(True)
+                            bpy.context.view_layer.objects.active = bpy.data.objects[x.name]
+                        else:
+                            bpy.data.objects[x.name].select_set(True)     
+                try:
+                    bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+                except:
+                    bn_error = 1
+                else:
+                    print("Bones Successfully Parented")
+                    bn_error = 2
+                                                                                                                    
+        return {'FINISHED'}      
     
     #PANEL UI
 ####################################
@@ -494,8 +664,8 @@ class TOOLBOX_MENU(bpy.types.Panel):
         # some data on the subpanel
         if context.scene.subpanel_readme:
             box = layout.box()
-            box.operator('object.url_handler', text = "Read Instructions, Credits", icon='ARMATURE_DATA').rbx_link = "instructions"
-            box.operator('object.url_handler', text = "Read Version Log", icon='CON_ARMATURE').rbx_link = "version" 
+            box.operator('object.url_handler', text = "Read Instructions, Credits", icon='ARMATURE_DATA').rbx_link = "Credits and Instructions"
+            box.operator('object.url_handler', text = "Read Version Log", icon='CON_ARMATURE').rbx_link = "Version_log" 
             if rbx_assets_set != 1:
                 box.label(text = "To unlock additional features")
                 box.label(text = "Specify folder with UGC")
@@ -708,6 +878,132 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 col.label(text='Backdrop:')
                 split.prop(bkdrp_0, 'default_value', text = "")
 
+
+        ######### Armature #########
+        row = layout.row()
+        bn_icon = 'HANDLETYPE_AUTO_CLAMP_VEC'
+        icon = 'DOWNARROW_HLT' if context.scene.subpanel_bn else 'RIGHTARROW'
+        row.prop(context.scene, 'subpanel_bn', icon=icon, icon_only=True)
+        row.label(text='Animation (Advanced)', icon='OUTLINER_DATA_ARMATURE')
+        # some data on the subpanel
+        if context.scene.subpanel_bn:
+            box = layout.box()
+            box.operator('object.url_handler', text = "How to Use", icon='HELP').rbx_link = "Guide_Armature"
+            icon = 'DOWNARROW_HLT' if context.scene.subpanel_bn_st1 else 'RIGHTARROW'
+            box.prop(context.scene, 'subpanel_bn_st1', icon=icon, icon_only=False, text='Step-1 (Add Armature)')
+            # some data on the subpanel
+            if context.scene.subpanel_bn_st1:               
+                 
+                bn_exist = 0 
+                try:
+                    for i in bpy.context.selected_objects:
+                        if i.type == 'ARMATURE':
+                            bn_exist = 1
+                            break
+                except:
+                    pass
+                arma_names = ['R15 Blocky','R15 Boy','R15 Girl','R15 Woman','Rthro Boy','Rthro Girl','Rthro Normal','Rthro Slender'] 
+                for x in range(len(arma_names)):
+                    split = box.split(factor = 0.08)
+                    col = split.column(align = True)
+                    col.label(text='')
+                    split.operator('object.button_bn', text = arma_names[x] + " Armature", icon='IMPORT').bn = arma_names[x] + '_arma'
+
+                if bn_exist == 1:             
+                    #box = layout.box()
+                    split = box.split(factor = 0.5)
+                    col = split.column(align = True)
+                    col.label(text='Show Bones:')
+                    split.prop(context.object,'show_in_front')
+            
+            ##### STEP-2 #####    
+            box = layout.box()
+            box.label(text='Step-2 (Prepare Mesh):', icon=bn_icon)
+            box.operator('object.button_bn', text = "Recalculate Normals", icon='NORMALS_FACE').bn = 'normal'
+            if msh_selection:
+                box.label(text=msh_selection, icon='ERROR')
+            if msh_error == 'done_nml':
+                box.label(text='Recalucalting Done!', icon='CHECKMARK')             
+            
+            ##### STEP-3 #####
+            #CALCULATE DOUBLES
+            box = layout.box()
+            box.label(text='Step-3 (Double Vertices):', icon=bn_icon)            
+            msh_exist = 0 
+            dbls_msg = None
+            try:
+                if len(bpy.context.selected_objects) != 1:
+                    dbls_msg = 'Select 1 Object Only'
+                else:
+                    if bpy.context.selected_objects[0].type != 'MESH':
+                        dbls_msg = 'Object Must be a Mesh'
+                    else:
+                        msh_exist = 1
+                        dbls_msg = None
+            except:
+                pass 
+            if dbls_msg:
+                box.label(text=dbls_msg, icon='ERROR')
+                box.label(text='Doubles Found: ERROR!', icon='INFO')                            
+            if msh_exist == 1:
+                # Get the active mesh
+                me = bpy.context.object.data
+                distance = 0.0001 # remove doubles tolerance
+                # Get a BMesh representation
+                bm = bmesh.new()   # create an empty BMesh
+                bm.from_mesh(me)   # fill it in from a Mesh
+                len_bef = len(bm.verts)
+                bmesh.ops.remove_doubles(bm, verts=bm.verts, dist = distance)
+                len_af = len(bm.verts)
+                doubles = len_bef - len_af
+                bm.clear()
+                bm.free()  # free and prevent further access
+                box.label(text='Doubles Found: ' + str(doubles), icon='INFO')     
+            box.operator('object.button_bn', text = "Remove Double Vertices", icon='VERTEXSEL').bn = 'doubles'
+            if msh_selection:
+                box.label(text=msh_selection, icon='ERROR')
+            if msh_error == 'done_vts':  
+                box.label(text='Remove Doubles Done!', icon='CHECKMARK')
+            # MESH SMOOTHING #
+            msh_exist = 0 
+            try:
+                for i in bpy.context.selected_objects:
+                    if i.type == 'MESH':
+                        msh_exist = 1
+                        break
+            except:
+                pass                     
+            if msh_exist == 1:
+                box.label(text='(Optional):')             
+                split = box.split(factor = 0.6)
+                col = split.column(align = True)
+                col.label(text='Mesh Smoothing:')
+                split.prop(context.object.data,'use_auto_smooth', text='Auto')                
+            
+            ##### STEP-4 #####       
+            box = layout.box() 
+            box.label(text='Step-4:', icon=bn_icon)            
+            box.label(text="Adjust Bones in 'Edit Mode'")
+            box.label(text="If needed")
+            
+            ##### STEP-5 #####
+            box = layout.box()
+            box.label(text='Step-5:', icon=bn_icon)
+            box.label(text='Select Mesh + Bones, then Parent')
+            box.operator('object.button_bn', text = "Parent Bones and Mesh", icon='BONE_DATA').bn = 'parent'
+
+            if bn_selection:
+                box.label(text=bn_selection, icon='ERROR')
+            if bn_error:
+                if bn_error == 1:
+                    box.label(text='Error, need rectify Mesh', icon='ERROR')
+                if bn_error == 2:
+                    box.label(text='Parenting Done!', icon='CHECKMARK')
+                    box.label(text='Step-6 (Optional):', icon=bn_icon)
+                    box.label(text='You can also now export this')
+                    box.label(text='Model as .fbx to Mixamo for')
+                    box.label(text='animation. (No need redo bones)')
+                    box.operator('object.url_handler', text = "Go to Mixamo", icon='URL').rbx_link = "mixamo"
                         
         row = layout.row()
         row.label(text='          -------------------------------------  ') 
@@ -724,7 +1020,8 @@ classes = (
         RBX_BUTTON_HDRI,
         BUTTON_DMMY, 
         BUTTON_BNDS,
-        BUTTON_CMR, 
+        BUTTON_CMR,
+        BUTTON_BN, 
         TOOLBOX_MENU
         )
         
@@ -738,6 +1035,8 @@ def register():
     Scene.subpanel_bounds = BoolProperty(default=False)
     Scene.subpanel_dummy = BoolProperty(default=False)
     Scene.subpanel_cams = BoolProperty(default=False)
+    Scene.subpanel_bn = BoolProperty(default=False)
+    Scene.subpanel_bn_st1 = BoolProperty(default=False)
 
 
 
@@ -750,6 +1049,8 @@ def unregister():
     del Scene.subpanel_bounds
     del Scene.subpanel_dummy
     del Scene.subpanel_cams
+    del Scene.subpanel_bn
+    del Scene.subpanel_bn_st1
 
         
 

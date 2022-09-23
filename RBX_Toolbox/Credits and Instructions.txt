@@ -68,5 +68,17 @@ For now i only have one, if you have other templates do hit me up, i will includ
 
 2. Quick spawn of Animated Staging: 
 	Fully preset Animated Rotating Staging with camera and Lights (animation is cyclic)
+	
+	
+####################################			
+       Animation (Advanced):
+####################################
+
+1. Quick spawn of Armatures already adjusted for each character
+2. 1 click Normals Recalculate (Outside)
+3. 1 click cleaning Double vertices
+4. 1 click parenting (Auto Weight Mode)
+Instructions are inside the toolbox Animation tab
+Credits: Armature basic were taken from Blender Built-in Rigify addon and modified for Roblox models.
 
 

@@ -546,6 +546,7 @@ class BUTTON_BN(bpy.types.Operator):
                     elif bpy.context.mode == 'EDIT_MESH':
                         bpy.ops.mesh.select_all(action='SELECT')
                     bpy.ops.mesh.remove_doubles()
+                    bpy.ops.mesh.normals_make_consistent(inside=False)
                     bpy.ops.object.editmode_toggle()
                     msh_error = 'done_vts'
                     print("Doubles Removed")
@@ -893,7 +894,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
             box.prop(context.scene, 'subpanel_bn_st1', icon=icon, icon_only=False, text='Step-1 (Add Armature)')
             # some data on the subpanel
             if context.scene.subpanel_bn_st1:               
-                 
+                ##### STEP-1 #####  
                 bn_exist = 0 
                 try:
                     for i in bpy.context.selected_objects:
@@ -915,6 +916,9 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     col = split.column(align = True)
                     col.label(text='Show Bones:')
                     split.prop(context.object,'show_in_front')
+                box.label(text='          -------------------------------------  ')
+                box.label(text='You may try from Step-4')
+                box.label(text='If no work - back to Step-2')
             
             ##### STEP-2 #####    
             box = layout.box()
@@ -933,7 +937,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
             dbls_msg = None
             try:
                 if len(bpy.context.selected_objects) != 1:
-                    dbls_msg = 'Select 1 Object Only'
+                    dbls_msg = 'Select 1 Object'
                 else:
                     if bpy.context.selected_objects[0].type != 'MESH':
                         dbls_msg = 'Object Must be a Mesh'
@@ -941,24 +945,30 @@ class TOOLBOX_MENU(bpy.types.Panel):
                         msh_exist = 1
                         dbls_msg = None
             except:
-                pass 
+                pass    
+            if msh_exist == 1:
+                try:
+                    # Get the active mesh
+                    me = bpy.context.object.data
+                except:
+                    pass #dbls_msg = 'No Mesh Selected'
+                else:
+                    dbls_msg = None
+                    distance = 0.0001 # remove doubles tolerance
+                    # Get a BMesh representation
+                    bm = bmesh.new()   # create an empty BMesh
+                    bm.from_mesh(me)   # fill it in from a Mesh
+                    len_bef = len(bm.verts)
+                    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist = distance)
+                    len_af = len(bm.verts)
+                    doubles = len_bef - len_af
+                    bm.clear()
+                    bm.free()  # free and prevent further access
+                    box.label(text='Doubles Found: ' + str(doubles), icon='INFO')
             if dbls_msg:
                 box.label(text=dbls_msg, icon='ERROR')
-                box.label(text='Doubles Found: ERROR!', icon='INFO')                            
-            if msh_exist == 1:
-                # Get the active mesh
-                me = bpy.context.object.data
-                distance = 0.0001 # remove doubles tolerance
-                # Get a BMesh representation
-                bm = bmesh.new()   # create an empty BMesh
-                bm.from_mesh(me)   # fill it in from a Mesh
-                len_bef = len(bm.verts)
-                bmesh.ops.remove_doubles(bm, verts=bm.verts, dist = distance)
-                len_af = len(bm.verts)
-                doubles = len_bef - len_af
-                bm.clear()
-                bm.free()  # free and prevent further access
-                box.label(text='Doubles Found: ' + str(doubles), icon='INFO')     
+                box.label(text='Doubles Found: ERROR!', icon='INFO')                     
+                 
             box.operator('object.button_bn', text = "Remove Double Vertices", icon='VERTEXSEL').bn = 'doubles'
             if msh_selection:
                 box.label(text=msh_selection, icon='ERROR')
@@ -974,11 +984,14 @@ class TOOLBOX_MENU(bpy.types.Panel):
             except:
                 pass                     
             if msh_exist == 1:
-                box.label(text='(Optional):')             
+                box.label(text='(Optional, Might help look better):')             
                 split = box.split(factor = 0.6)
                 col = split.column(align = True)
                 col.label(text='Mesh Smoothing:')
-                split.prop(context.object.data,'use_auto_smooth', text='Auto')                
+                try:
+                    split.prop(context.object.data,'use_auto_smooth', text='Auto') 
+                except:
+                    pass               
             
             ##### STEP-4 #####       
             box = layout.box() 

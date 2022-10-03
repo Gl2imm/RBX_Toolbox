@@ -22,3 +22,6 @@ v.1.3:
 	The parented bones are also recognized by Mixamo, so you can export model as FBX and get custom animation from there (No need redo bones)
 	Instructions are inside Tollbox Anmation tab
 	Restart Blender after update
+v.1.4:
+	Added:
+	Avatar Editor Room background full setup with lights, camera and world settings.

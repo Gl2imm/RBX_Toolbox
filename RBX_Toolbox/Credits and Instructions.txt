@@ -69,6 +69,9 @@ For now i only have one, if you have other templates do hit me up, i will includ
 2. Quick spawn of Animated Staging: 
 	Fully preset Animated Rotating Staging with camera and Lights (animation is cyclic)
 	
+3. Quick spawn of Avatar Editor Room Background: 
+	Fully preset Avatar Editor Room Background with camera and Lights	
+	
 	
 ####################################			
        Animation (Advanced):

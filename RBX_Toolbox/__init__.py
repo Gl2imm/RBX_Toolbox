@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (1, 3),
+    "version": (1, 4),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -34,7 +34,7 @@ import platform
 import bmesh
 
 ## Toolbox vars ##
-ver = "v.1.3"
+ver = "v.1.4"
 lts_ver = ver
 
 mode = 1 #0 - Test Mode; 1 - Live mode
@@ -386,7 +386,7 @@ class BUTTON_CMR(bpy.types.Operator):
         cmr = self.cmr
         cmr_spl = cmr.rsplit('_',1)
         
-        #### Apend Cameras ####
+        #### Apend Cameras Stage ####
         if cmr == 'append':               
             if bpy.data.objects.get('Camera_F') == None:
                 bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_collection, filename ='Cameras')
@@ -396,7 +396,23 @@ class BUTTON_CMR(bpy.types.Operator):
                 print("Cameras Setup Spawned")
             else:
                 print("Cameras Setup Already Exist")
-                
+
+        #### Apend Cameras Stage ####
+        if cmr == 'edtr_append':               
+            if bpy.data.objects.get('Avatar Editor Camera') == None:
+                bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_collection, filename ='Avatar Editor Room (New)')
+                bpy.context.scene.render.resolution_x = 1080
+                bpy.context.scene.render.resolution_y = 1080
+                bpy.context.scene.render.resolution_percentage = 100
+                print("Avatar Editor Room Setup Spawned")
+            else:
+                print("Avatar Editor Room Setup Already Exist") 
+            if bpy.context.scene.world != 'Avatar Editor Stage (New) World':
+                if 'Avatar Editor Stage (New) World' not in bpy.data.worlds:
+                    bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_world, filename ='Avatar Editor Stage (New) World')
+                rbx_hdri = bpy.data.worlds['Avatar Editor Stage (New) World']
+                scene.world = rbx_hdri
+            
         
         #### Set Active ####        
         if cmr_spl[-1] == 'active':
@@ -433,7 +449,18 @@ class BUTTON_CMR(bpy.types.Operator):
             bpy.data.objects['Staging Camera'].select_set(True)
             bpy.context.view_layer.objects.active = bpy.data.objects['Staging Camera']
             print("'Staging Camera' Set as Active")
-            del cam            
+            del cam 
+            
+        #### Set Active (Avatar Editor Room cam) ####        
+        if cmr == 'edtr-active':
+            cam = bpy.data.objects['Avatar Editor Camera']
+            bpy.data.scenes['Scene'].camera = cam
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.context.view_layer.objects.active = None
+            bpy.data.objects['Avatar Editor Camera'].select_set(True)
+            bpy.context.view_layer.objects.active = bpy.data.objects['Avatar Editor Camera']
+            print("'Avatar Editor Camera' Set as Active")
+            del cam                         
                                                                                                         
         return {'FINISHED'}      
 
@@ -879,6 +906,19 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 col.label(text='Backdrop:')
                 split.prop(bkdrp_0, 'default_value', text = "")
 
+            ##### Avatar Editor Room (New) #####
+            box.operator('object.button_cmr', text = "Add Avatar Editor Room", icon='IMPORT').cmr = 'edtr_append'                        
+            try:
+                bpy.data.objects['Avatar Editor Camera']
+            except:
+                pass
+            else:               
+                #box = layout.box()
+                split = box.split(factor = 0.5)
+                col = split.column(align = True)
+                col.label(text='Camera:')
+                split.operator('object.button_cmr', text = "Set Active").cmr = 'edtr-active'
+                
 
         ######### Armature #########
         row = layout.row()

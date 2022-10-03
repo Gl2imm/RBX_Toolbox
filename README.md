@@ -15,6 +15,12 @@ If you want to have additional effects, templates, dummies, etc - pls share it i
 ### Spawn Dummies and Their Armatures in 1 click
 ![Dummies](https://i.ibb.co/S5WNcrh/RBX-2.png)
 
+### Spawn Animated (rotating) Staging fully preset with camera and light
+![Staging](https://i.ibb.co/0B6qg6f/stage.png)
+
+### Spawn Roblox Avatar Editor Room Background fully preset with camera and light
+![Avatar Room](https://i.ibb.co/DQVHtHb/avtr-edtr-rm.png)
+
 ### Below are the tools currently available in Toolbox
 ![Tools](https://i.ibb.co/McBc15V/RBX-3.png)
 
@@ -37,7 +43,9 @@ Quick spawn of 4 cameras that already preset to following:
 Front, Back, Left, Right views  
 1080 x 1080 resolution (you can change that)  
 Quick set each camera as active and preview it (adjust)  
-Quick render selected view  
+Quick render selected view   
+Fully preset Animated (Rotating) Stage with camera and light  
+Fully preset Roblox Avatar editor background with camera and light  
 
 - Animation (Advanced):  
 Quick spawn of Armatures already adjusted for each character  

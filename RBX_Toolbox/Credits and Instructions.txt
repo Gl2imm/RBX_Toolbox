@@ -85,3 +85,11 @@ Instructions are inside the toolbox Animation tab
 Credits: Armature basic were taken from Blender Built-in Rigify addon and modified for Roblox models.
 
 
+####################################			
+       Other Functions:
+####################################
+
+1. FBX Eport
+	This will do a few operation in 1 click: Apply all transform, Set Origin to Geometry, Preset FBX export settings for 1:1 model import in Studio
+
+

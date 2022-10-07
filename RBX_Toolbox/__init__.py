@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (1, 4),
+    "version": (1, 5),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -34,7 +34,7 @@ import platform
 import bmesh
 
 ## Toolbox vars ##
-ver = "v.1.4"
+ver = "v.1.5"
 lts_ver = ver
 
 mode = 1 #0 - Test Mode; 1 - Live mode
@@ -163,8 +163,28 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
         global lts_ver
         split_1 = full_text.split('536450223/')[1]
         lts_ver = split_1.split('</id>')[0]                     
-            
+
+
+############   OPERATORS   ##############    
+class RBX_OPERATORS(bpy.types.Operator):
+    bl_label = "RBX_OPERATORS"
+    bl_idname = "object.rbx_operators"
+    bl_options = {'REGISTER', 'UNDO'}
+    rbx_operator : bpy.props.StringProperty(name= "Added")
+
+    def execute(self, context):
+        rbx_operator = (self.rbx_operator)
+        
+        if rbx_operator == 'exp_fbx':
+            bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+            bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
+            bpy.ops.export_scene.fbx('INVOKE_DEFAULT', use_selection=True, object_types={'MESH'}, global_scale=0.01, bake_anim=False)
+
+
+        return {'FINISHED'}
     
+    
+        
 ############   URL HANDLER OPERATOR   ##############    
 class URL_HANDLER(bpy.types.Operator):
     bl_label = "URL_HANDLER"
@@ -465,7 +485,7 @@ class BUTTON_CMR(bpy.types.Operator):
         return {'FINISHED'}      
 
  
- ######### Armature Buttons ###########    
+######### Armature Buttons ###########    
 class BUTTON_BN(bpy.types.Operator):
     bl_label = "BUTTON_BN"
     bl_idname = "object.button_bn"
@@ -1059,7 +1079,37 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     box.label(text='Model as .fbx to Mixamo for')
                     box.label(text='animation. (No need redo bones)')
                     box.operator('object.url_handler', text = "Go to Mixamo", icon='URL').rbx_link = "mixamo"
-                        
+        
+        #### Other Functions ####
+        row = layout.row()
+        row = layout.row()
+        row = layout.row()
+
+                
+        ######### Armature #########
+        row = layout.row()
+        icon = 'DOWNARROW_HLT' if context.scene.subpanel_other else 'RIGHTARROW'
+        row.prop(context.scene, 'subpanel_other', icon=icon, icon_only=True)
+        row.label(text='Other Functions:', icon='COLLAPSEMENU')
+        # some data on the subpanel
+        if context.scene.subpanel_other:
+
+            #### Export FBX ####
+            box = layout.box()
+
+            try:
+                if len(bpy.context.selected_objects) == 1:        
+                    box.operator('object.rbx_operators', text = "Export FBX", icon='EXPORT').rbx_operator = 'exp_fbx'
+                    box.label(text='What it does:')
+                    box.label(text='1. Apply all transforms')
+                    box.label(text='2. Set Origin to Geometry')
+                    box.label(text='3. Preset Export Settings')
+                else:
+                    box.label(text='Select one object', icon='ERROR')
+            except:
+                box.label(text='Select one object', icon='ERROR')
+        
+        #### Discord Support Server ####                
         row = layout.row()
         row.label(text='          -------------------------------------  ') 
         row = layout.row()  
@@ -1070,6 +1120,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
 ##########################################
 classes = (
         RBXToolsPreferences,
+        RBX_OPERATORS,
         PROPERTIES_RBX, 
         URL_HANDLER,
         RBX_BUTTON_HDRI,
@@ -1092,6 +1143,7 @@ def register():
     Scene.subpanel_cams = BoolProperty(default=False)
     Scene.subpanel_bn = BoolProperty(default=False)
     Scene.subpanel_bn_st1 = BoolProperty(default=False)
+    Scene.subpanel_other = BoolProperty(default=False)
 
 
 
@@ -1106,6 +1158,7 @@ def unregister():
     del Scene.subpanel_cams
     del Scene.subpanel_bn
     del Scene.subpanel_bn_st1
+    del Scene.subpanel_other
 
         
 

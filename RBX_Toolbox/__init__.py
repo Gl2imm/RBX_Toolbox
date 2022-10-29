@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (1, 5),
+    "version": (1, 6),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -34,11 +34,11 @@ import platform
 import bmesh
 
 ## Toolbox vars ##
-ver = "v.1.5"
+ver = "v.1.6"
 lts_ver = ver
 
 mode = 1 #0 - Test Mode; 1 - Live mode
-wh =0   #0 - W; 1 - H
+wh =1   #0 - W; 1 - H
 
 
 if mode == 0:
@@ -527,7 +527,7 @@ class BUTTON_BN(bpy.types.Operator):
             ], 
             'Rthro Slender': [
                 {'name': 'Character_bones_rth_slender'}          
-            ]                                                                                                                                                             
+            ]                                                                                                                                                          
             }          
         
         #### Apend Armature ####
@@ -817,14 +817,28 @@ class TOOLBOX_MENU(bpy.types.Panel):
         if context.scene.subpanel_dummy:
             box = layout.box()
             # Dummies
+            box.label(text='R15 Dummies')
             box.operator('object.button_dmmy', text = "R15 Blocky").dmy = "R15 Blocky"
             box.operator('object.button_dmmy', text = "R15 Boy").dmy = "R15 Boy"
             box.operator('object.button_dmmy', text = "R15 Girl").dmy = "R15 Girl"
             box.operator('object.button_dmmy', text = "R15 Woman").dmy = "R15 Woman"
+            box.label(text='4.0 Dummies')
+            box.operator('object.button_dmmy', text = "Lin").dmy = "4.0 Lin"
+            box.operator('object.button_dmmy', text = "Oakley").dmy = "4.0 Oakley"
+            box.label(text='3.0 Dummies')
+            box.operator('object.button_dmmy', text = "Man").dmy = "3.0 Man"
+            box.operator('object.button_dmmy', text = "Woman").dmy = "3.0 Woman"
+            box.label(text='2.0 Dummies')
+            box.operator('object.button_dmmy', text = "Robloxian 2.0").dmy = "Robloxian 2.0"
+            box.label(text='Neoclassic Dummies')
+            box.operator('object.button_dmmy', text = "Neoclassic Skyler").dmy = "Neoclassic Skyler"
+            box.label(text='Rthro Dummies')
             box.operator('object.button_dmmy', text = "Rthro Boy").dmy = "Rthro Boy"
             box.operator('object.button_dmmy', text = "Rthro Girl").dmy = "Rthro Girl"
             box.operator('object.button_dmmy', text = "Rthro Normal").dmy = "Rthro Normal"
             box.operator('object.button_dmmy', text = "Rthro Slender").dmy = "Rthro Slender"
+            box.label(text='R6 Dummies (1.0)')
+            box.operator('object.button_dmmy', text = "R6 Blocky").dmy = "R6 (1.0)"
                         
         
         ######### Cameras #########
@@ -1086,7 +1100,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
         row = layout.row()
 
                 
-        ######### Armature #########
+        ######### Other Functions #########
         row = layout.row()
         icon = 'DOWNARROW_HLT' if context.scene.subpanel_other else 'RIGHTARROW'
         row.prop(context.scene, 'subpanel_other', icon=icon, icon_only=True)
@@ -1108,6 +1122,10 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     box.label(text='Select one object', icon='ERROR')
             except:
                 box.label(text='Select one object', icon='ERROR')
+            
+            box.label(text='')
+            box.label(text='Camera', icon='OUTLINER_DATA_CAMERA')
+            box.prop(bpy.context.space_data, 'lock_camera', text='Lock active Camera to View')
         
         #### Discord Support Server ####                
         row = layout.row()

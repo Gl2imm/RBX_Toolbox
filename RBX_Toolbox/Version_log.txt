@@ -33,3 +33,9 @@ v.1.5:
 	Added:
 	FBX Export. This will do a few operation in 1 click: Apply all transform, Set Origin to Geometry, Preset FBX export settings for 1:1 model import in Studio
 	Restart Blender after update
+v.1.6:
+	Added:
+	7 New Dummies: 1.0 Blocky, 2.0 Robloxian, 3.0 Man and Woman, 4.0 Lin and Oakley, Neoclassic Skyler 
+	Other Functions:
+	Quick access option to Lock active Camera to View (same option as in View Tab, but you dont have to switch to it now)
+	Restart Blender after update

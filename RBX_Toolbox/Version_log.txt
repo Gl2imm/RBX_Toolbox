@@ -38,4 +38,22 @@ v.1.6:
 	7 New Dummies: 1.0 Blocky, 2.0 Robloxian, 3.0 Man and Woman, 4.0 Lin and Oakley, Neoclassic Skyler 
 	Other Functions:
 	Quick access option to Lock active Camera to View (same option as in View Tab, but you dont have to switch to it now)
+	Show face orientation button
 	Restart Blender after update
+v.2.0:
+	Fix:
+	HDRI button Error
+	Various interface and code improvements
+	UGC Boundary items: now it will rotate facing front, materials are added for dummies, have option to hide dummy (only boundary shown).
+	Added:
+	Roblox Character Import: Import any character directly to Blender
+	This addon is developed by https://twitter.com/Zeblyno (@Zeblyno), i had readjusted some of the things inside, so you do not need to touch up the meshes after import. There is no license usage on this addon and the developer last seen a year ago, i had asked him for permissons to use, so this feature will depends on his responce. If anyone knows him and can contact - pls let him know about this.
+	Quick Operations:
+	Backface Culling - quick On or Off
+	Recalculate Normals - added buttons to flip normals inside or outside
+	Layered Clothing Templates:
+	Layered Cloth Dummies (Cages): Default Mannequin, Roblox Boy, Roblox Girl, Roblox Man, Roblox Woman, Classic Male, Classic Female, Neo Classic Male, Neo Classic Female, Rthro Realistic Male, Rthro Realistic Female, Bazooka Bones, Magma Fiend, Skelly, Station Visitor
+	Layered Cloth Samples: Female Hair, Hoodie, Cargo Pants, Skate, Tennis
+	Restart Blender after update
+	
+	

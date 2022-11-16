@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (1, 6),
+    "version": (2, 0),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -25,20 +25,27 @@ bl_info = {
 
 import bpy
 import os
-from bpy.types import Scene
-from bpy.props import (BoolProperty,FloatProperty)
+from bpy.types import (Scene,Panel,PropertyGroup)
+from bpy.props import (BoolProperty,FloatProperty,StringProperty)
 import requests
 import webbrowser
 import sys
 import platform
 import bmesh
 
+import zipfile
+import io
+import mathutils
+from bpy.props import FloatVectorProperty
+from mathutils import Vector
+from bpy_extras.object_utils import AddObjectHelper, object_data_add
+
 ## Toolbox vars ##
-ver = "v.1.6"
+ver = "v.2.0"
 lts_ver = ver
 
 mode = 1 #0 - Test Mode; 1 - Live mode
-wh =1   #0 - W; 1 - H
+wh =0   #0 - W; 1 - H
 
 
 if mode == 0:
@@ -86,7 +93,7 @@ bn_selection = None
 bn_error = None
 msh_selection = None
 msh_error = None
-
+rbx_char_error = None
 
 print("**********************************************")
 print("OS Platform: " + platform.system())
@@ -137,14 +144,129 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
                  ('OP2', "Sky 2", ""),
                  ('OP3', "Sky 3", "") 
                 ]
-        )        
+        ) 
     
-    ## not in use ##
-    bool : BoolProperty(
-    name="World Transparency",
-    description="World Transparency property",
-    default = False
+    ### NORMALS ###    
+    rbx_face_enum : bpy.props.EnumProperty(
+        name = "Faces",
+        description = "Recalculate Faces",
+        default='OP1',
+        items = [('OP1', "Selected Only", ""),
+                 ('OP2', "All Faces", "")
+                ]
+        )
+         
+
+    ## UGC Boundaries: Hide Dummy ##
+    rbx_bnds_hide : BoolProperty(
+    name="Hide Dummy",
+    description="Hide Dummy property",
+    default = True
+    )  
+    
+    
+    ### UGC Boundaries ###    
+    rbx_bnds_enum : bpy.props.EnumProperty(
+        name = "Boundaries",
+        description = "Boundaries spawn",
+        default='OP1',
+        items = [('OP1', "Hat", ""),
+                 ('OP2', "Hair", ""),
+                 ('OP3', "Face Center", ""),
+                 ('OP4', "Face Front", ""),
+                 ('OP5', "Neck", ""),
+                 ('OP6', "Front", ""),
+                 ('OP7', "Back", ""),
+                 ('OP8', "Shoulder Right", ""),
+                 ('OP9', "Shoulder Left", ""),
+                 ('OP10', "Shoulder Neck", ""),
+                 ('OP11', "Waist Back", ""),
+                 ('OP12', "Waist Front", ""),
+                 ('OP13', "Waist Center", "")
+                ]
+        )     
+
+    ### Dummies ###    
+    rbx_dum_enum : bpy.props.EnumProperty(
+        name = "Dummies",
+        description = "Dummies",
+        default='OP1',
+        items = [('OP1', "R15: Blocky", ""),
+                 ('OP2', "R15: Boy", ""),
+                 ('OP3', "R15: Girl", ""),
+                 ('OP4', "R15: Woman", ""),
+                 ('OP5', "4.0: Lin", ""),
+                 ('OP6', "4.0: Oakley", ""),
+                 ('OP7', "3.0: Man", ""),
+                 ('OP8', "3.0: Woman", ""),
+                 ('OP9', "2.0: Robloxian 2.0", ""),
+                 ('OP10', "Neoclassic: Skyler", ""),
+                 ('OP11', "Rthro: Boy", ""),
+                 ('OP12', "Rthro: Girl", ""),
+                 ('OP13', "Rthro: Normal", ""),
+                 ('OP14', "Rthro: Slender", ""),
+                 ('OP15', "R6: Blocky", ""),
+                ]
+        ) 
+        
+        
+    ### Layered Cloth Dummies ###    
+    rbx_lc_dum_enum : bpy.props.EnumProperty(
+        name = "LC Dummies",
+        description = "Layered Cloth Dummies",
+        default='OP1',
+        items = [('OP1', "Default Mannequin", ""),
+                 ('OP2', "Roblox Boy", ""),
+                 ('OP3', "Roblox Girl", ""),
+                 ('OP4', "Roblox Man", ""),
+                 ('OP5', "Roblox Woman", ""),
+                 ('OP6', "Classic Male", ""),
+                 ('OP7', "Classic Female", ""),
+                 ('OP8', "Neo Classic Male", ""),
+                 ('OP9', "Neo Classic Female", ""),
+                 ('OP10', "Rthro Realistic Male", ""),
+                 ('OP11', "Rthro Realistic Female", ""),
+                 ('OP12', "Bazooka Bones", ""),
+                 ('OP13', "Magma Fiend", ""),
+                 ('OP14', "Skelly", ""),
+                 ('OP15', "Station Visitor", "")
+                ]
+        ) 
+        
+    ### Layered Cloth Samples ###    
+    rbx_lc_spl_enum : bpy.props.EnumProperty(
+        name = "LC Samples",
+        description = "Layered Cloth Samples",
+        default='OP1',
+        items = [('OP1', "Hair: Female Hair", ""),
+                 ('OP2', "Jacket: Hoodie", ""),
+                 ('OP3', "Pants: Cargo Pants", ""),
+                 ('OP4', "Shoe: Skate", ""),
+                 ('OP5', "Skirt: Tennis", "")
+                ]
+        )                 
+    
+    ## Other Functions: Origin to Geometry ##
+    rbx_of_orig : BoolProperty(
+    name="Origin to Geometry",
+    description="Origin to Geometry property",
+    default = True
     )
+    
+    ## Other Functions: Apply all Transforms ##
+    rbx_of_trsf : BoolProperty(
+    name="Apply all Transforms",
+    description="Apply all Transforms property",
+    default = True
+    ) 
+    
+    ## Import Character ##
+    rbx_username: StringProperty(
+        name="Username",
+        description="Username of the character to import",
+        default="nicolinooAT",
+        maxlen=100,
+    )       
     
     ## not in use just for display in test mode##
     recolor_folder: bpy.props.StringProperty(name="Folder",
@@ -173,12 +295,20 @@ class RBX_OPERATORS(bpy.types.Operator):
     rbx_operator : bpy.props.StringProperty(name= "Added")
 
     def execute(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs        
         rbx_operator = (self.rbx_operator)
-        
+                    
         if rbx_operator == 'exp_fbx':
-            bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-            bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
+            if rbx_prefs.rbx_of_trsf == True:
+                bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+            if rbx_prefs.rbx_of_orig == True:
+                bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
             bpy.ops.export_scene.fbx('INVOKE_DEFAULT', use_selection=True, object_types={'MESH'}, global_scale=0.01, bake_anim=False)
+            
+        if rbx_operator == 'set_unit': 
+            bpy.context.scene.unit_settings.length_unit = 'CENTIMETERS'
+            bpy.context.scene.unit_settings.scale_length = 0.01
 
 
         return {'FINISHED'}
@@ -204,7 +334,16 @@ class URL_HANDLER(bpy.types.Operator):
             webbrowser.open_new("https://discord.gg/gFa4mY7")   
             
         if rbx_link == "mixamo":
-            webbrowser.open_new("https://www.mixamo.com/")                       
+            webbrowser.open_new("https://www.mixamo.com/") 
+            
+        if rbx_link == "rbx github":
+            webbrowser.open_new("https://github.com/Roblox/avatar") 
+            
+        if rbx_link == "zeb twitter":
+            webbrowser.open_new("https://twitter.com/Zeblyno")
+            
+        if rbx_link == "zeb site":
+            webbrowser.open_new("https://zebrarblx.xyz/")                                                 
 
         for x in range(len(rbx_guides)):
             if rbx_link == rbx_guides[x]:
@@ -299,6 +438,71 @@ class RBX_BUTTON_HDRI(bpy.types.Operator):
         return {'FINISHED'}  
 
 
+############   IMPORT CHARACTER   ############## 
+class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
+    """Create a new Mesh Object"""
+    bl_idname = "object.add_character"
+    bl_label = "Add Roblox Character"
+    bl_options = {'REGISTER', 'UNDO'}
+    rbx_char : bpy.props.StringProperty(name= "Added")
+
+    def execute(self, context):
+        scene = context.scene
+        rbx_char = self.rbx_char
+        rbx_prefs = scene.rbx_prefs        
+        rbx_username = rbx_prefs.rbx_username
+        url = "https://zebrarblx.xyz/tools/character-downloader?user=%s" % rbx_username
+        rbx_char_path = bpy.path.abspath("//Imported_Characters") + fbs + rbx_username
+        global rbx_char_error
+        
+        
+        if rbx_char == 'import':
+            if not os.path.exists(rbx_char_path):
+                os.makedirs(rbx_char_path)
+            
+            r = requests.get(url, allow_redirects=True)
+            if not r or not r.content:
+                return
+
+            f = io.BytesIO(r.content)
+            
+            try:
+                archive = zipfile.ZipFile(f, "r")
+            except:
+                rbx_char_error = 1
+            else:
+                rbx_char_error = None
+                archive.extractall(rbx_char_path)
+
+                imported_obj = bpy.ops.import_scene.obj(filepath=rbx_char_path + ("/%s.obj" % rbx_username))
+                
+                ### Selecting Character ###
+                rbx_object = bpy.context.selected_objects[0]
+                bpy.ops.object.select_all(action='DESELECT')
+                bpy.context.view_layer.objects.active = None
+                bpy.data.objects[rbx_object.name].select_set(True)
+                bpy.context.view_layer.objects.active = bpy.data.objects[rbx_object.name]
+                                        
+                ### Position Character ###
+                bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
+                bpy.ops.view3d.snap_selected_to_cursor(use_offset=False)
+                bpy.ops.transform.translate(value=(0, 0, 3.28467), orient_axis_ortho='X', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True))
+                bpy.ops.transform.rotate(value=3.14159, orient_axis='Z', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True))
+                
+                ### Setting up materials ###
+                for rbx_mat_slot in bpy.context.object.material_slots:
+                    rbx_mat_slot.material.show_transparent_back = False
+                    rbx_mat_slot.material.use_backface_culling = True
+        
+        if rbx_char == 'folder':
+            if not os.path.exists(rbx_char_path):
+                pass
+            else:
+                os.startfile(os.path.dirname(rbx_char_path))
+        
+        return {'FINISHED'}
+    
+    
 ######### Dummy Buttons ###########    
 class BUTTON_DMMY(bpy.types.Operator):
     bl_label = "BUTTON_DMMY"
@@ -307,13 +511,127 @@ class BUTTON_DMMY(bpy.types.Operator):
     dmy : bpy.props.StringProperty(name= "Added")
 
     def execute(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs         
         dmy = self.dmy
+        dmy_spwn = None
+        rbx_mode = None
+        
+        dum_list = [
+                        'R15 Blocky',
+                        'R15 Boy',
+                        'R15 Girl',
+                        'R15 Woman',
+                        '4.0 Lin',
+                        '4.0 Oakley',
+                        '3.0 Man',
+                        '3.0 Woman',
+                        'Robloxian 2.0',
+                        'Neoclassic Skyler',
+                        'Rthro Boy',
+                        'Rthro Girl',
+                        'Rthro Normal',
+                        'Rthro Slender',
+                        'R6 (1.0)'
+                        ]  
+            
+        if bpy.context.mode == 'EDIT_MESH':
+            bpy.ops.object.editmode_toggle()
+            rbx_mode = 1
+            rbx_sel = bpy.context.selected_objects
+            
+                            
+        for x in range(len(dum_list)):
+            if rbx_prefs.rbx_dum_enum == 'OP' + str(x+1):
+                dmy_spwn = dum_list[x]                  
 
-        bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_object, filename =dmy)
-        print(dmy + " Spawned")
+        bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_object, filename =dmy_spwn)
+        
+        if rbx_mode == 1:
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.data.objects[rbx_sel[0].name].select_set(True)            
+            bpy.ops.object.editmode_toggle()
+        
+        print(dmy_spwn + " Dummy Spawned")
            
         
-        return {'FINISHED'}          
+        return {'FINISHED'} 
+    
+
+######### Layered Clothing Buttons ###########    
+class RBX_BUTTON_LC(bpy.types.Operator):
+    bl_label = "RBX_BUTTON_LC"
+    bl_idname = "object.rbx_button_lc"
+    bl_options = {'REGISTER', 'UNDO'}
+    rbx_lc : bpy.props.StringProperty(name= "Added")
+
+    def execute(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs        
+        rbx_lc = self.rbx_lc
+        rbx_lc_spwn = None 
+        rbx_mode = None
+        
+        lc_dum_list = [
+                        'Default Mannequin',
+                        'Roblox Boy',
+                        'Roblox Girl',
+                        'Roblox Man',
+                        'Roblox Woman',
+                        'Classic Male',
+                        'Classic Female',
+                        'Neo Classic Male',
+                        'Neo Classic Female',
+                        'Rthro Realistic Male',
+                        'Rthro Realistic Female',
+                        'Bazooka Bones',
+                        'Magma Fiend',
+                        'Skelly',
+                        'Station Visitor'
+                        ] 
+                        
+        lc_spl_list = [
+                        'Female Hair',
+                        'Hoodie',
+                        'Cargo Pants',
+                        'Skate',
+                        'Tennis'
+                        ]                             
+        
+        
+        if bpy.context.mode == 'EDIT_MESH':
+            bpy.ops.object.editmode_toggle()
+            rbx_mode = 1
+            rbx_sel = bpy.context.selected_objects
+
+        if rbx_lc == 'sample':
+            for x in range(len(lc_spl_list)):
+                if rbx_prefs.rbx_lc_spl_enum == 'OP' + str(x+1):
+                    rbx_lc_spwn = lc_spl_list[x]
+            bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_collection, filename =rbx_lc_spwn) 
+            bpy.data.collections[rbx_lc_spwn].hide_viewport = False
+            print(rbx_lc_spwn + " Sample Spawned") 
+        else:
+            for x in range(len(lc_dum_list)):
+                if rbx_prefs.rbx_lc_dum_enum == 'OP' + str(x+1):
+                    rbx_lc_spwn = lc_dum_list[x] + rbx_lc     
+                           
+
+            bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_collection, filename =rbx_lc_spwn)
+            
+            rbx_lc_spwn_split = rbx_lc_spwn.rsplit('_')
+            if rbx_lc == '_Arma':
+                print(rbx_lc_spwn_split[0] + " Inner Cage Spawned")
+            if rbx_lc == '_Cage':
+                print(rbx_lc_spwn_split[0] + " Outer Cage Spawned") 
+                
+        if rbx_mode == 1:
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.data.objects[rbx_sel[0].name].select_set(True)            
+            bpy.ops.object.editmode_toggle()
+                           
+        
+        return {'FINISHED'}              
         
         
 ######### Bounds Buttons ###########    
@@ -324,11 +642,17 @@ class BUTTON_BNDS(bpy.types.Operator):
     bnds : bpy.props.StringProperty(name= "Added")
 
     def execute(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs
         bnds = self.bnds
+        bnds_spwn = None
+        
+                
         if mode == 0:
             rbx_asset_folder = rbx_ast_fldr
         else:
             rbx_asset_folder = bpy.context.preferences.addons['RBX_Toolbox'].preferences.rbx_asset_folder
+        
             
         bnds_items = {
             'Hat': [
@@ -384,12 +708,52 @@ class BUTTON_BNDS(bpy.types.Operator):
                 {'name': 'Waist Center'}            
             ]                                                                                                                                                                   
             }  
-               
-        if bpy.data.objects.get(bnds) == None:
-            bpy.ops.wm.append(directory =rbx_asset_folder + ugc_bound_file + ap_object, files =bnds_items.get(bnds))
-            print(bnds + " Boundary Spawned")
+        
+        rbx_bnds_list = [
+                        'Hat',
+                        'Hair',
+                        'FaceCenter',
+                        'FaceFront',
+                        'Neck',
+                        'Front',
+                        'Back',
+                        'ShoulderRight',
+                        'ShoulderLeft',
+                        'ShoulderNeck',
+                        'WaistBack',
+                        'WaistFront',
+                        'WaistCenter'
+                        ] 
+                 
+                 
+        for x in range(len(rbx_bnds_list)):
+            if rbx_prefs.rbx_bnds_enum == 'OP' + str(x+1):
+                bnds_spwn = rbx_bnds_list[x]
+                    
+                                   
+        if bpy.data.objects.get(bnds_spwn) == None:
+            bpy.ops.wm.append(directory =rbx_asset_folder + ugc_bound_file + ap_object, files =bnds_items.get(bnds_spwn))
+            bpy.ops.transform.rotate(value=3.14159, orient_axis='Z', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True))
+            
+            ### Replace Material ###
+            rbx_sel = [obj.name for obj in bpy.context.selected_objects]
+            if bpy.data.materials.get('R15 Blocky') == None:
+                bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_material, filename ='R15 Blocky')
+            rbx_mat = bpy.data.materials.get('R15 Blocky')
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.data.objects[rbx_sel[2]].select_set(True)
+            for o in bpy.context.selected_objects:
+                if o.type == 'MESH':
+                    o.data.materials.clear()
+                    o.data.materials.append(rbx_mat) 
+                                     
+            ### Hide Dummy ###
+            if rbx_prefs.rbx_bnds_hide == True:
+                bpy.ops.object.hide_view_set(unselected=False)
+            
+            print(bnds_spwn + " Boundary Spawned")
         else:
-            print(bnds + " Boundary Already Exist")
+            print(bnds_spwn + " Boundary Already Exist")
         return {'FINISHED'}      
    
 
@@ -652,7 +1016,62 @@ class BUTTON_BN(bpy.types.Operator):
                     print("Bones Successfully Parented")
                     bn_error = 2
                                                                                                                     
+        return {'FINISHED'}   
+    
+    
+######### Other Functions ###########    
+class RBX_BUTTON_OF(bpy.types.Operator):
+    bl_label = "RBX_BUTTON_OF"
+    bl_idname = "object.rbx_button_of"
+    bl_options = {'REGISTER', 'UNDO'}
+    rbx_of : bpy.props.StringProperty(name= "Added")
+
+    def execute(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs
+        rbx_of = self.rbx_of
+        
+        def rbx_of_recalc():
+            if rbx_of == 'outside':
+                bpy.ops.mesh.normals_make_consistent(inside=False)
+            if rbx_of == 'inside':
+                bpy.ops.mesh.normals_make_consistent(inside=True)
+     
+ 
+        #### Recalculate Normals ####
+        rbx_sel = bpy.context.selected_objects
+        of_mesh = 0
+        if len(rbx_sel) < 1:
+            print("Nothing Selected")             
+        else:
+            for x in rbx_sel:
+                if x.type != 'MESH':
+                    print(x.type + " Selected. Pls Select Only Mesh")
+                    msh_selection = "Pls Select Only Mesh"
+                    of_mesh = 0
+                else:
+                    of_mesh = 1
+                    msh_selection = None
+            if of_mesh == 1:
+                if bpy.context.mode == 'OBJECT':
+                    bpy.ops.object.editmode_toggle()
+                    if rbx_prefs.rbx_face_enum == 'OP1':
+                        rbx_of_recalc()
+                    if rbx_prefs.rbx_face_enum == 'OP2':
+                        bpy.ops.mesh.select_all(action='SELECT')
+                        rbx_of_recalc()
+                    bpy.ops.object.editmode_toggle()               
+                elif bpy.context.mode == 'EDIT_MESH':
+                    if rbx_prefs.rbx_face_enum == 'OP1':
+                        rbx_of_recalc()
+                    if rbx_prefs.rbx_face_enum == 'OP2':
+                        bpy.ops.mesh.select_all(action='SELECT')
+                        rbx_of_recalc()
+
+            print("Normals Recalculated")
+                                                                                                                    
         return {'FINISHED'}      
+           
     
     #PANEL UI
 ####################################
@@ -675,7 +1094,19 @@ class TOOLBOX_MENU(bpy.types.Panel):
         if lts_ver > ver:
             box = layout.box()
             #box.label(text = "Addon Update Available: " + lts_ver, icon='IMPORT') 
-            box.operator('object.url_handler', text = "Update Available: " + lts_ver, icon='IMPORT').rbx_link = "update"      
+            box.operator('object.url_handler', text = "Update Available: " + lts_ver, icon='IMPORT').rbx_link = "update"    
+            
+        ######## Set Correct Units ########
+        '''
+        rbx_length = bpy.context.scene.unit_settings.scale_length
+        rbx_unit = bpy.context.scene.unit_settings.length_unit
+
+        if rbx_length == 1 or rbx_unit == 'METERS':
+            box = layout.box()
+            box.operator('object.rbx_operators', text = "Set Correct Units", icon='ERROR').rbx_operator = 'set_unit'
+            box.label(text = " (Length is 0.01;   Units is 'CM')")
+        '''
+           
                
         ######## ASSETS ########                
         if mode == 0:
@@ -747,16 +1178,17 @@ class TOOLBOX_MENU(bpy.types.Panel):
             else:
                 box.label(text='** Current World Controls: **')
                 wrld_0 = bpy.data.worlds[wrld].node_tree.nodes['Background'].inputs['Strength']
-                if wrld != 'World':
+                wrld_1 = None
+                if wrld == 'HDRI':
                     wrld_1 = bpy.data.worlds[wrld].node_tree.nodes['Mapping'].inputs['Rotation'] 
                 split = box.split(factor = 0.5)
                 col = split.column(align = True)
                 col.label(text='Brightness:')
                 split.prop(wrld_0, "default_value", text = "")
-                if wrld != 'World':
+                if wrld == 'HDRI':
                     split = box.split(factor = 0.5)
                     col = split.column(align = True)
-                    col.label(text='Rotation:')
+                    col.label(text='Rotationn:')
                     split.prop(wrld_1, "default_value", text = "") 
                     
                     
@@ -782,6 +1214,32 @@ class TOOLBOX_MENU(bpy.types.Panel):
             box.label(text='*You may setup your own')
             box.label(text=' Skybox in Shading tab')                  
 
+
+        ######### Import Character #########
+        if rbx_assets_set == 1:
+            row = layout.row()
+            icon = 'DOWNARROW_HLT' if context.scene.subpanel_imp_char else 'RIGHTARROW'
+            row.prop(context.scene, 'subpanel_imp_char', icon=icon, icon_only=True)
+            row.label(text='Import RBX Character', icon='IMPORT')
+            # some data on the subpanel
+            if context.scene.subpanel_imp_char:
+                box = layout.box()
+                #box.label(text = '')
+                box.prop(rbx_prefs, 'rbx_username', text ='')               
+                split = box.split(factor = 0.5)
+                col = split.column(align = True)            
+                col.operator('object.add_character', text = "Import").rbx_char = "import"
+                split.operator('object.add_character', text = "Open Folder").rbx_char = "folder"
+                
+                if rbx_char_error:
+                    box.label(text = 'Error. No Such Character!!', icon='ERROR')
+                
+                box.separator()
+                box.label(text = 'Addon developed by @Zeblyno')
+                box.label(text = 'modified by me')
+                box.operator('object.url_handler', text = "Zeblyno Twitter", icon='URL').rbx_link = "zeb twitter"
+                box.operator('object.url_handler', text = "Zeblyno Website", icon='URL').rbx_link = "zeb site"
+                
                                         
         ######### Bounds #########
         if rbx_assets_set == 1:
@@ -792,55 +1250,59 @@ class TOOLBOX_MENU(bpy.types.Panel):
             # some data on the subpanel
             if context.scene.subpanel_bounds:
                 box = layout.box()
-                # Bounds
-                box.operator('object.button_bnds', text = "Hat").bnds = "Hat"
-                box.operator('object.button_bnds', text = "Hair").bnds = "Hair"
-                box.operator('object.button_bnds', text = "Face Center").bnds = "FaceCenter"
-                box.operator('object.button_bnds', text = "Face Front").bnds = "FaceFront"
-                box.operator('object.button_bnds', text = "Neck").bnds = "Neck"
-                box.operator('object.button_bnds', text = "Front").bnds = "Front"
-                box.operator('object.button_bnds', text = "Back").bnds = "Back"
-                box.operator('object.button_bnds', text = "Shoulder Right").bnds = "ShoulderRight"
-                box.operator('object.button_bnds', text = "Shoulder Left").bnds = "ShoulderLeft"
-                box.operator('object.button_bnds', text = "Shoulder Neck").bnds = "ShoulderNeck"
-                box.operator('object.button_bnds', text = "Waist Back").bnds = "WaistBack"
-                box.operator('object.button_bnds', text = "Waist Front").bnds = "WaistFront"
-                box.operator('object.button_bnds', text = "Waist Center").bnds = "WaistCenter"
+                box.prop(rbx_prefs, 'rbx_bnds_enum', text ='Bounds')
+                box.prop(rbx_prefs, 'rbx_bnds_hide')                
+                split = box.split(factor = 0.5)
+                col = split.column(align = True)            
+                col.label(text = "")
+                split.operator('object.button_bnds', text = "Spawn")
+                
 
         
         ######### Dummies #########
-        row = layout.row()
+        row = layout.row()     
         icon = 'DOWNARROW_HLT' if context.scene.subpanel_dummy else 'RIGHTARROW'
         row.prop(context.scene, 'subpanel_dummy', icon=icon, icon_only=True)
         row.label(text='Dummy', icon='GHOST_DISABLED')
         # some data on the subpanel
         if context.scene.subpanel_dummy:
             box = layout.box()
-            # Dummies
-            box.label(text='R15 Dummies')
-            box.operator('object.button_dmmy', text = "R15 Blocky").dmy = "R15 Blocky"
-            box.operator('object.button_dmmy', text = "R15 Boy").dmy = "R15 Boy"
-            box.operator('object.button_dmmy', text = "R15 Girl").dmy = "R15 Girl"
-            box.operator('object.button_dmmy', text = "R15 Woman").dmy = "R15 Woman"
-            box.label(text='4.0 Dummies')
-            box.operator('object.button_dmmy', text = "Lin").dmy = "4.0 Lin"
-            box.operator('object.button_dmmy', text = "Oakley").dmy = "4.0 Oakley"
-            box.label(text='3.0 Dummies')
-            box.operator('object.button_dmmy', text = "Man").dmy = "3.0 Man"
-            box.operator('object.button_dmmy', text = "Woman").dmy = "3.0 Woman"
-            box.label(text='2.0 Dummies')
-            box.operator('object.button_dmmy', text = "Robloxian 2.0").dmy = "Robloxian 2.0"
-            box.label(text='Neoclassic Dummies')
-            box.operator('object.button_dmmy', text = "Neoclassic Skyler").dmy = "Neoclassic Skyler"
-            box.label(text='Rthro Dummies')
-            box.operator('object.button_dmmy', text = "Rthro Boy").dmy = "Rthro Boy"
-            box.operator('object.button_dmmy', text = "Rthro Girl").dmy = "Rthro Girl"
-            box.operator('object.button_dmmy', text = "Rthro Normal").dmy = "Rthro Normal"
-            box.operator('object.button_dmmy', text = "Rthro Slender").dmy = "Rthro Slender"
-            box.label(text='R6 Dummies (1.0)')
-            box.operator('object.button_dmmy', text = "R6 Blocky").dmy = "R6 (1.0)"
+            box.label(text = 'Dummies')
+            box.prop(rbx_prefs, 'rbx_dum_enum', text ='')
+            split = box.split(factor = 0.5)
+            col = split.column(align = True)            
+            col.label(text = "")            
+            split.operator('object.button_dmmy', text = "Spawn")
                         
-        
+ 
+        ######### Layered Cloth Dummies #########
+        row = layout.row()   
+        icon = 'DOWNARROW_HLT' if context.scene.subpanel_lc else 'RIGHTARROW'
+        row.prop(context.scene, 'subpanel_lc', icon=icon, icon_only=True)
+        row.label(text='Layered Cloth', icon='MATCLOTH')
+        # some data on the subpanel
+        if context.scene.subpanel_lc:
+            box = layout.box()
+            box.label(text = 'Cages')
+            box.prop(rbx_prefs, 'rbx_lc_dum_enum', text ='')
+            split = box.split(factor = 0.5)
+            col = split.column(align = True)            
+            col.operator('object.rbx_button_lc', text = "Inner").rbx_lc = "_Arma"
+            split.operator('object.rbx_button_lc', text = "Outer").rbx_lc = "_Cage"  
+
+        ######### Layered Cloth Samples #########
+            box = layout.box()
+            box.label(text = 'Samples')
+            box.prop(rbx_prefs, 'rbx_lc_spl_enum', text ='')
+            split = box.split(factor = 0.5)
+            col = split.column(align = True)            
+            col.label(text = "")
+            split.operator('object.rbx_button_lc', text = "Spawn").rbx_lc = "sample" 
+            
+            box = layout.box()
+            box.operator('object.url_handler', text = "Roblox Github", icon='URL').rbx_link = "rbx github"                         
+            
+                    
         ######### Cameras #########
         row = layout.row()
         icon = 'DOWNARROW_HLT' if context.scene.subpanel_cams else 'RIGHTARROW'
@@ -1108,24 +1570,38 @@ class TOOLBOX_MENU(bpy.types.Panel):
         # some data on the subpanel
         if context.scene.subpanel_other:
 
-            #### Export FBX ####
             box = layout.box()
-
             try:
-                if len(bpy.context.selected_objects) == 1:        
-                    box.operator('object.rbx_operators', text = "Export FBX", icon='EXPORT').rbx_operator = 'exp_fbx'
-                    box.label(text='What it does:')
-                    box.label(text='1. Apply all transforms')
-                    box.label(text='2. Set Origin to Geometry')
-                    box.label(text='3. Preset Export Settings')
+                if len(bpy.context.selected_objects) == 1: 
+                    box.prop(bpy.context.object.active_material, 'use_backface_culling', text='Backface Culling', icon='FACESEL')
+                    #box.prop(bpy.context.space_data, 'lock_camera', text='Lock Camera to View', icon='OUTLINER_DATA_CAMERA') 
                 else:
-                    box.label(text='Select one object', icon='ERROR')
+                    box.label(text='Select obj for Culling Option', icon='ERROR')                    
             except:
-                box.label(text='Select one object', icon='ERROR')
+                box.label(text='Culling: No Material Found', icon='ERROR') 
             
+            #box = layout.box()
             box.label(text='')
-            box.label(text='Camera', icon='OUTLINER_DATA_CAMERA')
-            box.prop(bpy.context.space_data, 'lock_camera', text='Lock active Camera to View')
+            box.prop(bpy.context.space_data.overlay, 'show_face_orientation', text='Show Face Orientation', icon='NORMALS_FACE')  
+            box.prop(rbx_prefs, 'rbx_face_enum')
+            split = box.split(factor = 0.5)
+            col = split.column(align = True)
+            col.operator("object.rbx_button_of", text = "Recalc Outside").rbx_of = 'outside'
+            split.operator("object.rbx_button_of", text = "Recalc Inside").rbx_of = 'inside'  
+            
+            #### Export FBX ####
+            row = layout.row()
+            row = layout.row()
+            box = layout.box()
+            try:
+                if len(bpy.context.selected_objects) == 1: 
+                    box.prop(rbx_prefs, 'rbx_of_orig', text = "Set Origin to Geometry") 
+                    box.prop(rbx_prefs, 'rbx_of_trsf', text = "Apply All Transforms")  
+                    box.operator('object.rbx_operators', text = "Export FBX", icon='EXPORT').rbx_operator = 'exp_fbx'
+                else:
+                    box.label(text='Select obj for FBX Export', icon='ERROR')
+            except:
+                box.label(text='Select obj for FBX Export', icon='ERROR')                                          
         
         #### Discord Support Server ####                
         row = layout.row()
@@ -1142,10 +1618,13 @@ classes = (
         PROPERTIES_RBX, 
         URL_HANDLER,
         RBX_BUTTON_HDRI,
+        OBJECT_OT_add_object,
         BUTTON_DMMY, 
+        RBX_BUTTON_LC,
         BUTTON_BNDS,
         BUTTON_CMR,
         BUTTON_BN, 
+        RBX_BUTTON_OF,
         TOOLBOX_MENU
         )
         
@@ -1156,8 +1635,10 @@ def register():
     bpy.types.Scene.rbx_prefs = bpy.props.PointerProperty(type= PROPERTIES_RBX)
     Scene.subpanel_readme = BoolProperty(default=False)
     Scene.subpanel_hdri = BoolProperty(default=False)
+    Scene.subpanel_imp_char = BoolProperty(default=False)
     Scene.subpanel_bounds = BoolProperty(default=False)
     Scene.subpanel_dummy = BoolProperty(default=False)
+    Scene.subpanel_lc = BoolProperty(default=False)
     Scene.subpanel_cams = BoolProperty(default=False)
     Scene.subpanel_bn = BoolProperty(default=False)
     Scene.subpanel_bn_st1 = BoolProperty(default=False)
@@ -1171,8 +1652,10 @@ def unregister():
     del bpy.types.Scene.rbx_prefs
     del Scene.subpanel_readme
     del Scene.subpanel_hdri
+    del Scene.subpanel_imp_char
     del Scene.subpanel_bounds
     del Scene.subpanel_dummy
+    del Scene.subpanel_lc
     del Scene.subpanel_cams
     del Scene.subpanel_bn
     del Scene.subpanel_bn_st1

@@ -8,7 +8,7 @@ If you want to have additional effects, templates, dummies, etc - pls share it i
 - Download addon: https://github.com/Gl2imm/RBX_Toolbox/releases (Look for file named 'RBX_Toolbox_vX.X.zip)
 - Instructions and Credits: https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/Credits%20and%20Instructions.txt
 - Version log: https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/Version_log.txt
-- Buy Coffee: https://donate.stripe.com/6oE5opawBc747HW289
+- Buy Coffee: https://donate.stripe.com/fZe5op0W1fjg2nC002
 
 ### Some item created with the help of this Toolbox - bones parenting, lights.. 
 ![Render](https://i.ibb.co/W6v0g64/RBX-1.png)

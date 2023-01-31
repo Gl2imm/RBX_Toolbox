@@ -4,6 +4,8 @@ This tool was created to assist and simplify workflow for Roblox modeling in Ble
 
 If you want to have additional effects, templates, dummies, etc - pls share it in my support discord, i might add it to addon with a proper credits.
 - Support/Suggestions Discord - https://discord.gg/gFa4mY7 (NYTV Gaming)
+- Twitter - https://twitter.com/NYTV_YT
+- NYTV UGC In Roblox: https://www.roblox.com/groups/7902286/NYTV-UGC
 - Download addon: https://github.com/Gl2imm/RBX_Toolbox/releases (Look for file named 'RBX_Toolbox_vX.X.zip)
 - Instructions and Credits: https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/Credits%20and%20Instructions.txt
 - Version log: https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/Version_log.txt

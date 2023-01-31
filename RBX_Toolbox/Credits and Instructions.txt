@@ -1,10 +1,9 @@
                                             ####################################			
-                                                       Roblox Toolbox
+                                                     Roblox Toolbox v.3.0
                                             ####################################
 
 This tool was created to assist and simplify workflow for Roblox modeling in Blender. Here i collect and organize useful tools/addons/operations all in one place. 
 
-In order to have additional features (Now is only UGC boundaries), you must have the UGC blend file that you can download from UGC program (if you selected). Do not ask me for this file, i will not share, since it conflicts with UGC T&C. But if you already have that file - inside addon "Roblox UGC Files" tab simply specify the folder where it is located, additional features will be automatically unlocked. You only need to do it once.
 If you want to have additional effects, templates, dummies, etc - pls share it in my support discord, i might add it to addon with a proper credits.
 Discord - https://discord.gg/gFa4mY7 (NYTV Gaming)
 
@@ -18,39 +17,46 @@ Discord - https://discord.gg/gFa4mY7 (NYTV Gaming)
 
 
 ####################################			
-               HDRI:
+         HDRI and Templates:
 ####################################
 
 A tool to Append and set HDRI for renders
-HDRIs: city, courtyard, forest, interior, night, studio, sunrise, sunset
+1. HDRIs: city, courtyard, forest, interior, night, studio, sunrise, sunset
 Credits: All HDRI now is a Blender built-in. All HDRIs are licenses as CC0 (Creative common). These were created by Greg Zaal (HDRI Haven https://hdrihaven.com).
 
+2. Quick set of simple Skybox:
+	Currently there are 3 sample Sky. You may use them or change image to your own in the Shading tab
+	Yes they are not so professional, but serve as example and also can be used. I could add a proper one, but is hard to find equirectangular textures
+Credits: Sample skies downloaded from https://unsplash.com.	
+
+3. Quick spawn of Animated Staging: 
+	Fully preset Animated Rotating Staging with camera and Lights (animation is cyclic)
+	
+4. Quick spawn of Avatar Editor Room Background: 
+	Fully preset Avatar Editor Room Background with camera and Lights
+
+5. Quick spawn of Roblox baseplate:
+	Default Roblox baseplate, same as when you create one in Studio
+
+
 
 ####################################			
-              Skybox:
+         Import From Roblox:
 ####################################
 
-A tool to Append and set simple Skybox
-Currently there are 3 sample Sky. You may use them or change image to your own in the Shading tab
-Yes they are not so professional, but serve as example and also can be used. I could add a proper one, but is hard to find equirectangular textures
-Credits: Sample skies downloaded from https://unsplash.com.
-
-
-####################################			
-         Import RBX Character:
-####################################
-
-Spawn any Roblox character directly into Blender.
-Credits: This addon is developed by https://twitter.com/Zeblyno (@Zeblyno), i had readjusted some of the things inside, so you do not need to touch up the meshes after import. There is no license usage on this addon and the developer last seen a year ago, i had asked him for permissons to use, so this feature will depends on his responce. If anyone knows him and can contact - pls let him know about this.
+One of the most popular and requested feature. You may import a Roblox player avatar as well as the accessory direct into Blender. 
+Credits: Huge thanx to the RoAPI discord for their amazing Wiki, which let me crearly understand on how to get the data from the Roblox through API and the help from the members on some of the codes. Also im using their code snippet to get the server number from CDN hashes. 
+RoAPI Discord: https://discord.gg/m6j732k4tQ
+RoAPI Wiki: https://robloxapi.wiki/wiki/Main_Page
 
 
 ####################################			
          Accessory Bounds:
 ####################################
 
-(This will only work if you have that 'Bounds.blend' from UGC)
-1 click spawn the bound that you need to verify your Accessory is within boundaries.
-Credits: Taken from UGC. I do not want expose the guy name here for his privacy. But if you are that guy and want the name, or other info to be reflected here - let me know, i will change it. 
+(These templates are now included in the addon since the UGC are now public)
+1 click spawn the bound that you need to verify your Accessory is within boundaries. Some boundaries are obsolete and do not tally 1:1 with the current Roblox ones, so just use them as a reference.
+Credits: Base Taken from Guilded UGC programme and modified/retextured. I do not want expose the guy name here for his privacy. But if you are that guy and want the name, or other info to be reflected here - let me know, i will change it. 
 
 
 
@@ -60,7 +66,30 @@ Credits: Taken from UGC. I do not want expose the guy name here for his privacy.
 
 Quick spawn of Dummy template
 Dummies: R15 Blocky, R15 Boy, R15 Girl, R15 Woman, Rthro Boy, Rthro Girl, Rthro Normal, Rthro Slender
-For now i only have one, if you have other templates do hit me up, i will include them with credits to you. 
+Credits: All dummies were exported from Roblox
+
+R6 Rig: Quick add of the R6 rig which you may easily retexture and use for your renders/animation
+Credits: Rig is shared by Nuke in Youtube. Here is his tutorial on the retexture as well: https://www.youtube.com/watch?v=ggqvqwYQUSc
+
+R15 Woman Rig and R15 Blocky rig
+Credits: Rigs are taken from Roblox Github (https://github.com/Roblox/avatar)
+
+
+
+####################################			
+             Hairs:
+####################################
+
+Quick spawn of Dummy Heads templates (Requested by hair and hat creators):
+Heads: Classic, Woman, Woman v2, Man, R6
+Credits: All dummies were exported from Roblox
+
+Quick spawn of hair mesh template: Add hair mesh template for novice hair creators
+Credits: This were created by me, so you may use it for your creations
+
+Hair shader:
+Added hair texture shader to create simple hair textures, adjust the color, hair strends, etc then bake the image and save it
+Credits: This were created by me, so you may use it freely for your models or renders
 
 
 
@@ -68,7 +97,7 @@ For now i only have one, if you have other templates do hit me up, i will includ
              Layered cloth:
 ####################################
 
-Quick spawn of Dummies with Layered clothing cages templates + Some samples of ready made accessories (From Roblox help files)
+Quick spawn of Commonly used Cages + Some samples of ready made accessories (From Roblox help files)
 
 
 
@@ -82,11 +111,7 @@ Quick spawn of Dummies with Layered clothing cages templates + Some samples of r
 	Quick set each camera as active and preview it (adjust)
 	Quick render selected view
 
-2. Quick spawn of Animated Staging: 
-	Fully preset Animated Rotating Staging with camera and Lights (animation is cyclic)
 	
-3. Quick spawn of Avatar Editor Room Background: 
-	Fully preset Avatar Editor Room Background with camera and Lights	
 	
 	
 ####################################			
@@ -102,14 +127,29 @@ Credits: Armature basic were taken from Blender Built-in Rigify addon and modifi
 
 
 ####################################			
-       Other Functions:
+       Quick Functions:
 ####################################
 
 1. Quick Backface Culling Option
 
 2. Show face orientation button
 	Quick access to show face orientation + buttons to recalculate normals inside and outside.
-3. FBX Eport
-	This will do a few operation in 1 click: Apply all transform, Set Origin to Geometry, Preset FBX export settings for 1:1 model import in Studio	
 
 
+####################################			
+           File Export:
+####################################
+
+1. UGC Item Export (Export accessory as FBX) 
+	This will do a few operation in 1 click: 
+	Apply all transform, 
+	Set Origin to Geometry,
+	Select Correct Object types, 
+	Preset FBX export settings for 1:1 model import in Studio	
+2. Layered Cloth Export (Export LC as FBX)
+	This will do a few operation in 1 click: 
+	Set Path mode to Copy, 
+	Select Correct Object types,
+	Disable Bake Animation, 
+	Disable Add Leaf Bones, 
+	Preset FBX export settings for 1:1 model import in Studio	

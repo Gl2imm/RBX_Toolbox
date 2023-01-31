@@ -55,5 +55,32 @@ v.2.0:
 	Layered Cloth Dummies (Cages): Default Mannequin, Roblox Boy, Roblox Girl, Roblox Man, Roblox Woman, Classic Male, Classic Female, Neo Classic Male, Neo Classic Female, Rthro Realistic Male, Rthro Realistic Female, Bazooka Bones, Magma Fiend, Skelly, Station Visitor
 	Layered Cloth Samples: Female Hair, Hoodie, Cargo Pants, Skate, Tennis
 	Restart Blender after update
+v.3.0:
+	Major update, most of the code has been rewritten, changed and the assets been readjusted/added new.
+	HDRI: Added Roblox default baseplate, sky and sun
+	Import from Roblox: Finally wrote my own code for this function, now you can also import accessories and preview items before you import
+		All the files now neatly stored in the addon folder, Drive acceess error been addressed and fixed
+	Accessory bounds: Templates been included in the addon now since the UGC become public. I had retextured them for easy viewing and also adjusted some
+	Dummies: Fixed all dummies to be exactly in the centre. Added R6 rig, Woman Rig and Blocky Rig
+	Added Hairs Tab: Easy add common heads templates (requested by hair and hat creators). Add hair mesh template for novice hair creators. 
+		Added hair texture shader to create simple hair textures.
+	Layered Cloth Tab: Removed un used cages to make addon smaller, redone the existing cages templates, added Blocky cages
+	File export: Added quick preset to export Layered Cloth as FBX
+	Added Most requested and popular feature: Buy me a Coffee button!! ;p
+	Restart Blender after update
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	

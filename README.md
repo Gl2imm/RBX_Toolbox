@@ -2,7 +2,6 @@
 
 This tool was created to assist and simplify workflow for Roblox modeling in Blender. Here i collect and organize useful tools/addons/operations all in one place. 
 
-In order to have additional features (Now is only UGC boundaries), you must have the UGC blend file that you can download from UGC program (if you selected). Do not ask me for this file, i will not share, since it conflicts with UGC T&C. But if you already have that file - inside addon "Roblox UGC Files" tab simply specify the folder where it is located, additional features will be automatically unlocked. You only need to do it once.
 If you want to have additional effects, templates, dummies, etc - pls share it in my support discord, i might add it to addon with a proper credits.
 - Support/Suggestions Discord - https://discord.gg/gFa4mY7 (NYTV Gaming)
 - Download addon: https://github.com/Gl2imm/RBX_Toolbox/releases (Look for file named 'RBX_Toolbox_vX.X.zip)
@@ -10,50 +9,43 @@ If you want to have additional effects, templates, dummies, etc - pls share it i
 - Version log: https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/Version_log.txt
 - Buy me a Coffee: https://donate.stripe.com/fZe5op0W1fjg2nC002
 
-### Some item created with the help of this Toolbox - bones parenting, lights.. 
-![Render](https://i.ibb.co/W6v0g64/RBX-1.png)
+### Import from Roblox:
+You may import a Roblox player avatar as well as the accessory direct into Blender.
+![image](https://user-images.githubusercontent.com/69973491/215672873-f1c0702f-35bb-4874-b406-382eb1fd9654.png)
+
+### Accessory bounds: 
+1 click spawn the bound that you need to verify your Accessory is within boundaries.
+![image](https://user-images.githubusercontent.com/69973491/215673187-90ae28be-6eea-4de6-b71b-65a9092d3b7d.png)
 
 ### Spawn Dummies and Their Armatures in 1 click
 ![Dummies](https://i.ibb.co/S5WNcrh/RBX-2.png)
+![image](https://user-images.githubusercontent.com/69973491/215675593-5af0c887-1236-4f40-af0d-e60e90e2f0a6.png)
+
+### Layered Cloth Tab:
+Quick spawn of Commonly used Cages + Some samples of ready made accessories
+![image](https://user-images.githubusercontent.com/69973491/215676425-3bd063ad-84e2-4824-90a8-cfd3b48b2b2b.png)
+
+### Hairs Tab: 
+Easy add common heads templates (requested by hair and hat creators). Add hair mesh template for novice hair creators. 
+![image](https://user-images.githubusercontent.com/69973491/215675983-ef182f50-3b09-4e31-9c9d-14cacf519090.png)
+
+### hair texture shader to create simple hair textures.
+![image](https://user-images.githubusercontent.com/69973491/215673686-c49733bb-8e9f-442d-aa96-bd8cd9f0ab80.png)
+
+### Roblox default baseplate, sky and sun
+![image](https://user-images.githubusercontent.com/69973491/215672509-e933ed28-a4bd-4fe3-a186-95050b9f4a97.png)
 
 ### Spawn Animated (rotating) Staging fully preset with camera and light
 ![Staging](https://i.ibb.co/0B6qg6f/stage.png)
 
 ### Spawn Roblox Avatar Editor Room Background fully preset with camera and light
 ![Avatar Room](https://i.ibb.co/DQVHtHb/avtr-edtr-rm.png)
-
-### Below are the tools currently available in Toolbox
-![Tools](https://i.ibb.co/McBc15V/RBX-3.png)
-
-- Accessory Bounds:  
-(This will only work if you have that 'Bounds.blend' from UGC)  
-1 click spawn the bound that you need to verify your Accessory is within boundaries.  
-Credits: Taken from UGC. I do not want expose the guy name here for his privacy. But if you are that guy and want the name, or other info to be reflected here - let me know, i will change it. 
-
-- HDRI:  
-A tool to Append and set HDRI for renders  
-HDRIs: city, courtyard, forest, interior, night, studio, sunrise, sunset  
-Credits: All HDRI now is a Blender built-in. All HDRIs are licenses as CC0 (Creative common). These were created by Greg Zaal (HDRI Haven https://hdrihaven.com).
-	
-- Dummy:  
-Quick spawn of Dummy template  
-Dummies: R15 Blocky, R15 Boy, R15 Girl, R15 Woman, Rthro Boy, Rthro Girl, Rthro Normal, Rthro Slender
-			
-- Cameras:  
-Quick spawn of 4 cameras that already preset to following:  
-Front, Back, Left, Right views  
-1080 x 1080 resolution (you can change that)  
-Quick set each camera as active and preview it (adjust)  
-Quick render selected view   
-Fully preset Animated (Rotating) Stage with camera and light  
-Fully preset Roblox Avatar editor background with camera and light  
-
-- Animation (Advanced):  
-Quick spawn of Armatures already adjusted for each character  
-1 click Normals Recalculate (Outside)  
-1 click cleaning Double vertices  
-1 click parenting (Auto Weight Mode)  
-Instructions are inside the toolbox Animation tab  
-(This was done in the guided form with the new Blender users in mind to minimize confusions and errors while Rigging yor character)  
+ 
 
 - Addon can be found on the right side N-panel (Click "N" for it to appear)
+
+Recources used and special thx:
+- Roblox Github (alot templates were taken from there): https://github.com/Roblox/avatar
+- RoAPI (Great explanation on Roblox API and help with the code): https://discord.gg/m6j732k4tQ
+- Xenonic_778 for feedback on errors and sharing Toolbox on Twitter: https://twitter.com/Xenonic_778
+- Others not mention here, but addressed in the Instructions and Credits: https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/Credits%20and%20Instructions.txt

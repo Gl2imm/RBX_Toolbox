@@ -37,6 +37,9 @@ Easy add common heads templates (requested by hair and hat creators). Add hair m
 ### Roblox default baseplate, sky and sun
 ![image](https://user-images.githubusercontent.com/69973491/215672509-e933ed28-a4bd-4fe3-a186-95050b9f4a97.png)
 
+### Quick set of simple Skybox:
+![render](https://user-images.githubusercontent.com/69973491/216493108-c58e5564-5d1f-4411-9a39-bde3dc4db725.png)
+
 ### Spawn Animated (rotating) Staging fully preset with camera and light
 ![Staging](https://i.ibb.co/0B6qg6f/stage.png)
 

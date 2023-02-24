@@ -68,7 +68,11 @@ v.3.0:
 	File export: Added quick preset to export Layered Cloth as FBX
 	Added Most requested and popular feature: Buy me a Coffee button!! ;p
 	Restart Blender after update
-	
+v.3.0:
+	Updated R15 Woman and 3.0 Woman to the latest dummies
+	Updated Woman Layered clothing Cage and Armature
+	Fixed Boundaries spawn error	
+	Restart Blender after update
 	
 	
 	

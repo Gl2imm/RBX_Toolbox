@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (3, 0),
+    "version": (3, 1),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -45,7 +45,7 @@ import bpy.utils.previews
 
 
 ## Toolbox vars ##
-ver = "v.3.0"
+ver = "v.3.1"
 lts_ver = ver
 
 mode = 1 #0 - Test Mode; 1 - Live mode
@@ -1202,11 +1202,12 @@ class BUTTON_BNDS(bpy.types.Operator):
         bnds = self.bnds
         bnds_spwn = None
         
-                
+        '''        
         if mode == 0:
             rbx_asset_folder = rbx_ast_fldr
         else:
             rbx_asset_folder = bpy.context.preferences.addons['RBX_Toolbox'].preferences.rbx_asset_folder
+        '''
         
         rbx_bnds_list = [
                         'Hat',

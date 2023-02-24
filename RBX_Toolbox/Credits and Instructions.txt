@@ -98,6 +98,10 @@ Credits: This were created by me, so you may use it freely for your models or re
 ####################################
 
 Quick spawn of Commonly used Cages + Some samples of ready made accessories (From Roblox help files)
+Default Mannequinn, R15 boy, R15 Girl, Woman, Man, Classic Male, Classic Female, Blocky
+Credits: Blocky cages were taken from Roblox DevFoum (https://devforum.roblox.com/t/10-blocky-layered-clothing-resources/2025916)
+All other cages are from Roblox online help files (https://create.roblox.com/docs/avatar/accessories/creating-in-blender)
+and Roblox Github (https://github.com/Roblox/avatar)
 
 
 

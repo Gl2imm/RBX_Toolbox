@@ -73,7 +73,25 @@ v.3.1:
 	Updated Woman Layered clothing Cage and Armature
 	Fixed Boundaries spawn error	
 	Restart Blender after update
+v.4.0:	
+	NEW FEATURES
+	Rigs:
+	-You can now spawn a Rig with the LC that you made and weight painted, so you can test it out for stretches, clipping or just for posing with animation (auto added) 
+	-You can fix your original LC and see the changes on the animation that you spawn, it is a linked duplicate.
+	Character clothing:
+	-You can now wear any Classic cloth (no decals yet) to the R6 rig that is in the dummies Tab. Select its armature and click Modify Character
+	-You will see the control panel where you can enter Cloth/Face item ID or just paste the link to the store item and press Import
 	
+	Changes
+	Character Import Direct from Blender:
+	-Rewrite code for character and accessory import, make it more responsive an work a bit quicker
+	-you can now spawn character by ID, username or link (Accessory by ID or link)
+	-You can now split all accessories while import character
+	-Accessories and Characters are now gets cleaned up while import and fixing shading
+	-Accessories now imports with original textures (there is sometime errors on some Roblox accessories, but im working on it)
+	Others:
+	-Added a quick theme button below (it is a simple theme i made with rounded corners)
+	Restart Blender after update
 	
 	
 	

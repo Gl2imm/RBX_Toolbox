@@ -96,6 +96,17 @@ Fully preset with camera and light.
 
 ![Avatar Room](https://i.ibb.co/DQVHtHb/avtr-edtr-rm.png)
 
+### NEW FEATURES
+**Rigs:**
+You can now spawn a Rig with the LC that you made and weight painted, so you can test it out for stretches, clipping or just for posing with animation (auto added) 
+
+https://user-images.githubusercontent.com/69973491/236590776-8e4a9ecb-c01c-461b-a2d6-24e67f151952.mp4
+
+**Character clothing:**
+You can now wear any Classic cloth (no decals yet) to the R6 rig that is in the dummies Tab. Select its armature and click Modify Character
+
+https://user-images.githubusercontent.com/69973491/236590799-65a6863b-214f-4a20-b8ac-102c7a57d9f1.mp4
+
 The addon can be found on the right side N-panel (press "N" to make it appear).
 
 ---
@@ -104,4 +115,5 @@ The addon can be found on the right side N-panel (press "N" to make it appear).
 - [Roblox GitHub](https://github.com/Roblox/avatar) (many templates were taken from here)
 - [RoAPI](https://discord.gg/m6j732k4tQ) (great explanation on Roblox API and help with the code)
 - [Xenonic_778](https://twitter.com/Xenonic_778) for feedback on errors and sharing Toolbox on Twitter
+- [Alan Bixby](https://github.com/alanbixby) for the written instructions in this page and for the cool badges
 - [Miscellaneous Instructions and Credits](https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/Credits%20and%20Instructions.txt)

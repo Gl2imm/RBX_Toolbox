@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (4, 0),
+    "version": (4, 1),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -48,14 +48,14 @@ import re
 
 
 ## Toolbox vars ##
-ver = "v.4.0"
+ver = "v.4.1"
 disp_ver = ver
 #disp_ver = "v.3.2 Beta-3" ### TO REMOVE IN 3.2
 lts_ver = None
 
 
 mode = 1 #0 - Test Mode; 1 - Live mode
-wh =0   #0 - W; 1 - H
+wh =1   #0 - W; 1 - H
 
 
 if mode == 0:
@@ -199,7 +199,7 @@ else:
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
     loop.set_default_executor(executor)
     # loop.set_debug(True)      
-'''    
+   
     
 try:
     import aiohttp
@@ -246,7 +246,7 @@ except:
 
     installModule("aiohttp")        
     installModule("aiodns")
-
+''' 
 
 
                
@@ -730,6 +730,7 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
             if "https://www.roblox.com/" in rbx_accessory:
                 rbx_accessory = rbx_accessory.lstrip("https://www.roblox.com/catalog/")
                 rbx_accessory = rbx_accessory.split("/")[0]
+                print(rbx_accessory)
                 if not rbx_accessory.isdigit():
                     rbx_asset_netw_error = "Error: Invalid URL"
         else:
@@ -1190,101 +1191,94 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
         
     ########### INDIVIDUAL FUNCTIONS ###########
     async def get_user_id(self, rbx_username, rbx_username_is):
-        async with aiohttp.ClientSession() as session:
-            
-            if rbx_username_is == "id":
-                    async with session.get(f"https://users.roblox.com/v1/users/{rbx_username}") as responce:
-                        data = await responce.json()
-                        if responce.status == 200:
-                            rbx_usr_id = data['id']
-                            rbx_username = data['name']
-                            rbx_char_netw_error = None
-                        else:
-                            if responce.status == 404:
-                                rbx_username_is = "username"
-                            else:
-                                rbx_usr_id = None
-                                rbx_char_netw_error = f"{responce.status}: Error getting User ID" 
-            if rbx_username_is == "username":
-                payload = {
-                    "usernames": [rbx_username],
-                    "excludeBannedUsers" : 'true'
-                    }
-                async with session.post("https://users.roblox.com/v1/usernames/users", json=payload) as responce:
-                    data = await responce.json()
-                    if responce.status == 200:
-                        try:
-                            rbx_usr_id = data.get('data')[0]['id']
-                        except:
-                            rbx_usr_id = None
-                            rbx_char_netw_error = "Error: Unable to find this user"
-                        else:
-                            rbx_char_netw_error = None           
-                    else:
-                        rbx_usr_id = None
-                        rbx_char_netw_error = f"{responce.status}: Error getting User ID"
-              
+        if rbx_username_is == "id":
+            data = requests.get(f"https://users.roblox.com/v1/users/{rbx_username}")
+            if data.status_code == 200:
+                data = data.json()
+                rbx_usr_id = data['id']
+                rbx_username = data['name']
+                rbx_char_netw_error = None
+            else:
+                if data.status_code == 404:
+                    rbx_username_is = "username"
+                else:
+                    rbx_usr_id = None
+                    rbx_char_netw_error = f"{data.status_code}: Error getting User ID" 
+        if rbx_username_is == "username":
+            payload = {
+                "usernames": [rbx_username],
+                "excludeBannedUsers" : 'true'
+                }
+            data = requests.post("https://users.roblox.com/v1/usernames/users", json=payload)
+            if data.status_code == 200:
+                data = data.json()
+                try:
+                    rbx_usr_id = data.get('data')[0]['id']
+                except:
+                    rbx_usr_id = None
+                    rbx_char_netw_error = "Error: Unable to find this user"
+                else:
+                    rbx_char_netw_error = None           
+            else:
+                rbx_usr_id = None
+                rbx_char_netw_error = f"{data.status_code}: Error getting User ID"
         return rbx_usr_id, rbx_char_netw_error, rbx_username
     
                     
     async def get_user_avatar_url(self, rbx_usr_id):
         rbx_size = '250x250'
         rbx_format = 'Png'
-        rbx_isCircular = 'false'                 
-        async with aiohttp.ClientSession() as session:                             
-            url = f"https://thumbnails.roblox.com/v1/users/avatar?userIds={rbx_usr_id}&size={rbx_size}&format={rbx_format}&isCircular={rbx_isCircular}"
-            async with session.get(url) as responce:
-                data = await responce.json()
-                if responce.status == 200:
-                    rbx_usr_img_url = data["data"][0]["imageUrl"]
-                    rbx_char_netw_error = None
-                else:
-                    rbx_usr_img_url = None
-                    rbx_char_netw_error = "Error getting Avatar URL"
+        rbx_isCircular = 'false'                                            
+        url = f"https://thumbnails.roblox.com/v1/users/avatar?userIds={rbx_usr_id}&size={rbx_size}&format={rbx_format}&isCircular={rbx_isCircular}"
+        data = requests.get(url)
+        if data.status_code == 200:
+            data = data.json()
+            rbx_usr_img_url = data["data"][0]["imageUrl"]
+            rbx_char_netw_error = None
+        else:
+            rbx_usr_img_url = None
+            rbx_char_netw_error = f"{data.status_code}: Error getting Avatar URL"
         return rbx_usr_img_url, rbx_char_netw_error
                 
                 
     async def get_user_avatar_img(self, rbx_usr_img_url): 
-        async with aiohttp.ClientSession() as session:            
-            async with session.get(rbx_usr_img_url) as responce:
-                image_data = await responce.content.read()
-                if responce.status == 200:
-                    rbx_char_netw_error = None
-                else:
-                    rbx_char_netw_error = "Error getting Avatar IMG"
-            return image_data, rbx_char_netw_error
+        image_data = requests.get(rbx_usr_img_url)
+        if image_data.status_code == 200:
+            image_data = image_data.content
+            rbx_char_netw_error = None
+        else:
+            rbx_char_netw_error = f"{image_data.status_code}: Error getting Avatar IMG"
+        return image_data, rbx_char_netw_error
 
 
 
-    async def get_user_hashes(self, rbx_usr_id):             
-        async with aiohttp.ClientSession() as session:                             
-            async with session.get(f"https://thumbnails.roblox.com/v1/users/avatar-3d?userId={rbx_usr_id}") as responce:
-                data = await responce.json()
-                if responce.status == 200:
-                    rbx_usr_hsh_urls = data['imageUrl']  #Get Link to OBJ and Textures Hashes
-                    rbx_char_netw_error = None
-                    async with session.get(rbx_usr_hsh_urls) as responce:
-                        rbx_usr_hsh_urls = await responce.json(content_type='text/plain') #Get OBJ and Textures Hashes links
-                        if responce.status == 200:
-                            rbx_char_netw_error = None
-                        else:
-                            rbx_usr_hsh_urls = None
-                            rbx_char_netw_error = "Error getting user hashes"
-                else:
-                    rbx_usr_hsh_urls = None
-                    rbx_char_netw_error = "Error getting user hashes"
+    async def get_user_hashes(self, rbx_usr_id): 
+        data = requests.get(f"https://thumbnails.roblox.com/v1/users/avatar-3d?userId={rbx_usr_id}")                   
+        if data.status_code == 200:
+            data = data.json()
+            rbx_usr_hsh_urls = data['imageUrl']  #Get Link to OBJ and Textures Hashes
+            rbx_char_netw_error = None
+            rbx_usr_hsh_urls = requests.get(rbx_usr_hsh_urls)
+            if rbx_usr_hsh_urls.status_code == 200:
+                rbx_usr_hsh_urls = rbx_usr_hsh_urls.json() #Get OBJ and Textures Hashes links
+                rbx_char_netw_error = None
+            else:
+                rbx_usr_hsh_urls = None
+                rbx_char_netw_error = f"{rbx_usr_hsh_urls.status_code}: Error getting user hashes"
+        else:
+            rbx_usr_hsh_urls = None
+            rbx_char_netw_error = f"{rbx_usr_hsh_urls.status_code}: Error getting user hashes"
         return rbx_usr_hsh_urls, rbx_char_netw_error
 
 
     async def download(self, url, type): 
-        async with aiohttp.ClientSession() as session:            
-            async with session.get(url) as responce:
-                data = await responce.content.read()
-                if responce.status == 200:
-                    rbx_char_netw_error = None
-                else:
-                    rbx_char_netw_error = f"Error downloading {type} file"
-            return data, rbx_char_netw_error
+        data = requests.get(url) 
+        if data.status_code == 200:
+            data = data.content
+            rbx_char_netw_error = None
+        else:
+            rbx_char_netw_error = f"{data.status_code}: Error downloading {type} file"
+        return data, rbx_char_netw_error
 
 
 
@@ -1295,64 +1289,61 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
         if rbx_bundle == True:
             rbx_url = f"https://thumbnails.roblox.com/v1/bundles/thumbnails?bundleIds={rbx_accessory}&size=150x150&format={rbx_format}&isCircular={rbx_isCircular}"
         else:
-            rbx_url = f"https://thumbnails.roblox.com/v1/assets?assetIds={rbx_accessory}&returnPolicy=PlaceHolder&size={rbx_size}&format={rbx_format}&isCircular={rbx_isCircular}"     
-        async with aiohttp.ClientSession() as session:                             
-            async with session.get(rbx_url) as responce:
-                data = await responce.json()
-                if responce.status == 200:
-                    try:
-                        rbx_asset_img_url = data["data"][0]["imageUrl"]
-                    except:
-                        rbx_asset_netw_error = "Error, Invalid accessory"
-                        rbx_asset_img_url = None
-                    else:
-                        rbx_asset_netw_error = None
-                else:
-                    rbx_asset_img_url = None
-                    rbx_asset_netw_error = "Error getting Accessory IMG URL"
+            rbx_url = f"https://thumbnails.roblox.com/v1/assets?assetIds={rbx_accessory}&returnPolicy=PlaceHolder&size={rbx_size}&format={rbx_format}&isCircular={rbx_isCircular}"         
+        data = requests.get(rbx_url)
+        if data.status_code == 200:
+            data = data.json()
+            try:
+                rbx_asset_img_url = data["data"][0]["imageUrl"]
+            except:
+                rbx_asset_netw_error = f"{data.status_code}: Error, Invalid accessory"
+                rbx_asset_img_url = None
+            else:
+                rbx_asset_netw_error = None
+        else:
+            rbx_asset_img_url = None
+            rbx_asset_netw_error = f"{data.status_code}: Error getting Accessory IMG URL"
         return rbx_asset_img_url, rbx_asset_netw_error
 
 
     async def get_acc_img(self, rbx_asset_img_url): 
-        async with aiohttp.ClientSession() as session:            
-            async with session.get(rbx_asset_img_url) as responce:
-                image_data = await responce.content.read()
-                if responce.status == 200:
-                    rbx_asset_netw_error = None
-                else:
-                    rbx_char_netw_error = "Error getting Accessory IMG Data"
-            return image_data, rbx_asset_netw_error
+        data = requests.get(rbx_asset_img_url)
+        if data.status_code == 200:
+            image_data = data.content
+            rbx_asset_netw_error = None
+        else:
+            rbx_char_netw_error = f"{data.status_code}: Error getting Accessory IMG Data"
+        return image_data, rbx_asset_netw_error
 
     async def get_acc_info(self, rbx_accessory, rbx_bundle):          
-        async with aiohttp.ClientSession() as session:  
-            if rbx_bundle == True:
-                url = f"https://catalog.roblox.com/v1/bundles/{rbx_accessory}/details"
-                async with session.get(url) as responce:
-                    data = await responce.json()
-                    if responce.status == 200:
-                        rbx_asset_name = data['name']
-                        rbx_asset_type = data['bundleType']
-                        rbx_asset_creator = data['creator']['name']
-                        rbx_asset_netw_error = None
-                    else:
-                        rbx_asset_name = None
-                        rbx_asset_creator = None
-                        rbx_asset_type = None
-                        rbx_asset_netw_error = "Error getting Accessory Info"
-            else:                           
-                url = f"https://economy.roblox.com/v2/assets/{rbx_accessory}/details"
-                async with session.get(url) as responce:
-                    data = await responce.json()
-                    if responce.status == 200:
-                        rbx_asset_name = data['Name']
-                        rbx_asset_type = data['AssetTypeId']
-                        rbx_asset_creator = data['Creator']['Name']
-                        rbx_asset_netw_error = None
-                    else:
-                        rbx_asset_name = None
-                        rbx_asset_creator = None
-                        rbx_asset_type = None
-                        rbx_asset_netw_error = "Error getting Accessory Info"
+        if rbx_bundle == True:
+            url = f"https://catalog.roblox.com/v1/bundles/{rbx_accessory}/details"
+            data = requests.get(url)
+            if data.status_code == 200:
+                data = data.json()
+                rbx_asset_name = data['name']
+                rbx_asset_type = data['bundleType']
+                rbx_asset_creator = data['creator']['name']
+                rbx_asset_netw_error = None
+            else:
+                rbx_asset_name = None
+                rbx_asset_creator = None
+                rbx_asset_type = None
+                rbx_asset_netw_error = f"{data.status_code}: Error getting Accessory Info"
+        else:                           
+            url = f"https://economy.roblox.com/v2/assets/{rbx_accessory}/details"
+            data = requests.get(url)
+            if data.status_code == 200:
+                data = data.json()
+                rbx_asset_name = data['Name']
+                rbx_asset_type = data['AssetTypeId']
+                rbx_asset_creator = data['Creator']['Name']
+                rbx_asset_netw_error = None
+            else:
+                rbx_asset_name = None
+                rbx_asset_creator = None
+                rbx_asset_type = None
+                rbx_asset_netw_error = f"{data.status_code}: Error getting Accessory Info"
         return rbx_asset_name, rbx_asset_type, rbx_asset_creator, rbx_asset_netw_error
 
 
@@ -1360,56 +1351,54 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
 
 
     async def get_acc_bundl_info(self, rbx_accessory):          
-        async with aiohttp.ClientSession() as session:  
-            url = f"https://catalog.roblox.com/v1/bundles/{rbx_accessory}/details"
-            async with session.get(url) as responce:
-                data = await responce.json()
-                if responce.status == 200:
-                    rbx_asset_name = data['name']
-                    rbx_asset_type = data['bundleType']
-                    rbx_asset_creator = data['creator']['name']
-                    rbx_asset_items = data['items']
-                    rbx_asset_netw_error = None
-                else:
-                    rbx_asset_name = None
-                    rbx_asset_creator = None
-                    rbx_asset_type = None
-                    rbx_asset_items = None
-                    rbx_asset_netw_error = "Error getting Accessory Info"
+        url = f"https://catalog.roblox.com/v1/bundles/{rbx_accessory}/details"
+        data = requests.get(url)
+        if data.status_code == 200:
+            data = data.json()
+            rbx_asset_name = data['name']
+            rbx_asset_type = data['bundleType']
+            rbx_asset_creator = data['creator']['name']
+            rbx_asset_items = data['items']
+            rbx_asset_netw_error = None
+        else:
+            rbx_asset_name = None
+            rbx_asset_creator = None
+            rbx_asset_type = None
+            rbx_asset_items = None
+            rbx_asset_netw_error = f"{data.status_code}: Error getting Accessory Info"
         return rbx_asset_name, rbx_asset_type, rbx_asset_creator, rbx_asset_items, rbx_asset_netw_error
     
     
 
     async def get_asset_data(self, rbx_accessory):
         url = f"https://assetdelivery.roblox.com/v1/asset?id={rbx_accessory}" 
-        async with aiohttp.ClientSession() as session:      
-            async with session.get(url) as responce:
-                asset_data = await responce.content.read()
-                if responce.status == 200:
-                    rbx_asset_netw_error = None
-                else:
-                    asset_data = None
-                    rbx_char_netw_error = "Error getting Asset Data"
-            return asset_data, rbx_asset_netw_error
+        data = requests.get(url)
+        if data.status_code == 200:
+            asset_data = data.content
+            rbx_asset_netw_error = None
+        else:
+            asset_data = None
+            rbx_char_netw_error = f"{data.status_code}: Error getting Asset Data"
+        return asset_data, rbx_asset_netw_error
 
 
     async def get_asset_hashes(self, rbx_accessory):             
-        async with aiohttp.ClientSession() as session:                             
-            async with session.get(f"https://thumbnails.roblox.com/v1/assets-thumbnail-3d?assetId={rbx_accessory}") as responce:
-                data = await responce.json()
-                if responce.status == 200:
-                    rbx_acc_hsh_urls = data['imageUrl']  #Get Link to OBJ and Textures Hashes
-                    rbx_asset_netw_error = None
-                    async with session.get(rbx_acc_hsh_urls) as responce:
-                        rbx_acc_hsh_urls = await responce.json(content_type='text/plain') #Get OBJ and Textures Hashes links
-                        if responce.status == 200:
-                            rbx_asset_netw_error = None
-                        else:
-                            rbx_acc_hsh_urls = None
-                            rbx_asset_netw_error = "Error getting Asset hashes"
-                else:
-                    rbx_acc_hsh_urls = None
-                    rbx_asset_netw_error = "Error getting Asset hashes"
+        url = f"https://thumbnails.roblox.com/v1/assets-thumbnail-3d?assetId={rbx_accessory}"
+        data = requests.get(url)
+        if data.status_code == 200:
+            data = data.json()
+            rbx_acc_hsh_urls = data['imageUrl']  #Get Link to OBJ and Textures Hashes
+            rbx_asset_netw_error = None
+            data = requests.get(rbx_acc_hsh_urls)
+            if data.status_code == 200:
+                rbx_acc_hsh_urls = data.json() #Get OBJ and Textures Hashes links
+                rbx_asset_netw_error = None
+            else:
+                rbx_acc_hsh_urls = None
+                rbx_asset_netw_error = f"{data.status_code}: Error getting Asset hashes"
+        else:
+            rbx_acc_hsh_urls = None
+            rbx_asset_netw_error = f"{data.status_code}: Error getting Asset hashes"
         return rbx_acc_hsh_urls, rbx_asset_netw_error
 
 
@@ -1795,21 +1784,20 @@ class BUTTON_WEAR(bpy.types.Operator):
     
 
     ### Get Item info ###
-    async def get_acc_info(self, id):          
-        async with aiohttp.ClientSession() as session:                         
-            url = f"https://economy.roblox.com/v2/assets/{id}/details"
-            async with session.get(url) as responce:
-                data = await responce.json()
-                if responce.status == 200:
-                    name = data['Name']
-                    type = data['AssetTypeId']
-                    creator = data['Creator']['Name']
-                    netw_error = None
-                else:
-                    name = None
-                    creator = None
-                    type = None
-                    netw_error = f"{responce.status}  Error getting Accessory Info"
+    async def get_acc_info(self, id):                                
+        url = f"https://economy.roblox.com/v2/assets/{id}/details"
+        data = requests.get(url)
+        if data.status_code == 200:
+            data = data.json()
+            name = data['Name']
+            type = data['AssetTypeId']
+            creator = data['Creator']['Name']
+            netw_error = None
+        else:
+            name = None
+            creator = None
+            type = None
+            netw_error = f"{data.status_code}: Error getting Accessory Info"
         return name, type, creator, netw_error 
     
     ### Get Item Thumbnail ###
@@ -1818,44 +1806,41 @@ class BUTTON_WEAR(bpy.types.Operator):
         rbx_format = 'Png'
         rbx_isCircular = 'false'
         url = f"https://thumbnails.roblox.com/v1/assets?assetIds={id}&returnPolicy=PlaceHolder&size={rbx_size}&format={rbx_format}&isCircular={rbx_isCircular}"     
-        async with aiohttp.ClientSession() as session:                             
-            async with session.get(url) as responce:
-                data = await responce.json()
-                if responce.status == 200:
-                    try:
-                        img_url = data["data"][0]["imageUrl"]
-                    except:
-                        netw_error = f"{responce.status} Error, Invalid {type}"
-                        img_url = None
-                    else:
-                        netw_error = None
-                else:
-                    img_url = None
-                    netw_error = f"{responce.status} Error getting {type} IMG URL"
+        data = requests.get(url)
+        if data.status_code == 200:
+            data = data.json()
+            try:
+                img_url = data["data"][0]["imageUrl"]
+            except:
+                netw_error = f"{data.status_code}: Error, Invalid {type}"
+                img_url = None
+            else:
+                netw_error = None
+        else:
+            img_url = None
+            netw_error = f"{data.status_code}: Error getting {type} IMG URL"
         return img_url, netw_error      
     
     ### Get items Data by URL ###
     async def get_url_data(self, img_url): 
-        async with aiohttp.ClientSession() as session:            
-            async with session.get(img_url) as responce:
-                image_data = await responce.content.read()
-                if responce.status == 200:
-                    netw_error = None
-                else:
-                    netw_error = f"{responce.status} Error getting IMG Data"
-            return image_data, netw_error
+        data = requests.get(img_url)
+        if data.status_code == 200:
+            image_data = data.content
+            netw_error = None
+        else:
+            netw_error = f"{data.status_code}: Error getting IMG Data"
+        return image_data, netw_error
  
     ### Get items Data by ID ###
     async def get_id_data(self, id, type):
         url = f"https://assetdelivery.roblox.com/v1/asset?id={id}" 
-        async with aiohttp.ClientSession() as session:            
-            async with session.get(url) as responce:
-                data = await responce.content.read()
-                if responce.status == 200:
-                    netw_error = None
-                else:
-                    netw_error = f"{responce.status} Error getting {type} Data"
-            return data, netw_error       
+        data = requests.get(url)
+        if data.status_code == 200:
+            data = data.content
+            netw_error = None
+        else:
+            netw_error = f"{data.status_code}: Error getting {type} Data"
+        return data, netw_error       
         
          
 

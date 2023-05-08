@@ -92,6 +92,8 @@ v.4.0:
 	Others:
 	-Added a quick theme button below (it is a simple theme i made with rounded corners)
 	Restart Blender after update
+v.4.1:
+	Hotfix - removed aiohttp error
 	
 	
 	

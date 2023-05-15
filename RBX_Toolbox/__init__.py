@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (4, 1),
+    "version": (4, 2),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -48,7 +48,7 @@ import re
 
 
 ## Toolbox vars ##
-ver = "v.4.1"
+ver = "v.4.2"
 disp_ver = ver
 #disp_ver = "v.3.2 Beta-3" ### TO REMOVE IN 3.2
 lts_ver = None
@@ -76,6 +76,7 @@ addon_path = os.path.dirname(RBX_Toolbox.__file__)
 bldr_path = (os.path.dirname(bpy.app.binary_path))
 bldr_ver = bpy.app.version_string.split('.')
 bldr_fdr = bldr_ver[0] + '.' + bldr_ver[1]
+
     
 if platform.system() == 'Windows':
     fbs = '\\'
@@ -901,6 +902,55 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
                         for rbx_mat_slot in bpy.context.object.material_slots:
                             rbx_mat_slot.material.show_transparent_back = False
                             rbx_mat_slot.material.use_backface_culling = True 
+                        
+                        ### Setting up materials for New Heads and Skinned characters ###    
+                        with open(rbx_mtl_file, 'r', encoding='UTF-8') as f:
+                            lines = f.readlines()
+                            for i in range(len(lines)):
+                                if "newmtl" in lines[i]:
+                                    mat_nm = lines[i].split("newmtl")
+                                    mat_nm = mat_nm[1].strip()
+                                    for x in range(i,i+2):
+                                        if "Material Color" in lines[x]:
+                                            for n in range(x,len(lines)):
+                                                if "Ka" in lines[n]:
+                                                    rbx_shade = lines[n].split(" ")
+                                                    rbx_shade_r = rbx_shade[1].strip()
+                                                    rbx_shade_g = rbx_shade[2].strip()
+                                                    rbx_shade_b = rbx_shade[3].strip()
+                                                    if (rbx_shade_r, rbx_shade_g, rbx_shade_b) != ('1','1','1'):
+                                                        rbx_shade_r = float(rbx_shade_r)
+                                                        rbx_shade_g = float(rbx_shade_g)
+                                                        rbx_shade_b = float(rbx_shade_b)                                                    
+                                                        for rbx_mat_slot in bpy.context.object.material_slots:
+                                                            if mat_nm in rbx_mat_slot.name:
+                                                                rbx_mat = rbx_mat_slot.material
+                                                                rbx_nodes = rbx_mat.node_tree.nodes
+                                                                bsdf = rbx_nodes['Principled BSDF']
+                                                                
+                                                                if float(bldr_fdr) < 3.4:
+                                                                    rbx_MixNode = rbx_nodes.new('ShaderNodeMixRGB')
+                                                                    rbx_MixNode.inputs[1].default_value = (rbx_shade_r, rbx_shade_g, rbx_shade_b, 1)
+                                                                else:
+                                                                    rbx_MixNode = rbx_nodes.new('ShaderNodeMix')
+                                                                    rbx_MixNode.data_type='RGBA'
+                                                                    rbx_MixNode.inputs[6].default_value = (rbx_shade_r, rbx_shade_g, rbx_shade_b, 1)
+                                                                rbx_MixNode.location = (-200,300)
+                                                                
+                                                                rbx_img = rbx_nodes['Image Texture']
+                                                                rbx_img.location = (-500,300)
+                                                                rbx_img_link = rbx_img.outputs[0].links[0] #existing link to bsdf
+                                                                rbx_mat.node_tree.links.remove(rbx_img_link) #remove existing link to bsdf
+                                                                
+                                                                if float(bldr_fdr) < 3.4:
+                                                                    rbx_mat.node_tree.links.new(rbx_img.outputs[1], rbx_MixNode.inputs[0]) #Alpha
+                                                                    rbx_mat.node_tree.links.new(rbx_img.outputs[0], rbx_MixNode.inputs[2]) #Color
+                                                                    rbx_mat.node_tree.links.new(rbx_MixNode.outputs[0], bsdf.inputs[0])
+                                                                else:
+                                                                    rbx_mat.node_tree.links.new(rbx_img.outputs[1], rbx_MixNode.inputs[0]) #Alpha
+                                                                    rbx_mat.node_tree.links.new(rbx_img.outputs[0], rbx_MixNode.inputs[7]) #Color
+                                                                    rbx_mat.node_tree.links.new(rbx_MixNode.outputs[2], bsdf.inputs[0])
+                                                    break
  
                         ### Removing doubles ###
                         if bpy.context.mode == 'OBJECT':
@@ -1192,36 +1242,46 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
     ########### INDIVIDUAL FUNCTIONS ###########
     async def get_user_id(self, rbx_username, rbx_username_is):
         if rbx_username_is == "id":
-            data = requests.get(f"https://users.roblox.com/v1/users/{rbx_username}")
-            if data.status_code == 200:
-                data = data.json()
-                rbx_usr_id = data['id']
-                rbx_username = data['name']
-                rbx_char_netw_error = None
-            else:
-                if data.status_code == 404:
-                    rbx_username_is = "username"
+            try:
+                data = requests.get(f"https://users.roblox.com/v1/users/{rbx_username}")
+            except:
+                rbx_char_netw_error = "Get User ID Error, no respose"
+                rbx_usr_id = None
+            else: 
+                if data.status_code == 200:
+                    data = data.json()
+                    rbx_usr_id = data['id']
+                    rbx_username = data['name']
+                    rbx_char_netw_error = None
                 else:
-                    rbx_usr_id = None
-                    rbx_char_netw_error = f"{data.status_code}: Error getting User ID" 
+                    if data.status_code == 404:
+                        rbx_username_is = "username"
+                    else:
+                        rbx_usr_id = None
+                        rbx_char_netw_error = f"{data.status_code}: Error getting User ID" 
         if rbx_username_is == "username":
             payload = {
                 "usernames": [rbx_username],
                 "excludeBannedUsers" : 'true'
                 }
-            data = requests.post("https://users.roblox.com/v1/usernames/users", json=payload)
-            if data.status_code == 200:
-                data = data.json()
-                try:
-                    rbx_usr_id = data.get('data')[0]['id']
-                except:
-                    rbx_usr_id = None
-                    rbx_char_netw_error = "Error: Unable to find this user"
-                else:
-                    rbx_char_netw_error = None           
-            else:
+            try:
+                data = requests.post("https://users.roblox.com/v1/usernames/users", json=payload)
+            except:
+                rbx_char_netw_error = "Get User ID Error, no respose"
                 rbx_usr_id = None
-                rbx_char_netw_error = f"{data.status_code}: Error getting User ID"
+            else:
+                if data.status_code == 200:
+                    data = data.json()
+                    try:
+                        rbx_usr_id = data.get('data')[0]['id']
+                    except:
+                        rbx_usr_id = None
+                        rbx_char_netw_error = "Error: Unable to find this user"
+                    else:
+                        rbx_char_netw_error = None           
+                else:
+                    rbx_usr_id = None
+                    rbx_char_netw_error = f"{data.status_code}: Error getting User ID"
         return rbx_usr_id, rbx_char_netw_error, rbx_username
     
                     
@@ -2617,10 +2677,13 @@ class TOOLBOX_MENU(bpy.types.Panel):
         
         
         ######## Update Notifier ########
-        if lts_ver > ver:
-            box = layout.box()
-            #box.label(text = "Addon Update Available: " + lts_ver, icon='IMPORT') 
-            box.operator('object.url_handler', text = "Update Available: " + lts_ver, icon='IMPORT').rbx_link = "update"    
+        try:
+            if lts_ver > ver:
+                box = layout.box()
+                #box.label(text = "Addon Update Available: " + lts_ver, icon='IMPORT') 
+                box.operator('object.url_handler', text = "Update Available: " + lts_ver, icon='IMPORT').rbx_link = "update"    
+        except:
+            pass
             
         ######## Set Correct Units ########
         '''

@@ -94,6 +94,11 @@ v.4.0:
 	Restart Blender after update
 v.4.1:
 	Hotfix - removed aiohttp error
+	Restart Blender after update
+v.4.2:
+	Character Import:
+	Added support for new Roblox Heads and Skinned characters
+	Restart Blender after update
 	
 	
 	

@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (4, 2),
+    "version": (4, 3, 0),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -48,23 +48,23 @@ import re
 
 
 ## Toolbox vars ##
-ver = "v.4.2"
+ver = "v.4.3"
 disp_ver = ver
 #disp_ver = "v.3.2 Beta-3" ### TO REMOVE IN 3.2
 lts_ver = None
 
 
 mode = 1 #0 - Test Mode; 1 - Live mode
-wh =1   #0 - W; 1 - H
+wh =0   #0 - W; 1 - H
 
 
 if mode == 0:
     if wh == 1:
-        rbx_my_path = ("E:\\G-Drive\\Blender\\Roblox\\0. Addon\\RBX_Toolbox")
-        rbx_ast_fldr = ("E:\\G-Drive\\Blender\\Roblox\\UGC\\UGC Files") 
+        rbx_my_path = ("D:\\Mine\\GGDrv\\Blender\\Roblox\\0. Addon\\RBX_Toolbox")
+        rbx_ast_fldr = ("D:\\Mine\\GGDrv\\Blender\\Roblox\\UGC\\UGC Files") 
     if wh == 0:
-        rbx_my_path = ("D:\\Personal\\G-Drive\\Blender\\Roblox\\0. Addon\\RBX_Toolbox")
-        rbx_ast_fldr = ("D:\\Personal\\G-Drive\\Blender\\Roblox\\UGC\\UGC Files")    
+        rbx_my_path = ("D:\\Mine\\GGDrv\\Blender\\Roblox\\0. Addon\\RBX_Toolbox")
+        rbx_ast_fldr = ("D:\\Mine\\GGDrv\\Blender\\Roblox\\UGC\\UGC Files")    
 else:
     rbx_my_path = (os.path.dirname(os.path.realpath(__file__)))
     
@@ -127,6 +127,7 @@ rbx_asset_type_name = None
 rbx_asset_creator = None
 rbx_bkd_hair_img = None
 rbx_anim_error = None
+unhide_store = []
 
 #https://create.roblox.com/docs/reference/engine/enums/AssetType
 rbx_ast_type = {
@@ -351,11 +352,8 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
                  ('OP8', "3.0: Woman", ""),
                  ('OP9', "2.0: Robloxian 2.0", ""),
                  ('OP10', "Neoclassic: Skyler", ""),
-                 ('OP11', "Rthro: Boy", ""),
-                 ('OP12', "Rthro: Girl", ""),
-                 ('OP13', "Rthro: Normal", ""),
-                 ('OP14', "Rthro: Slender", ""),
-                 ('OP15', "R6: Blocky", ""),
+                 ('OP11', "R6: Blocky", ""),
+                 ('OP12', "Anime", "")
                 ]
         ) 
  
@@ -372,6 +370,17 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
                 ]
         )        
 
+    ### Avatars ###    
+    rbx_ava_enum : bpy.props.EnumProperty(
+        name = "Avatars",
+        description = "Avatars",
+        default='OP1',
+        items = [('OP1', "Blocky", ""),
+                 ('OP2', "Round Male", ""),
+                 ('OP3', "Anime", "")
+                ]
+        ) 
+        
 
     ### Armatures ###    
     rbx_arma_enum : bpy.props.EnumProperty(
@@ -385,7 +394,6 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
                  ('OP5', "Rthro: Boy Armature", ""),
                  ('OP6', "Rthro: Girl Armature", ""),
                  ('OP7', "Rthro: Normal Armature", ""),
-                 ('OP8', "Rthro: Slender Armature", ""),
                 ]
         ) 
                 
@@ -830,8 +838,8 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
                               
                 def get_cdn_url(hash):
                     i = 31
-                    for char in hash[:32]:
-                        i ^= ord(char)  # i ^= int(char, 16) also works
+                    for char in hash:
+                        i ^= ord(char)
                     return f"https://t{i%8}.rbxcdn.com/{hash}"
                 
                 avt_obj_hsh = rbx_usr_hsh_urls['obj']
@@ -919,9 +927,9 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
                                                     rbx_shade_g = rbx_shade[2].strip()
                                                     rbx_shade_b = rbx_shade[3].strip()
                                                     if (rbx_shade_r, rbx_shade_g, rbx_shade_b) != ('1','1','1'):
-                                                        rbx_shade_r = float(rbx_shade_r)
-                                                        rbx_shade_g = float(rbx_shade_g)
-                                                        rbx_shade_b = float(rbx_shade_b)                                                    
+                                                        rbx_shade_r = float(rbx_shade_r) - 0.187934
+                                                        rbx_shade_g = float(rbx_shade_g) - 0.28103
+                                                        rbx_shade_b = float(rbx_shade_b) - 0.269785                                                  
                                                         for rbx_mat_slot in bpy.context.object.material_slots:
                                                             if mat_nm in rbx_mat_slot.name:
                                                                 rbx_mat = rbx_mat_slot.material
@@ -1015,8 +1023,8 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
             if rbx_asset_netw_error == None:
                 def get_cdn_url(hash):
                     i = 31
-                    for char in hash[:32]:
-                        i ^= ord(char)  # i ^= int(char, 16) also works
+                    for char in hash:
+                        i ^= ord(char)
                     return f"https://t{i%8}.rbxcdn.com/{hash}"
                 ############## PARSING RBXM ################
                 ### WARNING!!
@@ -1489,11 +1497,8 @@ class BUTTON_DMMY(bpy.types.Operator):
                         '3.0 Woman',
                         'Robloxian 2.0',
                         'Neoclassic Skyler',
-                        'Rthro Boy',
-                        'Rthro Girl',
-                        'Rthro Normal',
-                        'Rthro Slender',
-                        'R6 (1.0)'
+                        'R6 (1.0)',
+                        'SKN Anime'
                         ] 
                         
         dum_hd_list = [
@@ -2263,12 +2268,109 @@ class RBX_BUTTON_LC_ANIM(bpy.types.Operator):
                     bpy.data.objects[rbx_object_copy.name].select_set(True)
                     bpy.context.view_layer.objects.active = bpy.data.objects[rbx_object_copy.name]
                           
-                
-                           
-        
         return {'FINISHED'}   
     
+
+
+
+######### Avatar Buttons ########### 
+class RBX_BUTTON_AVA(bpy.types.Operator):
+    bl_label = "RBX_BUTTON_AVA"
+    bl_idname = "object.rbx_button_ava"
+    bl_options = {'REGISTER', 'UNDO'}
+    rbx_ava : bpy.props.StringProperty(name= "Added")
+
+    def execute(self, context):
+        global rbx_anim_error
+        global unhide_store
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs        
+        rbx_ava = self.rbx_ava
+
+        ava_list = [
+                    'Blocky_ava',
+                    'Round_male',
+                    'Anime_ava'
+                    ]
+
+        if rbx_ava == 'avatar':     
+            for x in range(len(ava_list)):
+                if rbx_prefs.rbx_ava_enum == 'OP' + str(x+1):
+                    ava_spwn = ava_list[x]   
+                                 
+            bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_collection, filename =ava_spwn)
             
+            
+            
+        if rbx_ava == 'clear':
+            selected = bpy.context.selected_objects
+            active = bpy.context.view_layer.objects.active
+            prop_lst = []
+            
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.context.view_layer.objects.active = None
+            
+            for item in selected:
+                bpy.data.objects[item.name].select_set(True)
+                bpy.context.view_layer.objects.active = bpy.data.objects[item.name]
+                
+                props = bpy.data.objects[item.name].items()
+       
+                for x in props:
+                    prop_lst.append(x[0])
+                for prop in prop_lst:
+                    bpy.ops.wm.properties_remove(data_path='object', property_name=prop)
+                prop_lst.clear()
+                bpy.ops.object.select_all(action='DESELECT')
+                bpy.context.view_layer.objects.active = None
+                
+            for item in selected:
+                bpy.data.objects[item.name].select_set(True)
+                bpy.context.view_layer.objects.active = active
+                
+            bpy.context.view_layer.update()
+            
+            
+        if rbx_ava == 'rename':
+            objects = bpy.context.selected_objects
+        
+            for item in objects:
+                if '.' in item.name:
+                     new_name = item.name.split('.')[0]
+                     item.name = new_name
+            
+            bpy.context.view_layer.update()
+            
+            
+        if rbx_ava == 'hide':
+            objects = bpy.context.selected_objects
+            
+            for item in objects:
+                if '_Att' in item.name:
+                    item.hide_viewport = True
+                    unhide_store.append(item)
+            
+            bpy.context.view_layer.update()
+            
+            
+        if rbx_ava == 'unhide':
+           unhide_store.clear()
+           bpy.context.view_layer.update()
+           
+           for item in unhide_store:
+               item.hide_viewport = False
+
+           unhide_store.clear()
+           bpy.context.view_layer.update()
+                   
+            
+        if rbx_ava == 'export':
+            bpy.ops.export_scene.fbx('INVOKE_DEFAULT', path_mode='COPY', embed_textures=True, use_selection=True, object_types={'MESH', 'OTHER', 'EMPTY', 'ARMATURE'}, use_custom_props=True, add_leaf_bones=False, bake_anim=True, bake_anim_use_nla_strips=False, bake_anim_use_all_actions=True, bake_anim_force_startend_keying=False, bake_anim_simplify_factor=0)
+
+
+        return {'FINISHED'}         
+        
+                           
         
 ######### Bounds Buttons ###########    
 class BUTTON_BNDS(bpy.types.Operator):
@@ -2447,10 +2549,6 @@ class BUTTON_BN(bpy.types.Operator):
                     'Character_bones_r15_boy',
                     'Character_bones_r15_girl',
                     'Character_bones_r15_woman',
-                    'Character_bones_rth_boy',
-                    'Character_bones_rth_girl',
-                    'Character_bones_rth_normal',
-                    'Character_bones_rth_slender'
                     ] 
       
         
@@ -3287,7 +3385,48 @@ class TOOLBOX_MENU(bpy.types.Panel):
             box = layout.box()
             box.operator('object.url_handler', text = "Roblox Github", icon='URL').rbx_link = "rbx github"                         
             
-                    
+ 
+ 
+ 
+        ######### Avatars #########
+        row = layout.row()
+        icon = 'DOWNARROW_HLT' if context.scene.subpanel_cams else 'RIGHTARROW'
+        row.prop(context.scene, 'subpanel_ava', icon=icon, icon_only=True)
+        row.label(text='Avatars', icon='COMMUNITY')
+        # some data on the subpanel
+        if context.scene.subpanel_ava:
+            # Avatar templates:
+            box = layout.box()
+            box.label(text = 'Avatar Templates')
+            box.prop(rbx_prefs, 'rbx_ava_enum', text ='')
+            split = box.split(factor = 0.5)
+            col = split.column(align = True)            
+            col.label(text = "")            
+            split.operator('object.rbx_button_ava', text = "Spawn").rbx_ava = 'avatar'
+             
+            
+            # Clean props:
+            box = layout.box()                  
+            box.label(text = "Clear All Custom Props in selected")
+            box.operator('object.rbx_button_ava', text="Clean Up").rbx_ava = "clear" 
+            
+            # Renamer:
+            box = layout.box()
+            box.label(text = "Select Objects to remove .000")
+            box.label(text = "ps: not always works")
+            box.operator('object.rbx_button_ava', text="Rename All").rbx_ava = "rename" 
+
+
+            # Hide Att:
+            box = layout.box()
+            box.label(text = "Hide all Att in selected:")
+            box.operator('object.rbx_button_ava', text="Hide All").rbx_ava = "hide" 
+            box.operator('object.rbx_button_ava', text="UnHide Them").rbx_ava = "unhide" 
+            box.label(text = "(only the ones you hide before)")
+                
+                
+                
+                                    
         ######### Cameras #########
         row = layout.row()
         icon = 'DOWNARROW_HLT' if context.scene.subpanel_cams else 'RIGHTARROW'
@@ -3579,7 +3718,19 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 else:
                     box.label(text='Some items not selected', icon='ERROR')
             except:
-                box.label(text='Some items not selected', icon='ERROR')    
+                box.label(text='Some items not selected', icon='ERROR')  
+            
+            
+            #### Export Avatar ####
+            row = layout.row()
+            box = layout.box()
+            box.label(text='Avatar Export:')
+            box.label(text='Select all parts 1st')
+            box.operator('object.rbx_button_ava', text="Export Avatar").rbx_ava = 'export'
+
+            
+            
+              
                 
                         
         #### Discord Support Server ####                
@@ -3608,6 +3759,7 @@ classes = (
         BUTTON_HAIR, 
         RBX_BUTTON_LC,
         RBX_BUTTON_LC_ANIM,
+        RBX_BUTTON_AVA,
         BUTTON_BNDS,
         BUTTON_CMR,
         BUTTON_BN, 
@@ -3628,6 +3780,7 @@ def register():
     Scene.subpanel_dummy = BoolProperty(default=False)
     Scene.subpanel_hair = BoolProperty(default=False)
     Scene.subpanel_lc = BoolProperty(default=False)
+    Scene.subpanel_ava = BoolProperty(default=False)
     Scene.subpanel_cams = BoolProperty(default=False)
     Scene.subpanel_bn = BoolProperty(default=False)
     Scene.subpanel_bn_st1 = BoolProperty(default=False)
@@ -3652,6 +3805,7 @@ def unregister():
     del Scene.subpanel_dummy
     del Scene.subpanel_hair
     del Scene.subpanel_lc
+    del Scene.subpanel_ava
     del Scene.subpanel_cams
     del Scene.subpanel_bn
     del Scene.subpanel_bn_st1

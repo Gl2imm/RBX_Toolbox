@@ -65,7 +65,7 @@ Credits: Base Taken from Guilded UGC programme and modified/retextured. I do not
 ####################################
 
 Quick spawn of Dummy template
-Dummies: R15 Blocky, R15 Boy, R15 Girl, R15 Woman, Rthro Boy, Rthro Girl, Rthro Normal, Rthro Slender
+Dummies: R15 Blocky, R15 Boy, R15 Girl, R15 Woman, Rthro Boy, Anime
 Credits: All dummies were exported from Roblox
 
 R6 Rig: Quick add of the R6 rig which you may easily retexture and use for your renders/animation
@@ -102,6 +102,16 @@ Default Mannequinn, R15 boy, R15 Girl, Woman, Man, Classic Male, Classic Female,
 Credits: Blocky cages were taken from Roblox DevFoum (https://devforum.roblox.com/t/10-blocky-layered-clothing-resources/2025916)
 All other cages are from Roblox online help files (https://create.roblox.com/docs/avatar/accessories/creating-in-blender)
 and Roblox Github (https://github.com/Roblox/avatar)
+
+
+
+####################################			
+             Avatars:
+####################################
+
+Quick spawn of Avatar template
+Templates: Blocky, Round Male, Anime
+Credits: All dummies were exported from Roblox documentation
 
 
 
@@ -151,6 +161,13 @@ Credits: Armature basic were taken from Blender Built-in Rigify addon and modifi
 	Select Correct Object types, 
 	Preset FBX export settings for 1:1 model import in Studio	
 2. Layered Cloth Export (Export LC as FBX)
+	This will do a few operation in 1 click: 
+	Set Path mode to Copy, 
+	Select Correct Object types,
+	Disable Bake Animation, 
+	Disable Add Leaf Bones, 
+	Preset FBX export settings for 1:1 model import in Studio
+3. Avatar Export (Export Avatar as FBX)
 	This will do a few operation in 1 click: 
 	Set Path mode to Copy, 
 	Select Correct Object types,

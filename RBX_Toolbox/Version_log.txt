@@ -99,6 +99,16 @@ v.4.2:
 	Character Import:
 	Added support for new Roblox Heads and Skinned characters
 	Restart Blender after update
+v.4.3:
+	Hotfix - Fixed error importing avatars and accessories (Roblox changed their code)
+	Avatars:
+	Added avatar templates tab with Blocky, Round Male and Anime templates
+	Added quick functions when working with avatars (Batch rename, clean custom props, Batch hide attachments)
+	Added Avatar export function in Files export tab (Correct settings are already preset, no need change)
+	Dummies:
+	Added Anime dummy
+	Removed RTHRO dummies and Armatures to reduce addon size
+	Restart Blender after update
 	
 	
 	

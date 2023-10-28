@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (4, 3, 0),
+    "version": (4, 4),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -48,19 +48,19 @@ import re
 
 
 ## Toolbox vars ##
-ver = "v.4.3"
+ver = "v.4.4"
 disp_ver = ver
 #disp_ver = "v.3.2 Beta-3" ### TO REMOVE IN 3.2
 lts_ver = None
 
 
 mode = 1 #0 - Test Mode; 1 - Live mode
-wh =0   #0 - W; 1 - H
+wh =1   #0 - W; 1 - H
 
 
 if mode == 0:
     if wh == 1:
-        rbx_my_path = ("D:\\Mine\\GGDrv\\Blender\\Roblox\\0. Addon\\RBX_Toolbox")
+        rbx_my_path = ("E:\\G-Drive\\Blender\\Roblox\\0. Addon\\RBX_Toolbox")
         rbx_ast_fldr = ("D:\\Mine\\GGDrv\\Blender\\Roblox\\UGC\\UGC Files") 
     if wh == 0:
         rbx_my_path = ("D:\\Mine\\GGDrv\\Blender\\Roblox\\0. Addon\\RBX_Toolbox")
@@ -128,6 +128,10 @@ rbx_asset_creator = None
 rbx_bkd_hair_img = None
 rbx_anim_error = None
 unhide_store = []
+
+addon_keymaps = {}
+_icons = None
+
 
 #https://create.roblox.com/docs/reference/engine/enums/AssetType
 rbx_ast_type = {
@@ -380,7 +384,23 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
                  ('OP3', "Anime", "")
                 ]
         ) 
-        
+
+
+    ### Starter Rigs ###    
+    rbx_rigs_enum : bpy.props.EnumProperty(
+        name = "Starter Rigs",
+        description = "Starter Rigs",
+        default='OP1',
+        items = [('OP1', "Starter 2.0 Rig", ""),
+                 ('OP2', "Starter Blocky Rig", ""),
+                 ('OP3', "Starter Man Rig", ""),
+                 ('OP4', "Starter Boy Rig", ""),
+                 ('OP5', "Starter Superhero Rig", ""),
+                 ('OP6', "Starter Girl Rig", ""),
+                 ('OP7', "Starter Woman Rig", "")
+                ]
+        ) 
+                                              
 
     ### Armatures ###    
     rbx_arma_enum : bpy.props.EnumProperty(
@@ -1907,7 +1927,75 @@ class BUTTON_WEAR(bpy.types.Operator):
             netw_error = f"{data.status_code}: Error getting {type} Data"
         return data, netw_error       
         
-         
+
+'''
+######### Starter Rigs Buttons ###########    
+class BUTTON_RIGS(bpy.types.Operator):
+    bl_label = "BUTTON_RIGS"
+    bl_idname = "object.button_rigs"
+    bl_options = {'REGISTER', 'UNDO'}
+    rbx_rigs : bpy.props.StringProperty(name= "Added")
+
+    def execute(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs         
+        rbx_rigs = self.rbx_rigs
+        
+        rbx_rigs_path = os.path.join(rbx_my_path, 'Starter_Rigs')
+        
+        
+        rigs_spwn = None
+        rbx_mode = None
+        
+        rbx_blends_list = [
+                    'Starter_2.0_Rig.blend',
+                    'Starter_Blocky_Rig.blend',
+                    'Starter_Man_Rig.blend',
+                    'Starter_Boy_Rig.blend',
+                    'Starter_Superhero_Rig.blend',
+                    'Starter_Girl_Rig.blend',
+                    'Starter_Woman_Rig.blend'
+                    ]
+        
+        rbx_rigs_list = [
+                    'Starter 2.0 Rig',
+                    'Starter Blocky Rig',
+                    'Starter Man Rig',
+                    'Starter Boy Rig',
+                    'Starter Superhero Rig',
+                    'Starter Girl Rig',
+                    'Starter Woman Rig'
+                    ] 
+                                
+ 
+        if bpy.context.mode == 'EDIT_MESH':
+            bpy.ops.object.editmode_toggle()
+            rbx_mode = 1
+            rbx_sel = bpy.context.selected_objects
+            
+                            
+        for x in range(len(rbx_rigs_list)):
+            if rbx_prefs.rbx_rigs_enum == 'OP' + str(x+1):
+                rigs_spwn = rbx_rigs_list[x] 
+                rbx_rigs_path_blend = os.path.join(rbx_rigs_path, rbx_blends_list[x])            
+
+        bpy.ops.wm.append(directory =rbx_rigs_path_blend + ap_collection, filename =rigs_spwn)
+                
+
+        if rbx_mode == 1:
+                bpy.ops.object.select_all(action='DESELECT')
+                bpy.data.objects[rbx_sel[0].name].select_set(True)            
+                bpy.ops.object.editmode_toggle()
+                
+                            
+        print(rigs_spwn + " Spawned")
+
+        return {'FINISHED'}
+
+'''        
+        
+        
+                 
 
 ######### Hair Buttons ###########    
 class BUTTON_HAIR(bpy.types.Operator):
@@ -2705,14 +2793,61 @@ class RBX_BUTTON_OF(bpy.types.Operator):
         rbx_of = self.rbx_of
         
         
-        if rbx_of == 'inside' or rbx_of == 'outside':
+        if rbx_of == 'orig_to_geo':
+            try:
+                sel = bpy.context.selected_objects
+            except:
+                pass
+            else:
+                bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
+
+
+        if rbx_of == 'orig_to_3d':
+            try:
+                sel = bpy.context.selected_objects
+            except:
+                pass
+            else:
+                bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
+
+
+        if rbx_of == 'shd_flat':
+            try:
+                sel = bpy.context.selected_objects
+            except:
+                pass
+            else:
+                bpy.ops.object.shade_flat()
+                
+
+        if rbx_of == 'shd_smooth':
+            try:
+                sel = bpy.context.selected_objects
+            except:
+                pass
+            else:
+                bpy.ops.object.shade_smooth(use_auto_smooth=False, auto_smooth_angle=0.523599)
+                
+
+        if rbx_of == 'shd_aut_smooth':
+            try:
+                sel = bpy.context.selected_objects
+            except:
+                pass
+            else:
+                bpy.ops.object.shade_smooth(use_auto_smooth=True, auto_smooth_angle=0.523599)
+                                                
+                            
+        if rbx_of == 'inside' or rbx_of == 'outside' or rbx_of == 'flip':
             def rbx_of_recalc():
                 if rbx_of == 'outside':
                     bpy.ops.mesh.normals_make_consistent(inside=False)
                 if rbx_of == 'inside':
                     bpy.ops.mesh.normals_make_consistent(inside=True)
-         
-     
+                if rbx_of == 'flip':
+                    bpy.ops.mesh.flip_normals()
+                
+
             #### Recalculate Normals ####
             rbx_sel = bpy.context.selected_objects
             of_mesh = 0
@@ -2744,7 +2879,51 @@ class RBX_BUTTON_OF(bpy.types.Operator):
                             rbx_of_recalc()
 
                 print("Normals Recalculated")
-           
+
+        
+        #### Recalculate Normals (Pie Menu)####
+        if rbx_of == 'pie_inside' or rbx_of == 'pie_outside' or rbx_of == 'pie_flip' or rbx_of == 'pie_inside_all' or rbx_of == 'pie_outside_all' or rbx_of == 'pie_flip_all':
+            def rbx_of_recalc():
+                if rbx_of == 'pie_outside' or rbx_of == 'pie_outside_all':
+                    bpy.ops.mesh.normals_make_consistent(inside=False)
+                if rbx_of == 'pie_inside' or rbx_of == 'pie_inside_all':
+                    bpy.ops.mesh.normals_make_consistent(inside=True)
+                if rbx_of == 'pie_flip' or rbx_of == 'pie_flip_all':
+                    bpy.ops.mesh.flip_normals()
+                
+
+            #### Recalculate Normals ####
+            rbx_sel = bpy.context.selected_objects
+            of_mesh = 0
+            if len(rbx_sel) < 1:
+                print("Nothing Selected")             
+            else:
+                for x in rbx_sel:
+                    if x.type != 'MESH':
+                        print(x.type + " Selected. Pls Select Only Mesh")
+                        msh_selection = "Pls Select Only Mesh"
+                        of_mesh = 0
+                    else:
+                        of_mesh = 1
+                        msh_selection = None
+                if of_mesh == 1:
+                    if bpy.context.mode == 'OBJECT':
+                        bpy.ops.object.editmode_toggle()
+                        if rbx_of == 'pie_inside' or rbx_of == 'pie_outside' or rbx_of == 'pie_flip':
+                            rbx_of_recalc()
+                        if rbx_of == 'pie_inside_all' or rbx_of == 'pie_outside_all' or rbx_of == 'pie_flip_all':
+                            bpy.ops.mesh.select_all(action='SELECT')
+                            rbx_of_recalc()
+                        bpy.ops.object.editmode_toggle()               
+                    elif bpy.context.mode == 'EDIT_MESH':
+                        if rbx_of == 'pie_inside' or rbx_of == 'pie_outside' or rbx_of == 'pie_flip':
+                            rbx_of_recalc()
+                        if rbx_of == 'pie_inside_all' or rbx_of == 'pie_outside_all' or rbx_of == 'pie_flip_all':
+                            bpy.ops.mesh.select_all(action='SELECT')
+                            rbx_of_recalc()
+
+                print("Normals Recalculated")
+                           
  
         if rbx_of == 'theme_install':
             file = "Theme/RBXToolbox.xml"
@@ -2756,6 +2935,154 @@ class RBX_BUTTON_OF(bpy.types.Operator):
                                                                                                                            
         return {'FINISHED'}      
  
+
+
+#### RBX PIE MENU ####
+def find_user_keyconfig(key):
+    km, kmi = addon_keymaps[key]
+    for item in bpy.context.window_manager.keyconfigs.user.keymaps[km.name].keymap_items:
+        found_item = False
+        if kmi.idname == item.idname:
+            found_item = True
+            for name in dir(kmi.properties):
+                if not name in ["bl_rna", "rna_type"] and not name[0] == "_":
+                    if not kmi.properties[name] == item.properties[name]:
+                        found_item = False
+        if found_item:
+            return item
+    print(f"Couldn't find keymap item for {key}, using addon keymap instead. This won't be saved across sessions!")
+    return kmi
+
+
+#### MAIN MENU ####
+class RBX_MT_MENU(bpy.types.Menu):
+    bl_idname = "RBX_MT_MENU"
+    bl_label = "RBX Toolbox Menu"
+
+    @classmethod
+    def poll(cls, context):
+        return not (False)
+
+    def draw(self, context):
+        layout = self.layout.menu_pie()
+        op = layout.prop(bpy.context.space_data.overlay, 'show_face_orientation', text='Show Face Orientation', icon='NORMALS_FACE') 
+        layout.menu('RBX_MT_MENU3', text='Set Origin', icon='LAYER_ACTIVE')
+        layout.menu('RBX_MT_MENU2', text='Recalculate Normals', icon='FACESEL')
+        layout.menu('RBX_MT_MENU4', text='Shading', icon='SHADING_TEXTURE')
+        
+
+           
+#### Recalculate MENU ####        
+class RBX_MT_MENU2(bpy.types.Menu):
+    bl_idname = "RBX_MT_MENU2"
+    bl_label = ""
+
+    @classmethod
+    def poll(cls, context):
+        return not (False)
+
+    def draw(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs
+        layout = self.layout.column_flow(columns=1)
+        layout.operator_context = "INVOKE_DEFAULT"
+        layout.menu('RBX_MT_MENU2_1', text='Recalc Outside', icon_value=0)
+        layout.menu('RBX_MT_MENU2_2', text='Recalc Inside', icon_value=0)
+        layout.menu('RBX_MT_MENU2_3', text='Flip Normals', icon_value=0)
+
+
+#### Recalculate SUBMENU Recalc Outside ####        
+class RBX_MT_MENU2_1(bpy.types.Menu):
+    bl_idname = "RBX_MT_MENU2_1"
+    bl_label = ""
+
+    @classmethod
+    def poll(cls, context):
+        return not (False)
+
+    def draw(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs
+        layout = self.layout.column_flow(columns=1)
+        layout.operator_context = "INVOKE_DEFAULT"
+        op = layout.operator("object.rbx_button_of", text = "All Faces").rbx_of = 'pie_outside_all'
+        op = layout.operator("object.rbx_button_of", text = "Selected Faces").rbx_of = 'pie_outside'
+
+
+#### Recalculate SUBMENU Recalc Inside ####        
+class RBX_MT_MENU2_2(bpy.types.Menu):
+    bl_idname = "RBX_MT_MENU2_2"
+    bl_label = ""
+
+    @classmethod
+    def poll(cls, context):
+        return not (False)
+
+    def draw(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs
+        layout = self.layout.column_flow(columns=1)
+        layout.operator_context = "INVOKE_DEFAULT"
+        op = layout.operator("object.rbx_button_of", text = "All Faces").rbx_of = 'pie_inside_all'
+        op = layout.operator("object.rbx_button_of", text = "Selected Faces").rbx_of = 'pie_inside'
+        
+
+#### Recalculate SUBMENU Recalc Flip Normals ####        
+class RBX_MT_MENU2_3(bpy.types.Menu):
+    bl_idname = "RBX_MT_MENU2_3"
+    bl_label = ""
+
+    @classmethod
+    def poll(cls, context):
+        return not (False)
+
+    def draw(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs
+        layout = self.layout.column_flow(columns=1)
+        layout.operator_context = "INVOKE_DEFAULT"
+        op = layout.operator("object.rbx_button_of", text = "All Faces").rbx_of = 'pie_flip_all'
+        op = layout.operator("object.rbx_button_of", text = "Selected Faces").rbx_of = 'pie_flip'
+        
+
+#### Origin MENU #### 
+class RBX_MT_MENU3(bpy.types.Menu):
+    bl_idname = "RBX_MT_MENU3"
+    bl_label = ""
+
+    @classmethod
+    def poll(cls, context):
+        return not (False)
+
+    def draw(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs
+        layout = self.layout.column_flow(columns=1)
+        layout.operator_context = "INVOKE_DEFAULT"
+        op = layout.operator("object.rbx_button_of", text = "To Geometry").rbx_of = 'orig_to_geo'
+        op = layout.operator("object.rbx_button_of", text = "To 3D Cursor").rbx_of = 'orig_to_3d'
+
+        
+#### Shading MENU #### 
+class RBX_MT_MENU4(bpy.types.Menu):
+    bl_idname = "RBX_MT_MENU4"
+    bl_label = ""
+
+    @classmethod
+    def poll(cls, context):
+        return not (False)
+
+    def draw(self, context):
+        scene = context.scene
+        rbx_prefs = scene.rbx_prefs
+        layout = self.layout.column_flow(columns=1)
+        layout.operator_context = "INVOKE_DEFAULT"
+        op = layout.operator("object.rbx_button_of", text = "Shade Flat").rbx_of = 'shd_flat'
+        op = layout.operator("object.rbx_button_of", text = "Shade Smooth").rbx_of = 'shd_smooth'
+        op = layout.operator("object.rbx_button_of", text = "Shade Auto Smooth").rbx_of = 'shd_aut_smooth'
+        #op = layout.prop(bpy.context.object.data.auto_smooth_angle,"default_value", text = "")
+
+
 
     
     #PANEL UI
@@ -3210,7 +3537,23 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 box.operator('object.button_wear', text = "Textures Folder").rbx_cloth = "folder"
 
                 
-                
+        '''
+        ######### Starter Rigs #########
+        row = layout.row()
+        icon = 'DOWNARROW_HLT' if context.scene.subpanel_bounds else 'RIGHTARROW'
+        row.prop(context.scene, 'subpanel_rigs', icon=icon, icon_only=True)
+        row.label(text='Starter Rigs', icon='MOD_ARMATURE')
+        # some data on the subpanel
+        if context.scene.subpanel_rigs:
+            box = layout.box()
+            box.label(text = 'Rigs')
+            box.prop(rbx_prefs, 'rbx_rigs_enum', text ='')
+            split = box.split(factor = 0.5)
+            col = split.column(align = True)            
+            col.label(text = "")            
+            split.operator('object.button_rigs', text = "Spawn")
+        '''
+                            
                                   
 
         ######### Hairs #########
@@ -3676,7 +4019,8 @@ class TOOLBOX_MENU(bpy.types.Panel):
             split = box.split(factor = 0.5)
             col = split.column(align = True)
             col.operator("object.rbx_button_of", text = "Recalc Outside").rbx_of = 'outside'
-            split.operator("object.rbx_button_of", text = "Recalc Inside").rbx_of = 'inside'  
+            split.operator("object.rbx_button_of", text = "Recalc Inside").rbx_of = 'inside' 
+            box.operator("object.rbx_button_of", text = "Flip Normals").rbx_of = 'flip' 
 
 
         ######### Export Functions #########
@@ -3729,7 +4073,25 @@ class TOOLBOX_MENU(bpy.types.Panel):
             box.operator('object.rbx_button_ava', text="Export Avatar").rbx_ava = 'export'
 
             
+
+        ######### Pie Menu #########
+        row = layout.row()
+        icon = 'DOWNARROW_HLT' if context.scene.subpanel_export else 'RIGHTARROW'
+        row.prop(context.scene, 'subpanel_pie', icon=icon, icon_only=True)
+        row.label(text='Pie Menu:', icon='COLLAPSEMENU')
+        # some data on the subpanel
+        if context.scene.subpanel_pie:
+                        
+            #### Export FBX UGC ####
+            box = layout.box()
+            box.operator_context = "INVOKE_DEFAULT" if True else "EXEC_DEFAULT"
             
+            split = box.split(factor = 0.5)
+            col = split.column(align = True)
+            col.label(text='Shortcut:', icon_value=672)
+            split.prop(find_user_keyconfig('F85A6'), 'type', text='', full_event=True)
+            box.label(text='1. Wont work if shortcut exist') 
+            box.label(text='2. Work in Obj mode only')            
               
                 
                         
@@ -3756,6 +4118,7 @@ classes = (
         OBJECT_OT_add_object,
         BUTTON_DMMY,
         BUTTON_WEAR,
+        #BUTTON_RIGS,
         BUTTON_HAIR, 
         RBX_BUTTON_LC,
         RBX_BUTTON_LC_ANIM,
@@ -3764,7 +4127,14 @@ classes = (
         BUTTON_CMR,
         BUTTON_BN, 
         RBX_BUTTON_OF,
-        TOOLBOX_MENU
+        TOOLBOX_MENU,
+        RBX_MT_MENU,
+        RBX_MT_MENU2,
+        RBX_MT_MENU2_1,
+        RBX_MT_MENU2_2,
+        RBX_MT_MENU2_3,
+        RBX_MT_MENU3,
+        RBX_MT_MENU4
         )  
              
 
@@ -3778,6 +4148,7 @@ def register():
     Scene.subpanel_imp_char = BoolProperty(default=False)
     Scene.subpanel_bounds = BoolProperty(default=False)
     Scene.subpanel_dummy = BoolProperty(default=False)
+    #Scene.subpanel_rigs = BoolProperty(default=False)
     Scene.subpanel_hair = BoolProperty(default=False)
     Scene.subpanel_lc = BoolProperty(default=False)
     Scene.subpanel_ava = BoolProperty(default=False)
@@ -3786,6 +4157,13 @@ def register():
     Scene.subpanel_bn_st1 = BoolProperty(default=False)
     Scene.subpanel_other = BoolProperty(default=False)
     Scene.subpanel_export = BoolProperty(default=False)
+    Scene.subpanel_pie = BoolProperty(default=False)
+    kc = bpy.context.window_manager.keyconfigs.addon
+    km = kc.keymaps.new(name='Window', space_type='EMPTY')
+    kmi = km.keymap_items.new('wm.call_menu_pie', 'Y', 'PRESS',
+        ctrl=False, alt=False, shift=False, repeat=False)
+    kmi.properties.name = 'RBX_MT_MENU'
+    addon_keymaps['F85A6'] = (km, kmi)
     
     
 def unregister():
@@ -3803,6 +4181,7 @@ def unregister():
     del Scene.subpanel_imp_char
     del Scene.subpanel_bounds
     del Scene.subpanel_dummy
+    #del Scene.subpanel_rigs
     del Scene.subpanel_hair
     del Scene.subpanel_lc
     del Scene.subpanel_ava
@@ -3810,7 +4189,14 @@ def unregister():
     del Scene.subpanel_bn
     del Scene.subpanel_bn_st1
     del Scene.subpanel_other
-    del Scene.subpanel_export    
+    del Scene.subpanel_export 
+    del Scene.subpanel_pie 
+    wm = bpy.context.window_manager
+    kc = wm.keyconfigs.addon
+    for km, kmi in addon_keymaps.values():
+        km.keymap_items.remove(kmi)
+    addon_keymaps.clear() 
+
         
 
 if __name__ == "__main__":

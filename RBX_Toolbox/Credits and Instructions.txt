@@ -1,5 +1,5 @@
                                             ####################################			
-                                                     Roblox Toolbox v.3.0
+                                                     Roblox Toolbox v.4.3
                                             ####################################
 
 This tool was created to assist and simplify workflow for Roblox modeling in Blender. Here i collect and organize useful tools/addons/operations all in one place. 

@@ -3,7 +3,10 @@
                                             ####################################
 
 
-
+v.4.5:
+	Hotfix
+	Fixed Avatar/Accessory import for Blender 4.0
+	Restart Blender after update
 v.4.4:
 	Added:
 	Pie Menu (Y) - Shading, Face orientation, Set Origin, Recalculate Normals

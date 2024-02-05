@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (4, 4),
+    "version": (4, 5, 0),
     "blender": (2, 90, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -48,7 +48,7 @@ import re
 
 
 ## Toolbox vars ##
-ver = "v.4.4"
+ver = "v.4.5"
 disp_ver = ver
 #disp_ver = "v.3.2 Beta-3" ### TO REMOVE IN 3.2
 lts_ver = None
@@ -891,6 +891,7 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
                             
                 save_to_file(rbx_mtl_file, avt_mtl_url, "mtl")
                 save_to_file(rbx_obj_file, avt_obj_url, "obj")
+
                 
                 for i in range(len(avt_tex_url)):
                     rbx_tex_file = os.path.join(rbx_char_path, rbx_username + '_tex-' + str(i) + ".png")
@@ -910,8 +911,11 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
                             if "map_d" in text:
                                 text = text.replace("map_d","") ## Remove transparency
                             f.write(text)
-
-                        rbx_imp_avat = bpy.ops.import_scene.obj(filepath=rbx_obj_file)
+                        
+                        if bldr_ver[0] < '4':
+                            rbx_imp_avat = bpy.ops.import_scene.obj(filepath=rbx_obj_file)
+                        else:
+                            rbx_imp_avat = bpy.ops.wm.obj_import(filepath=rbx_obj_file)
                     
                         ### Selecting Character ###
                         rbx_object = bpy.context.selected_objects[0]
@@ -1160,7 +1164,10 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
                 if rbx_asset_netw_error == None:
  
                     ### Start Accessory Import ###
-                    rbx_imp_acc = bpy.ops.import_scene.obj(filepath=rbx_obj_file)
+                    if bldr_ver[0] < '4':
+                        rbx_imp_acc = bpy.ops.import_scene.obj(filepath=rbx_obj_file)
+                    else:
+                        rbx_imp_acc = bpy.ops.wm.obj_import(filepath=rbx_obj_file)
 
                     ### Creating new Material ###
                     rbx_obj = bpy.context.selected_objects[0]

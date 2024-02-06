@@ -2952,7 +2952,7 @@ class RBX_BUTTON_OF(bpy.types.Operator):
             
             mat = bpy.data.materials.get("RBX_Outline_mat")
             if mat == None:
-                bpy.ops.wm.append(directory =my_path + blend_file + ap_material, filename ='RBX_Outline_mat')
+                bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_material, filename ='RBX_Outline_mat')
                 mat = bpy.data.materials.get("RBX_Outline_mat") 
                 
             mat.node_tree.nodes["RGB"].outputs[0].default_value = (0, 0, 0, 1)

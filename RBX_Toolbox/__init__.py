@@ -14,8 +14,8 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (4, 5, 0),
-    "blender": (2, 90, 0),
+    "version": (4, 6, 0),
+    "blender": (3, 6, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
     "warning": "Subscribe to NYTV :)",
@@ -48,7 +48,7 @@ import re
 
 
 ## Toolbox vars ##
-ver = "v.4.5"
+ver = "v.4.6"
 disp_ver = ver
 #disp_ver = "v.3.2 Beta-3" ### TO REMOVE IN 3.2
 lts_ver = None
@@ -927,7 +927,8 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
                         ### Position Character ###
                         bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
                         bpy.ops.view3d.snap_selected_to_cursor(use_offset=False)
-                        bpy.ops.transform.translate(value=(0, 0, 3.28467), orient_axis_ortho='X', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True))
+                        #bpy.ops.transform.translate(value=(0, 0, 3.28467), orient_axis_ortho='X', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True))
+                        bpy.ops.transform.translate(value=(0, 0, 3.28467), orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True))
                         bpy.ops.transform.rotate(value=3.14159, orient_axis='Z', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True))
                         
                         ### Setting up materials ###
@@ -995,6 +996,8 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper):
                         bpy.ops.object.editmode_toggle()
                         bpy.ops.mesh.customdata_custom_splitnormals_clear()
                         bpy.context.object.data.use_auto_smooth = False
+                        bpy.ops.object.shade_smooth()
+
                               
                 if rbx_split == True:
                     if rbx_char_netw_error == None:
@@ -1621,7 +1624,22 @@ class BUTTON_DMMY(bpy.types.Operator):
                 bpy.ops.object.editmode_toggle()
             
             print("Rigged R15 Woman Spawned")                                   
-        
+
+        if dmy == 'Plushie': 
+            if bpy.context.mode == 'EDIT_MESH':
+                bpy.ops.object.editmode_toggle()
+                rbx_mode = 1
+                rbx_sel = bpy.context.selected_objects               
+
+            bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_collection, filename ='Plushie')
+            
+            if rbx_mode == 1:
+                bpy.ops.object.select_all(action='DESELECT')
+                bpy.data.objects[rbx_sel[0].name].select_set(True)            
+                bpy.ops.object.editmode_toggle()
+            
+            print("Plushie Spawned") 
+                     
         return {'FINISHED'} 
 
 
@@ -2886,7 +2904,90 @@ class RBX_BUTTON_OF(bpy.types.Operator):
                             rbx_of_recalc()
 
                 print("Normals Recalculated")
+        
+        
+        
+        if rbx_of == 'glow':
+            try:
+                sel = bpy.context.selected_objects
+            except:
+                pass
+            else:
+                if bpy.context.mode == 'OBJECT':
+                    bpy.ops.object.editmode_toggle()
+                    bpy.ops.mesh.point_normals(target_location=(0, 0, 99999))
+                    bpy.ops.object.editmode_toggle() 
+                elif bpy.context.mode == 'EDIT_MESH':
+                    bpy.ops.mesh.point_normals(target_location=(0, 0, 99999))
+                else:
+                    return {'FINISHED'}
 
+
+        if rbx_of == 'unglow':
+            try:
+                sel = bpy.context.selected_objects
+            except:
+                pass
+            else:
+                if bpy.context.mode == 'OBJECT':
+                    bpy.ops.mesh.customdata_custom_splitnormals_clear()
+                elif bpy.context.mode == 'EDIT_MESH':
+                    bpy.ops.object.editmode_toggle()
+                    bpy.ops.mesh.customdata_custom_splitnormals_clear()
+                    bpy.ops.object.editmode_toggle()
+                else:
+                    return {'FINISHED'}
+ 
+ 
+        if rbx_of == 'make_outline':
+            obj = bpy.context.selected_objects[0]
+            
+            if 'RBX_Outline' not in obj.modifiers:
+                obj.modifiers.new("RBX_Outline","SOLIDIFY")
+                solidify = obj.modifiers["RBX_Outline"]
+                solidify.use_flip_normals = True
+                solidify.thickness = -0.1
+                solidify.material_offset = 999
+            
+            
+            mat = bpy.data.materials.get("RBX_Outline_mat")
+            if mat == None:
+                bpy.ops.wm.append(directory =my_path + blend_file + ap_material, filename ='RBX_Outline_mat')
+                mat = bpy.data.materials.get("RBX_Outline_mat") 
+                
+            mat.node_tree.nodes["RGB"].outputs[0].default_value = (0, 0, 0, 1)
+            if mat.use_backface_culling != True:
+                mat.use_backface_culling = True
+
+            if "RBX_Outline_mat" not in obj.material_slots:
+                obj.data.materials.append(mat)
+            
+
+        if rbx_of == 'apply_outline':
+            obj = bpy.context.selected_objects[0]
+                        
+            bpy.ops.object.modifier_apply(modifier="RBX_Outline")
+            obj.active_material_index = 1
+            
+            bpy.ops.object.editmode_toggle()
+            bpy.ops.mesh.select_all(action='DESELECT')
+            bpy.ops.object.material_slot_select() #Select all faces from the outline material
+            bpy.ops.uv.project_from_view(camera_bounds=False, correct_aspect=True, scale_to_bounds=False) #UV unwrap
+            
+            original_area = bpy.context.area.type
+            bpy.context.area.ui_type = 'UV'
+            bpy.ops.uv.select_all(action='SELECT')
+            bpy.ops.transform.translate(value=(1, 0, 0), orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(True, False, False)) #Move Unwrapped UV
+            bpy.context.area.type = original_area # return to the original mode where the script was run
+            bpy.ops.object.editmode_toggle()
+            
+            bpy.ops.object.material_slot_remove()
+            bpy.context.object.active_material.use_backface_culling = True
+
+
+
+
+       
         
         #### Recalculate Normals (Pie Menu)####
         if rbx_of == 'pie_inside' or rbx_of == 'pie_outside' or rbx_of == 'pie_flip' or rbx_of == 'pie_inside_all' or rbx_of == 'pie_outside_all' or rbx_of == 'pie_flip_all':
@@ -3431,6 +3532,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
             box.operator('object.button_dmmy', text = "Add Rigged R6").dmy = 'rigged_r6'
             box.operator('object.button_dmmy', text = "R15 Blocky Rig").dmy = 'rigged_r15_blocky'
             box.operator('object.button_dmmy', text = "R15 Woman Rig").dmy = 'rigged_r15_woman'
+            box.operator('object.button_dmmy', text = "Plushie Template").dmy = 'Plushie'
             
             
             
@@ -4009,18 +4111,37 @@ class TOOLBOX_MENU(bpy.types.Panel):
         if context.scene.subpanel_other:
 
             box = layout.box()
+            objs = None
+            mat = None
             try:
-                if len(bpy.context.selected_objects) == 1: 
-                    box.prop(bpy.context.object.active_material, 'use_backface_culling', text='Backface Culling', icon='FACESEL')
-                    #box.prop(bpy.context.space_data, 'lock_camera', text='Lock Camera to View', icon='OUTLINER_DATA_CAMERA') 
-                else:
-                    box.label(text='Select obj for Culling Option', icon='ERROR')                    
+                objs = bpy.context.selected_objects
+                try:
+                    mat = bpy.context.object.active_material
+                except:
+                    pass
             except:
-                box.label(text='Culling: No Material Found', icon='ERROR') 
+                pass
+
+            if objs:
+                if len(objs) == 1: 
+                    if mat:
+                        box.label(text='Culling Option', icon='HIDE_ON') 
+                        box.label(text='(Hide flipped faces, like in Roblox)') 
+                        box.prop(bpy.context.object.active_material, 'use_backface_culling', text='Backface Culling', icon='FACESEL')
+                    else:
+                        box.enabled=False
+                        box.label(text='Culling Option (Add Material)', icon='HIDE_ON')
+                        box.label(text='(Hide flipped faces, like in Roblox)') 
+                        box.operator("object.rbx_button_of", text = "Backface Culling",  icon='FACESEL') #Fake button 
+            else:
+                box.enabled=False
+                box.label(text='Culling Option (Select Object)', icon='HIDE_ON')
+                box.label(text='(Hide flipped faces, like in Roblox)') 
+                box.operator("object.rbx_button_of", text = "Backface Culling",  icon='FACESEL') #Fake button    
             
 
-            #box = layout.box()
-            box.label(text='')
+            box = layout.box()
+            box.label(text='Normals', icon='ORIENTATION_NORMAL')
             box.prop(bpy.context.space_data.overlay, 'show_face_orientation', text='Show Face Orientation', icon='NORMALS_FACE')  
             box.prop(rbx_prefs, 'rbx_face_enum')
             split = box.split(factor = 0.5)
@@ -4028,7 +4149,65 @@ class TOOLBOX_MENU(bpy.types.Panel):
             col.operator("object.rbx_button_of", text = "Recalc Outside").rbx_of = 'outside'
             split.operator("object.rbx_button_of", text = "Recalc Inside").rbx_of = 'inside' 
             box.operator("object.rbx_button_of", text = "Flip Normals").rbx_of = 'flip' 
+            
+            box = layout.box()
+            try:
+                if len(bpy.context.selected_objects) == 1: 
+                    box.label(text='Glowing UGC', icon='SHADING_SOLID')
+                    box.operator("object.rbx_button_of", text = "Make Item Glow").rbx_of = 'glow'
+                    box.operator("object.rbx_button_of", text = "Remove Glowing").rbx_of = 'unglow'            
+                else:
+                    box.enabled=False
+                    box.label(text='Glowing UGC (Select Object)', icon='SHADING_SOLID')
+                    box.operator("object.rbx_button_of", text = "Make Item Glow").rbx_of = 'glow'
+                    box.operator("object.rbx_button_of", text = "Remove Glowing").rbx_of = 'unglow'
+            except:
+                pass
 
+
+
+
+            #### Make Outline ####
+            box = layout.box()
+            if objs:
+                if len(objs) == 1: 
+                    if mat:
+                        box.label(text='UGC Outline ', icon='HIDE_ON') 
+                        box.operator("object.rbx_button_of", text = "Make Outline").rbx_of = 'make_outline'
+                        
+                        if 'RBX_Outline_mat' in objs[0].material_slots and 'RBX_Outline' in objs[0].modifiers:
+                            mat = bpy.data.materials.get("RBX_Outline_mat")
+                            color = mat.node_tree.nodes['RGB']
+                            box.label(text='** Outline Controls: **')
+                            col_0 = color.outputs[0]
+                            
+                            split = box.split(factor = 0.5)
+                            col = split.column(align = True)
+                            col.label(text='Preview Color:')
+                            split.prop(col_0, "default_value", text = "")
+                            
+                            box.prop(bpy.context.object.modifiers["RBX_Outline"], 'thickness', text='Outline Thickness:')
+                            
+                            box.label(text='')
+                            box.label(text='** Add Outline to UGC: **')
+                            box.operator("object.rbx_button_of", text = "Apply Outline").rbx_of = 'apply_outline'
+                            box.label(text='*Outline faces will be added to your')
+                            box.label(text='object and UV moved outside.')
+                            box.label(text='Just move that UV to the color')
+                            box.label(text='that you need or re-unwrap it')
+
+
+                    else:
+                        box.enabled=False
+                        box.label(text='UGC Outline (Add Material)', icon='HIDE_ON')
+                        box.operator("object.rbx_button_of", text = "Make Outline").rbx_of = 'make_outline'
+            else:
+                box.enabled=False
+                box.label(text='UGC Outline (Select Object)', icon='HIDE_ON')
+                box.operator("object.rbx_button_of", text = "Make Outline").rbx_of = 'make_outline'  
+                
+                
+                
 
         ######### Export Functions #########
         row = layout.row()

@@ -4133,6 +4133,11 @@ class TOOLBOX_MENU(bpy.types.Panel):
                         box.label(text='Culling Option (Add Material)', icon='HIDE_ON')
                         box.label(text='(Hide flipped faces, like in Roblox)') 
                         box.operator("object.rbx_button_of", text = "Backface Culling",  icon='FACESEL') #Fake button 
+                else:
+                    box.enabled=False
+                    box.label(text='Culling Option (Select 1 Object)', icon='HIDE_ON')
+                    box.label(text='(Hide flipped faces, like in Roblox)') 
+                    box.operator("object.rbx_button_of", text = "Backface Culling",  icon='FACESEL') #Fake button
             else:
                 box.enabled=False
                 box.label(text='Culling Option (Select Object)', icon='HIDE_ON')
@@ -4195,12 +4200,14 @@ class TOOLBOX_MENU(bpy.types.Panel):
                             box.label(text='object and UV moved outside.')
                             box.label(text='Just move that UV to the color')
                             box.label(text='that you need or re-unwrap it')
-
-
                     else:
                         box.enabled=False
                         box.label(text='UGC Outline (Add Material)', icon='HIDE_ON')
                         box.operator("object.rbx_button_of", text = "Make Outline").rbx_of = 'make_outline'
+                else:
+                    box.enabled=False
+                    box.label(text='UGC Outline (Select 1 Object)', icon='HIDE_ON')
+                    box.operator("object.rbx_button_of", text = "Make Outline").rbx_of = 'make_outline'
             else:
                 box.enabled=False
                 box.label(text='UGC Outline (Select Object)', icon='HIDE_ON')

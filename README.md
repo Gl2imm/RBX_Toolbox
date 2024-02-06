@@ -4,7 +4,7 @@
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Gl2imm/RBX_Toolbox?label=version)
 ---
 
-RBX Toolbox is a Blender 2.80+ addon designed to simplify and enhance the workflow for Roblox modeling. This repository collects and organizes useful tools, addons, and operations in a single, convenient location.
+RBX Toolbox is a Blender 3.60+ addon designed to simplify and enhance the workflow for Roblox modeling. This repository collects and organizes useful tools, addons, and operations in a single, convenient location.
 
 If you have additional effects, templates, dummies, etc., [please share them in our Discord server](https://discord.gg/gFa4mY7); we may include them in the addon with proper credits.
 

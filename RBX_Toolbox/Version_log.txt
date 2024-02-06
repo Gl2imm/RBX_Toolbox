@@ -3,6 +3,16 @@
                                             ####################################
 
 
+v.4.6:
+	Important!!
+	RBX_Toolbox min Blender requirements now is v.3.6 and above. Lower Blender versions no longer supported. (you may still use version 4.4 of the Toolbox)
+	Fixed:
+	Some minor bug fixes for avatar/accessory import function in Blender 3.6 and above
+	Added:
+	Dummies - added Plushie template with armature, so you can pose it easily (followed RoBuilder Tutorial) 
+	Quick Functions:
+	Glowing UGC - option to make your UGC glowing in game (it will glow under right condition)
+	UGC Outline - quick option to add outline to your UGC with preview and faces setup.
 v.4.5:
 	Hotfix
 	Fixed Avatar/Accessory import for Blender 4.0

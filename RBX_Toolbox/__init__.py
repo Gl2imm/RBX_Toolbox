@@ -14,7 +14,7 @@
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Random Blender Dude",
-    "version": (4, 6, 0),
+    "version": (4, 7, 0),
     "blender": (3, 6, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -48,14 +48,14 @@ import re
 
 
 ## Toolbox vars ##
-ver = "v.4.6"
+ver = "v.4.7"
 disp_ver = ver
 #disp_ver = "v.3.2 Beta-3" ### TO REMOVE IN 3.2
 lts_ver = None
 
 
 mode = 1 #0 - Test Mode; 1 - Live mode
-wh =1   #0 - W; 1 - H
+wh = 0   #0 - W; 1 - H
 
 
 if mode == 0:
@@ -2262,8 +2262,10 @@ class RBX_BUTTON_LC_ANIM(bpy.types.Operator):
                 bpy.ops.view3d.snap_cursor_to_center()
                 bpy.ops.wm.append(directory =rbx_my_path + rbx_blend_file + ap_collection, filename =rbx_anim_dum_spwn)
                 bpy.ops.view3d.snap_selected_to_cursor(use_offset=False)
-                bpy.ops.transform.translate(value=(5, -0, -0), orient_axis_ortho='X', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL')
-
+                #bpy.ops.transform.translate(value=(5, -0, -0), orient_axis_ortho='X', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL') #old
+                bpy.ops.transform.translate(value=(5, -0, -0), orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True))
+                #bpy.ops.transform.rotate(value=3.14159, orient_axis='Z', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True))
+                
                 ### Create new collection ###
                 rbx_rig_collection = bpy.context.selected_objects[0].users_collection
                 rbx_rig_collection = rbx_rig_collection[0]
@@ -2278,6 +2280,7 @@ class RBX_BUTTON_LC_ANIM(bpy.types.Operator):
                         bpy.data.objects[part.name].select_set(True)
                 bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
                 
+                
                 ### Move parts to new collection and delete rig collection ###
                 for obj in bpy.context.selected_objects:
                     for collection in obj.users_collection:
@@ -2285,7 +2288,7 @@ class RBX_BUTTON_LC_ANIM(bpy.types.Operator):
                     rbx_anim_collection.objects.link(obj)
                 bpy.data.collections.remove(rbx_rig_collection)
 
-
+                
                 ### Duplicate LC Arma and item ###
                 bpy.ops.object.select_all(action='DESELECT')
                 bpy.context.view_layer.objects.active = None
@@ -2297,7 +2300,8 @@ class RBX_BUTTON_LC_ANIM(bpy.types.Operator):
                         bpy.data.objects[item.name].hide_viewport = True
                 bpy.data.objects[rbx_object.name].select_set(True)
                 bpy.context.view_layer.objects.active = bpy.data.objects[rbx_object.name]
-                bpy.ops.object.duplicate_move_linked(OBJECT_OT_duplicate={"linked":True, "mode":'TRANSLATION'}, TRANSFORM_OT_translate={"value":(5, 0, 0), "orient_axis_ortho":'X', "orient_type":'GLOBAL', "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 1, 0)), "orient_matrix_type":'GLOBAL'})
+                #bpy.ops.object.duplicate_move_linked(OBJECT_OT_duplicate={"linked":True, "mode":'TRANSLATION'}, TRANSFORM_OT_translate={"value":(5, 0, 0), "orient_axis_ortho":'X', "orient_type":'GLOBAL', "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 1, 0)), "orient_matrix_type":'GLOBAL'}) #Old
+                bpy.ops.object.duplicate_move_linked(OBJECT_OT_duplicate={"linked":True, "mode":'TRANSLATION'}, TRANSFORM_OT_translate={"value":(5, 0, 0), "orient_type":'GLOBAL', "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, True)})
                 
                 ### Move LC Arma and item to new collection ###
                 for obj in bpy.context.selected_objects:
@@ -2309,7 +2313,7 @@ class RBX_BUTTON_LC_ANIM(bpy.types.Operator):
                 for part in rbx_anim_collection.all_objects:
                     if part.type == 'ARMATURE':
                         rbx_object_copy = part
-                                        
+                                     
                 ### Parent parts to LC Arma bones ###
                 def parentBone(rig, part):
                     bpy.ops.object.mode_set(mode='EDIT')
@@ -2380,6 +2384,8 @@ class RBX_BUTTON_LC_ANIM(bpy.types.Operator):
                     ### Select Copy of LC Bones and make active ###
                     bpy.data.objects[rbx_object_copy.name].select_set(True)
                     bpy.context.view_layer.objects.active = bpy.data.objects[rbx_object_copy.name]
+                    
+                    '''''' 
                           
         return {'FINISHED'}   
     

@@ -2,7 +2,10 @@
                                                       Version History:
                                             ####################################
 
-
+v.4.7:	
+	Bug fixes:
+	Fixed error when making a rig for LC clothes check.
+	Restart Blender after update
 v.4.6:
 	Important!!
 	RBX_Toolbox min Blender requirements now is v.3.6 and above. Lower Blender versions no longer supported. (you may still use version 4.4 of the Toolbox)

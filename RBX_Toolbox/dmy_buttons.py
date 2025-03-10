@@ -15,7 +15,6 @@ class BUTTON_DMMY(bpy.types.Operator):
         rbx_prefs = scene.rbx_prefs         
         dmy = self.dmy
         dmy_spwn = None
-        rbx_mode = None
         
         dum_list = [
                         'R15 Blocky',
@@ -48,14 +47,14 @@ class BUTTON_DMMY(bpy.types.Operator):
 
         if dmy == 'Dummy':    
             rbx_selected = selected_object()
-                              
             for x in range(len(dum_list)):
                 if rbx_prefs.rbx_dum_enum == 'OP' + str(x+1):
-                    dmy_spwn = dum_list[x]                  
+                    dmy_spwn = dum_list[x]             
             bpy.ops.wm.append(directory = glob_vars.addon_path + glob_vars.rbx_blend_file + glob_vars.ap_object, filename = dmy_spwn)
             if rbx_selected:
                 back_to_edit_mode(rbx_selected)
             print(f"{dmy_spwn} Dummy Spawned")
+            return {'FINISHED'} 
 
         
         if dmy == 'aepbr':    
@@ -67,6 +66,7 @@ class BUTTON_DMMY(bpy.types.Operator):
             if rbx_selected:
                 back_to_edit_mode(rbx_selected)
             print(f"{dmy_spwn} Dummy Spawned")
+            return {'FINISHED'} 
 
             
         ### Rigs
@@ -76,6 +76,7 @@ class BUTTON_DMMY(bpy.types.Operator):
             if rbx_selected:
                 back_to_edit_mode(rbx_selected)
             print(f"{dmy} Spawned")
+            return {'FINISHED'} 
 
 
-        return {'FINISHED'} 
+        

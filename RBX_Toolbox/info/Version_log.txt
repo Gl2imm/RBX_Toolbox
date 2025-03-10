@@ -2,7 +2,10 @@
                                                       Version History:
                                             ####################################
 
-
+v.5.1:
+    Fixes:
+    Fixed the addon spawns all dummies instead of only one
+    Fixed the addon delete already installed AEPBR rig after update. Re-download it again if you used it previously. Next updates addon will not touch the rig.
 v.5.0:
     Major changes:
     Finally figured out on how to split different functions into different python modules. Not visible to the common user, but this makes updating toolbox

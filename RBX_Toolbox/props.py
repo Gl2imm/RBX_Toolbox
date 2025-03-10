@@ -304,17 +304,27 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
 
 
 
-
     ####   Check for update addon  ####
-    rbx_url = 'https://github.com/Gl2imm/RBX_Toolbox/releases.atom'
+    '''rbx_url = 'https://github.com/Gl2imm/RBX_Toolbox/releases.atom'
     try:
         full_text = requests.get(rbx_url, allow_redirects=True).text
     except:
         pass
     else:
         split_1 = full_text.split('536450223/')[1]
-        glob_vars.lts_ver = split_1.split('</id>')[0]
+        glob_vars.lts_ver = split_1.split('</id>')[0]'''
 
+    rbx_url = 'https://github.com/Gl2imm/RBX_Toolbox/releases.atom'
+    rbx_result = get_name_and_ver(rbx_url)
+    if rbx_result is not None:
+        rbx_latest_title, rbx_latest_tag = rbx_result
+        #latest_tag = rbx_latest_tag.split("v.")[1]
+        if glob_vars.update_test == True:
+            glob_vars.lts_ver = "v.999.0"
+            glob_vars.lts_title = rbx_latest_title
+        else:
+            glob_vars.lts_ver = rbx_latest_tag
+            glob_vars.lts_title = rbx_latest_title
 
 
 

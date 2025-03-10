@@ -9,10 +9,13 @@ import shutil
 import glob_vars
 
 
-
-rbx_toolbox_url = "https://github.com/Gl2imm/RBX_Toolbox/releases/download/" + glob_vars.lts_ver + "/"
-rbx_toolbox_file = "RBX_Toolbox_" + glob_vars.lts_ver + ".zip"
-UPDATE_URL = rbx_toolbox_url + rbx_toolbox_file
+if glob_vars.update_test == True:
+    UPDATE_URL = glob_vars.rbx_update_test_down_link
+else:
+    rbx_toolbox_url = "https://github.com/Gl2imm/RBX_Toolbox/releases/download/" + glob_vars.lts_ver + "/"
+    #rbx_toolbox_file = "RBX_Toolbox_" + glob_vars.lts_ver + ".zip"
+    rbx_toolbox_file = glob_vars.lts_title + ".zip"
+    UPDATE_URL = rbx_toolbox_url + rbx_toolbox_file
 
 
 # Global variables to track the state of the operator
@@ -117,7 +120,7 @@ class RBX_INSTALL_UPDATE(bpy.types.Operator):
                 file_path = os.path.join(addon_path, filename)
                 if os.path.isfile(file_path) and filename != "update.zip":
                     os.remove(file_path)
-                elif os.path.isdir(file_path):
+                elif os.path.isdir(file_path) and filename != "rig_aepbr":
                     shutil.rmtree(file_path)
 
             # Extract ZIP

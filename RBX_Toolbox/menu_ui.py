@@ -8,7 +8,7 @@ import menu_pie
 import update
 import update_aepbr
 
-addon_version = "v.5.0"
+addon_version = "v.5.1"
 
 
 def get_aepbr_cur_ver():
@@ -39,6 +39,8 @@ class TOOLBOX_MENU(bpy.types.Panel):
 
 
         ######## Update Notifier ########
+        print("lts_ver: ", glob_vars.lts_ver)
+        print("addon_version: ", addon_version)
         if glob_vars.lts_ver > addon_version:
             box = layout.box()
             box.label(text = "Update Available: " + glob_vars.lts_ver)

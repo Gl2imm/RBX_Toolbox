@@ -18,6 +18,15 @@ else:
 
 ## Toolbox vars ##
 lts_ver = None
+lts_title = None
+
+
+## Tests
+update_test = False # Set to True to test out update process without uploading new version to Github
+rbx_update_test_down_link = "https://github.com/Gl2imm/RBX_Toolbox/releases/download/v.5.0/RBX_Toolbox_v.5.0.zip"
+
+
+
 
 ## AEPBR vars ##
 rbx_aepbr_fldr = "rig_aepbr"

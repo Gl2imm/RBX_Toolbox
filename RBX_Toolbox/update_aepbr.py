@@ -9,9 +9,12 @@ import glob_vars
 
 
 
-
-aepbr_url = "https://github.com/paribeshere/AEPBR/releases/download/" + "v." + glob_vars.aepbr_lts_ver + "/"
-aepbr_file = glob_vars.aepbr_lts_title + ".zip"
+if glob_vars.aepbr_lts_ver == None:
+    aepbr_url = ""
+    aepbr_file = ""
+else:
+    aepbr_url = "https://github.com/paribeshere/AEPBR/releases/download/" + "v." + glob_vars.aepbr_lts_ver + "/"
+    aepbr_file = glob_vars.aepbr_lts_title + ".zip"
 AEPBR_UPDATE_URL = aepbr_url + aepbr_file
 
 

@@ -7,8 +7,10 @@ import glob_vars
 import menu_pie
 import update
 import update_aepbr
+import props
 
-addon_version = "v.5.1"
+addon_version = "v.5.2"
+#to update in __init__ as well
 
 
 def get_aepbr_cur_ver():
@@ -39,29 +41,30 @@ class TOOLBOX_MENU(bpy.types.Panel):
 
 
         ######## Update Notifier ########
-        print("lts_ver: ", glob_vars.lts_ver)
-        print("addon_version: ", addon_version)
-        if glob_vars.lts_ver > addon_version:
-            box = layout.box()
-            box.label(text = "Update Available: " + glob_vars.lts_ver)
-            box.operator('object.url_handler', text = "Release Notes " + glob_vars.lts_ver, icon='DOCUMENTS').rbx_link = "update"
-            if update.operator_state == "IDLE":
-                box.operator("wm.install_update", text="Install Update", icon='IMPORT')
-                '''elif update.operator_state == "DOWNLOADING":
-                box.label(text=f"Downloading... {update.download_progress:.2f}%")'''
-            elif update.operator_state == "DOWNLOADING":
-                # Display the progress bar
-                box.prop(update.current_operator, "progress", text="Downloading", slider=True)
-            elif update.operator_state == "INSTALLING":
-                box.label(text="Installing...")
-            elif update.operator_state == "FINISHED":
+        #print("lts_ver: ", glob_vars.lts_ver)
+        #print("addon_version: ", addon_version)
+        if glob_vars.lts_ver is not None:
+            if glob_vars.lts_ver > addon_version:
                 box = layout.box()
-                box.alert = True  # 🔴 Makes the button red
-                box.operator("wm.install_update", text="Restart Blender")
-            elif update.operator_state == "ERROR":
-                box = layout.box()
-                box.alert = True  # 🔴 Makes the button red
-                box.label(text=f"Error: {update.error_message}", icon='ERROR')
+                box.label(text = "Update Available: " + glob_vars.lts_ver)
+                box.operator('object.url_handler', text = "Release Notes " + glob_vars.lts_ver, icon='DOCUMENTS').rbx_link = "update"
+                if update.operator_state == "IDLE":
+                    box.operator("wm.install_update", text="Install Update", icon='IMPORT')
+                    '''elif update.operator_state == "DOWNLOADING":
+                    box.label(text=f"Downloading... {update.download_progress:.2f}%")'''
+                elif update.operator_state == "DOWNLOADING":
+                    # Display the progress bar
+                    box.prop(update.current_operator, "progress", text="Downloading", slider=True)
+                elif update.operator_state == "INSTALLING":
+                    box.label(text="Installing...")
+                elif update.operator_state == "FINISHED":
+                    box = layout.box()
+                    box.alert = True  # 🔴 Makes the button red
+                    box.operator("wm.install_update", text="Restart Blender")
+                elif update.operator_state == "ERROR":
+                    box = layout.box()
+                    box.alert = True  # 🔴 Makes the button red
+                    box.label(text=f"Error: {update.error_message}", icon='ERROR')
 
 
 
@@ -282,31 +285,44 @@ class TOOLBOX_MENU(bpy.types.Panel):
             box.operator('object.button_dmmy', text = "Multirig Faceless").dmy = 'Multirig_faceless'
 
 
+            if props.has_internet_connection():
+                ######### Paribes Rigs #########
+                box = layout.box()
+                box.label(text = 'Paribes Rig')
+                #box.operator('object.button_dmmy', text = "AEPBR").dmy = 'aepbr'
 
-            ######### Paribes Rigs #########
-            box = layout.box()
-            box.label(text = 'Paribes Rig')
-            #box.operator('object.button_dmmy', text = "AEPBR").dmy = 'aepbr'
-
-            # Check if folder exists
-            addon_path = os.path.dirname(os.path.abspath(__file__))
-            aepbr_path = os.path.join(addon_path, glob_vars.rbx_aepbr_fldr)
-            folder_exists = os.path.exists(aepbr_path)
-            blend_files = glob.glob(os.path.join(aepbr_path, "*.blend"))
-            if folder_exists and blend_files:
-                #insert dummy operator
-                box.operator('object.button_dmmy', text = "AEPBR").dmy = 'aepbr'
-                ######## Update Notifier ########
-                aepbr_cur_ver = get_aepbr_cur_ver()
-                if glob_vars.aepbr_lts_ver > aepbr_cur_ver:
-                    box.label(text = '')
-                    box.label(text = '- - - - - - - ')
-                    box.label(text = f"Update Available:  ({aepbr_cur_ver} -> {glob_vars.aepbr_lts_ver})")
-                    box.label(text = glob_vars.aepbr_lts_title)
-                    #box.operator('object.url_handler', text = "Release Notes " + glob_vars.lts_ver, icon='DOCUMENTS').rbx_link = "update"
+                # Check if folder exists
+                addon_path = os.path.dirname(os.path.abspath(__file__))
+                aepbr_path = os.path.join(addon_path, glob_vars.rbx_aepbr_fldr)
+                folder_exists = os.path.exists(aepbr_path)
+                blend_files = glob.glob(os.path.join(aepbr_path, "*.blend"))
+                if folder_exists and blend_files:
+                    #insert dummy operator
+                    box.operator('object.button_dmmy', text = "AEPBR").dmy = 'aepbr'
+                    ######## Update Notifier ########
+                    aepbr_cur_ver = get_aepbr_cur_ver()
+                    if glob_vars.aepbr_lts_ver > aepbr_cur_ver:
+                        box.label(text = '')
+                        box.label(text = '- - - - - - - ')
+                        box.label(text = f"Update Available:  ({aepbr_cur_ver} -> {glob_vars.aepbr_lts_ver})")
+                        box.label(text = glob_vars.aepbr_lts_title)
+                        #box.operator('object.url_handler', text = "Release Notes " + glob_vars.lts_ver, icon='DOCUMENTS').rbx_link = "update"
+                        if update_aepbr.aepbr_operator_state == "IDLE":
+                            box.operator("wm.update_aepbr", text="Install Update", icon='IMPORT')
+                            box.operator('object.url_handler', text = f"Release Notes v.{glob_vars.aepbr_lts_ver}", icon='DOCUMENTS').rbx_link = "aepbr notes"
+                        elif update_aepbr.aepbr_operator_state == "DOWNLOADING":
+                            # Display the progress bar
+                            box.prop(update_aepbr.aepbr_current_operator, "progress", text="Downloading", slider=True)
+                        elif update_aepbr.aepbr_operator_state == "INSTALLING":
+                            box.label(text="Installing...")
+                        elif update_aepbr.aepbr_operator_state == "ERROR":
+                            box = layout.box()
+                            box.alert = True  # 🔴 Makes the button red
+                            box.label(text=f"Error: {update_aepbr.aepbr_error_message}", icon='ERROR')
+                ### download rig if not installed
+                else:
                     if update_aepbr.aepbr_operator_state == "IDLE":
-                        box.operator("wm.update_aepbr", text="Install Update", icon='IMPORT')
-                        box.operator('object.url_handler', text = f"Release Notes v.{glob_vars.aepbr_lts_ver}", icon='DOCUMENTS').rbx_link = "aepbr notes"
+                        box.operator("wm.update_aepbr", text=f"Dowload rig (v.{glob_vars.aepbr_lts_ver})", icon='IMPORT')
                     elif update_aepbr.aepbr_operator_state == "DOWNLOADING":
                         # Display the progress bar
                         box.prop(update_aepbr.aepbr_current_operator, "progress", text="Downloading", slider=True)
@@ -316,22 +332,9 @@ class TOOLBOX_MENU(bpy.types.Panel):
                         box = layout.box()
                         box.alert = True  # 🔴 Makes the button red
                         box.label(text=f"Error: {update_aepbr.aepbr_error_message}", icon='ERROR')
-            ### download rig if not installed
-            else:
-                if update_aepbr.aepbr_operator_state == "IDLE":
-                    box.operator("wm.update_aepbr", text=f"Dowload rig (v.{glob_vars.aepbr_lts_ver})", icon='IMPORT')
-                elif update_aepbr.aepbr_operator_state == "DOWNLOADING":
-                    # Display the progress bar
-                    box.prop(update_aepbr.aepbr_current_operator, "progress", text="Downloading", slider=True)
-                elif update_aepbr.aepbr_operator_state == "INSTALLING":
-                    box.label(text="Installing...")
-                elif update_aepbr.aepbr_operator_state == "ERROR":
-                    box = layout.box()
-                    box.alert = True  # 🔴 Makes the button red
-                    box.label(text=f"Error: {update_aepbr.aepbr_error_message}", icon='ERROR')
 
-            box = layout.box()    
-            box.operator('object.url_handler', text = "AEPBR Discord", icon='URL').rbx_link = "aepbr discord"
+                box = layout.box()    
+                box.operator('object.url_handler', text = "AEPBR Discord", icon='URL').rbx_link = "aepbr discord"
                 
 
 

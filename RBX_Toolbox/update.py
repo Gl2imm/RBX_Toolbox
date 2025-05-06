@@ -12,9 +12,12 @@ import glob_vars
 if glob_vars.update_test == True:
     UPDATE_URL = glob_vars.rbx_update_test_down_link
 else:
-    rbx_toolbox_url = "https://github.com/Gl2imm/RBX_Toolbox/releases/download/" + glob_vars.lts_ver + "/"
-    #rbx_toolbox_file = "RBX_Toolbox_" + glob_vars.lts_ver + ".zip"
-    rbx_toolbox_file = glob_vars.lts_title + ".zip"
+    if glob_vars.lts_ver == None:
+        rbx_toolbox_url = ""
+        rbx_toolbox_file = ""
+    else:
+        rbx_toolbox_url = "https://github.com/Gl2imm/RBX_Toolbox/releases/download/" + glob_vars.lts_ver + "/"
+        rbx_toolbox_file = glob_vars.lts_title + ".zip"
     UPDATE_URL = rbx_toolbox_url + rbx_toolbox_file
 
 

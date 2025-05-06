@@ -4,6 +4,15 @@ import glob_vars
 import xml.etree.ElementTree as ET
 
 
+
+def has_internet_connection(test_url="https://github.com", timeout=5):
+    try:
+        requests.get(test_url, timeout=timeout)
+        return True
+    except (requests.ConnectionError, requests.Timeout):
+        return False
+    
+
 def get_name_and_ver(url): 
     try:
         full_xml = requests.get(url, allow_redirects=True).text
@@ -314,29 +323,35 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
         split_1 = full_text.split('536450223/')[1]
         glob_vars.lts_ver = split_1.split('</id>')[0]'''
 
-    rbx_url = 'https://github.com/Gl2imm/RBX_Toolbox/releases.atom'
-    rbx_result = get_name_and_ver(rbx_url)
-    if rbx_result is not None:
-        rbx_latest_title, rbx_latest_tag = rbx_result
-        #latest_tag = rbx_latest_tag.split("v.")[1]
-        if glob_vars.update_test == True:
-            glob_vars.lts_ver = "v.999.0"
-            glob_vars.lts_title = rbx_latest_title
-        else:
-            glob_vars.lts_ver = rbx_latest_tag
-            glob_vars.lts_title = rbx_latest_title
+    if has_internet_connection():
+        rbx_url = 'https://github.com/Gl2imm/RBX_Toolbox/releases.atom'
+        rbx_result = get_name_and_ver(rbx_url)
+        if rbx_result is not None:
+            rbx_latest_title, rbx_latest_tag = rbx_result
+            #latest_tag = rbx_latest_tag.split("v.")[1]
+            if glob_vars.update_test == True:
+                glob_vars.lts_ver = "v.999.0"
+                glob_vars.lts_title = rbx_latest_title
+            else:
+                glob_vars.lts_ver = rbx_latest_tag
+                glob_vars.lts_title = rbx_latest_title
+    else:
+        print("No internet connection. Skipping RBX Toolbox update check.")
 
 
 
 
     ####   Check for update AEPBR  ####
-    aepbr_url = 'https://github.com/paribeshere/AEPBR/releases.atom'
-    result = get_name_and_ver(aepbr_url)
-    if result is not None:
-        latest_title, latest_tag = result
-        latest_tag = latest_tag.split("v.")[1]
-        glob_vars.aepbr_lts_ver = latest_tag
-        glob_vars.aepbr_lts_title = latest_title
+    if has_internet_connection():
+        aepbr_url = 'https://github.com/paribeshere/AEPBR/releases.atom'
+        result = get_name_and_ver(aepbr_url)
+        if result is not None:
+            latest_title, latest_tag = result
+            latest_tag = latest_tag.split("v.")[1]
+            glob_vars.aepbr_lts_ver = latest_tag
+            glob_vars.aepbr_lts_title = latest_title
+    else:
+        print("No internet connection. Skipping AEPBR update check.")
 
 
 

@@ -2,6 +2,9 @@
                                                       Version History:
                                             ####################################
 
+v.5.2:
+    Fixes:
+    Fiexed addon does not installing for people without internet connection
 v.5.1:
     Fixes:
     Fixed the addon spawns all dummies instead of only one

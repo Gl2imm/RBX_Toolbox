@@ -9,8 +9,8 @@ RBX Toolbox is a Blender 3.60+ addon designed to simplify and enhance the workfl
 If you have additional effects, templates, dummies, etc., [please share them in our Discord server](https://discord.gg/gFa4mY7); we may include them in the addon with proper credits.
 
 - [Download the Add-on](https://github.com/Gl2imm/RBX_Toolbox/releases)
-- [Instructions and Credits](https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/Credits%20and%20Instructions.txt)
-- [Version Log](https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/Version_log.txt)
+- [Instructions and Credits](https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/info/Credits%20and%20Instructions.txt)
+- [Version Log](https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/info/Version_log.txt)
 
 #### Support our community:
 - [NYTV Gaming Support/Suggestions Discord](https://discord.gg/gFa4mY7)
@@ -116,4 +116,4 @@ The addon can be found on the right side N-panel (press "N" to make it appear).
 - [RoAPI](https://discord.gg/m6j732k4tQ) (great explanation on Roblox API and help with the code)
 - [Xenonic_778](https://twitter.com/Xenonic_778) for feedback on errors and sharing Toolbox on Twitter
 - [Alan Bixby](https://github.com/alanbixby) for the written instructions in this page and for the cool badges
-- [Miscellaneous Instructions and Credits](https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/Credits%20and%20Instructions.txt)
+- [Miscellaneous Instructions and Credits](https://github.com/Gl2imm/RBX_Toolbox/blob/main/RBX_Toolbox/info/Credits%20and%20Instructions.txt)

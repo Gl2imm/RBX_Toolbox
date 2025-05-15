@@ -109,6 +109,20 @@ https://user-images.githubusercontent.com/69973491/236590799-65a6863b-214f-4a20-
 
 The addon can be found on the right side N-panel (press "N" to make it appear).
 
+
+---
+
+## Sponsors and supporters of the Toolbox
+_This section for the people who had supported RBX Toolbox at various stages of its development._
+<br><br>
+- **Implementation of the OAuthorization in Roblox Toolbox:**<br>
+  _Kickstarter page to initialize the development_ - [Roblox Toolbox (Blender Addon)](https://www.kickstarter.com/projects/gl2imm/roblox-toolbox-blender-addon)
+  - **Sponsors:**
+      - [Valk](https://x.com/valkenheim__)
+      - [UptownRose](https://x.com/UptownRoseYT)
+  - **Developers:**
+    - _(works currently in development on Fiverr)_
+      
 ---
 
 ## Special Thanks and Additional Resources

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>RBX Toolbox</title>
   <style>
+    /* Reset and base */
     body {
       margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
@@ -21,6 +22,7 @@
       color: white;
       padding: 1.5rem 1rem;
       text-align: center;
+      flex-shrink: 0;
     }
 
     header img {
@@ -37,11 +39,13 @@
     }
 
     main {
-      flex: 1;
+      flex-grow: 1;
       max-width: 700px;
-      margin: 2rem auto 3rem;
-      padding: 0 1rem;
+      margin: 2rem auto;
+      padding: 0 1rem 3rem;
       text-align: center;
+      box-sizing: border-box;
+      width: 100%;
     }
 
     main p {
@@ -74,6 +78,8 @@
       text-align: center;
       padding: 1rem;
       font-size: 0.9rem;
+      flex-shrink: 0;
+      box-sizing: border-box;
     }
 
     footer a {
@@ -105,7 +111,10 @@
 </head>
 <body>
   <header>
-    <img src="https://raw.githubusercontent.com/Gl2imm/RBX_Toolbox/main/banner.png" alt="RBX Toolbox Banner" />
+    <img
+      src="https://raw.githubusercontent.com/Gl2imm/RBX_Toolbox/main/banner.png"
+      alt="RBX Toolbox Banner"
+    />
     <h1>RBX Toolbox</h1>
   </header>
 
@@ -122,9 +131,20 @@
   </main>
 
   <footer>
-    <a href="https://github.com/Gl2imm/RBX_Toolbox" target="_blank" rel="noopener noreferrer">GitHub</a> |
-    <a href="privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a> |
-    <a href="terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+    <a
+      href="https://github.com/Gl2imm/RBX_Toolbox"
+      target="_blank"
+      rel="noopener noreferrer"
+      >GitHub</a
+    >
+    |
+    <a href="privacy.html" target="_blank" rel="noopener noreferrer"
+      >Privacy Policy</a
+    >
+    |
+    <a href="terms.html" target="_blank" rel="noopener noreferrer"
+      >Terms of Service</a
+    >
   </footer>
 </body>
 </html>

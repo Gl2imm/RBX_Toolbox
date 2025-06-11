@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>RBX Toolbox - Roblox OAuth Login</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      max-width: 600px;
+      margin: auto;
+      background: #f4f4f4;
+    }
+    h1 {
+      color: #333;
+    }
+    .login-button {
+      display: inline-block;
+      padding: 12px 24px;
+      background: #0090ff;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>RBX Toolbox</h1>
+  <p>
+    RBX Toolbox is a Blender addon that connects to your Roblox account via OAuth. It helps you manage your assets and content more efficiently from within Blender.
+  </p>
+  <p>
+    To try the login process manually, click the button below:
+  </p>
+  <a
+    class="login-button"
+    href="https://apis.roblox.com/oauth/v1/authorize?client_id=3815580438818002246&response_type=code&redirect_uri=https%3A%2F%2Fgl2imm.github.io%2FRBX_Toolbox%2FRBX_Toolbox%2Foauth%2Fcallback.html&scope=openid"
+  >
+    Login with Roblox
+  </a>
+  <p style="margin-top: 2rem; font-size: 0.9rem; color: #666;">
+    Note: This is a demo page. The real login flow happens inside the RBX Toolbox Blender addon.
+  </p>
+</body>
+</html>

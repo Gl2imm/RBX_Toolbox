@@ -2,8 +2,17 @@
                                                       Version History:
                                             ####################################
 
+v.5.3:
+    NOTE!! 
+    This release introduces the Roblox OAuth2 functionality, allowing RBX Toolbox to be authorized directly with Roblox.
+    While this feature was not originally scheduled for release at this time, it was necessary to publish it early due to Roblox’s 
+    moderation requirements - they need to see the application live in order to review and approve it.
+    Please note: the feature is not fully functional yet. As the application is currently under review, only a limited number of users 
+    (up to 10) can authorize it at this stage. Once the verification process is complete and the app is approved, I will release 
+    an update and notify everyone when it's officially live.
+    Fixes:Fixed Rig menu very laggy
 v.5.2:
-    Fixes:
+    Fixes:Add commentMore actions
     Fiexed addon does not installing for people without internet connection
 v.5.1:
     Fixes:

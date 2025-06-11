@@ -29,11 +29,20 @@ current_operator = None
 
 
 
+def restart_blender(self):
+    import subprocess, sys
+    blender_exe = sys.argv[0]
+    subprocess.Popen([blender_exe])
+    bpy.ops.wm.quit_blender()
+
+
+
 
 class RBX_INSTALL_UPDATE(bpy.types.Operator):
     bl_idname = "wm.install_update"
     bl_label = "Install Update"
     _timer = None
+    restart_only: bpy.props.BoolProperty(default=False) # type: ignore
 
     # Add a property for the progress bar
     progress: bpy.props.FloatProperty(
@@ -48,6 +57,11 @@ class RBX_INSTALL_UPDATE(bpy.types.Operator):
     def execute(self, context):
         global operator_state, download_progress, error_message, current_operator
 
+        # Only call restart Blender
+        if self.restart_only:
+            self.restart_blender()
+            return {'FINISHED'}
+        
         # Start the download in a separate thread
         if operator_state == "IDLE":
             current_operator = self  # Store the operator instance
@@ -169,5 +183,14 @@ class RBX_INSTALL_UPDATE(bpy.types.Operator):
 
         # Continue running
         return {'PASS_THROUGH'}
+    
+
+    ### This is after addon installed and the button changes to Restart Blender
+    def restart_blender(self):
+        # Restart Blender
+        blender_exe = sys.argv[0]  # Get the Blender executable path
+        subprocess.Popen([blender_exe])
+        bpy.ops.wm.quit_blender()
+        return {'FINISHED'}
 
 

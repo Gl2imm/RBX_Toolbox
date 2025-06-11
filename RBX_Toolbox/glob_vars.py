@@ -1,3 +1,4 @@
+import json
 import os
 import bpy
 import platform
@@ -26,7 +27,63 @@ update_test = False # Set to True to test out update process without uploading n
 rbx_update_test_down_link = "https://github.com/Gl2imm/RBX_Toolbox/releases/download/v.5.0/RBX_Toolbox_v.5.0.zip"
 
 
+## Client Info ##
+def get_addon_preferences():
+    """Safely retrieves the addon's preferences object."""
+    try:
+        # The addon name must match the bl_idname in the preferences class
+        return bpy.context.preferences.addons["RBX_Toolbox"].preferences
+    except (AttributeError, KeyError):
+        print("Warning: Could not access RBX_Toolbox preferences.")
+        return None
 
+
+def get_login_info():
+    """
+    Retrieves all login-related information directly from addon preferences.
+    Returns a dictionary with the session data, or an empty dictionary if not logged in.
+    """
+    prefs = get_addon_preferences()
+    if not prefs or not prefs.is_logged_in:
+        return {}
+
+    token_data = {}
+    creators_data = []
+
+    if prefs.saved_token_data_json:
+        token_data = json.loads(prefs.saved_token_data_json)
+
+    if prefs.saved_creators_json:
+        creators_data = json.loads(prefs.saved_creators_json)
+
+    # We can reconstruct a comprehensive info dictionary
+    user_info = next(
+        (creator for creator in creators_data if creator.get('type') == 'USER'), None)
+
+    return {
+        "is_logged_in": prefs.is_logged_in,
+        "selected_creator": prefs.creator,
+        "user_name": user_info.get('name') if user_info else None,
+        "user_id": user_info.get('id') if user_info else None,
+        "token_data": token_data,
+        "creators": creators_data,
+    }
+
+
+def clear_login_info():
+    """
+    Clears all login-related information from addon preferences.
+    This effectively logs the user out.
+    """
+    prefs = get_addon_preferences()
+    if not prefs:
+        return
+
+    prefs.is_logged_in = False
+    prefs.creator = ""
+    prefs.saved_token_data_json = ""
+    prefs.saved_creators_json = ""
+    print("Login info cleared from preferences.")
 
 ## AEPBR vars ##
 rbx_aepbr_fldr = "rig_aepbr"

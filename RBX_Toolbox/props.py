@@ -4,7 +4,6 @@ import glob_vars
 import xml.etree.ElementTree as ET
 
 
-
 def has_internet_connection(test_url="https://github.com", timeout=5):
     try:
         requests.get(test_url, timeout=timeout)

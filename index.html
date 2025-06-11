@@ -1,44 +1,130 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>RBX Toolbox - Roblox OAuth Login</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RBX Toolbox</title>
   <style>
     body {
-      font-family: sans-serif;
-      padding: 2rem;
-      max-width: 600px;
-      margin: auto;
-      background: #f4f4f4;
-    }
-    h1 {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+        Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+      background: #f9fafb;
       color: #333;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
     }
-    .login-button {
-      display: inline-block;
-      padding: 12px 24px;
+
+    header {
       background: #0090ff;
       color: white;
-      text-decoration: none;
+      padding: 1.5rem 1rem;
+      text-align: center;
+    }
+
+    header img {
+      max-width: 250px;
+      height: auto;
+      margin-bottom: 1rem;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+    }
+
+    main {
+      flex: 1;
+      max-width: 700px;
+      margin: 2rem auto 3rem;
+      padding: 0 1rem;
+      text-align: center;
+    }
+
+    main p {
+      font-size: 1.15rem;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+      color: #444;
+    }
+
+    .login-button {
+      display: inline-block;
+      padding: 14px 32px;
+      background: #0078d4;
+      color: white;
+      font-weight: 600;
+      font-size: 1.1rem;
       border-radius: 6px;
-      font-weight: bold;
-      margin-top: 20px;
+      text-decoration: none;
+      user-select: none;
+      transition: background-color 0.3s ease;
+    }
+
+    .login-button:hover,
+    .login-button:focus {
+      background: #005a9e;
+    }
+
+    footer {
+      background: #f1f1f1;
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.9rem;
+    }
+
+    footer a {
+      color: #0090ff;
+      margin: 0 12px;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      header img {
+        max-width: 180px;
+      }
+      main p {
+        font-size: 1rem;
+      }
+      .login-button {
+        width: 100%;
+        padding: 16px 0;
+        font-size: 1.2rem;
+        border-radius: 0;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>RBX Toolbox</h1>
-  <p>
-    RBX Toolbox is a Blender addon that connects to your Roblox account via OAuth. It helps you manage your assets and content more efficiently from within Blender.
-  </p>
-  <p>
-    To try the login process manually, click the button below:
-  </p>
-  <a
-    class="login-button"
-    href="https://apis.roblox.com/oauth/v1/authorize?client_id=3815580438818002246&response_type=code&redirect_uri=https%3A%2F%2Fgl2imm.github.io%2FRBX_Toolbox%2FRBX_Toolbox%2Foauth%2Fcallback.html&scope=openid"
-  >
-    Login with Roblox
-  </a>
+  <header>
+    <img src="https://raw.githubusercontent.com/Gl2imm/RBX_Toolbox/main/banner.png" alt="RBX Toolbox Banner" />
+    <h1>RBX Toolbox</h1>
+  </header>
+
+  <main>
+    <p>
+      RBX Toolbox is a Blender addon that integrates directly with your Roblox account to streamline asset management and development workflows.
+    </p>
+    <a
+      class="login-button"
+      href="https://apis.roblox.com/oauth/v1/authorize?client_id=3815580438818002246&response_type=code&redirect_uri=https%3A%2F%2Fgl2imm.github.io%2FRBX_Toolbox%2FRBX_Toolbox%2Foauth%2Fcallback.html&scope=openid"
+    >
+      Login with Roblox
+    </a>
+  </main>
+
+  <footer>
+    <a href="https://github.com/Gl2imm/RBX_Toolbox" target="_blank" rel="noopener noreferrer">GitHub</a> |
+    <a href="privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a> |
+    <a href="terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+  </footer>
 </body>
 </html>

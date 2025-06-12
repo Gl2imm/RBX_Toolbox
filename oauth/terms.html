@@ -28,6 +28,90 @@
     a:hover {
       text-decoration: underline;
     }
+
+    header {
+      background: #0090ff;
+      color: white;
+      padding: 1.5rem 1rem;
+      text-align: center;
+    }
+
+    header img {
+      max-width: 250px;
+      height: auto;
+      margin-bottom: 1rem;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 2rem;
+    }
+
+    main {
+      flex: 1;
+      max-width: 700px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+      text-align: center;
+      box-sizing: border-box;
+    }
+
+    main p {
+      font-size: 1.15rem;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+      color: #444;
+    }
+
+    .login-button {
+      display: inline-block;
+      padding: 14px 32px;
+      background: #0078d4;
+      color: white;
+      font-weight: 600;
+      font-size: 1.1rem;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: background-color 0.3s ease;
+    }
+
+    .login-button:hover {
+      background: #005a9e;
+    }
+
+    footer {
+      background: #f1f1f1;
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.9rem;
+    }
+
+    footer a {
+      color: #0090ff;
+      margin: 0 12px;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 480px) {
+      header img {
+        max-width: 180px;
+      }
+
+      main p {
+        font-size: 1rem;
+      }
+
+      .login-button {
+        width: 100%;
+        padding: 16px 0;
+        font-size: 1.2rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -47,5 +131,24 @@
   <p>
     For more information or support, please visit the <a href="https://github.com/Gl2imm/RBX_Toolbox">GitHub repository</a>.
   </p>
+  <p>
+    Or the <a href="https://discord.gg/gFa4mY7">NYTV Gaming Support/Suggestions Discord</a>.
+  </p>
+  <footer>
+    <a
+      href="https://github.com/Gl2imm/RBX_Toolbox"
+      target="_blank"
+      rel="noopener noreferrer"
+      >GitHub</a
+    >
+    |
+    <a href="/RBX_Toolbox/oauth/privacy.html" target="_blank" rel="noopener noreferrer"
+      >Privacy Policy</a
+    >
+    |
+    <a href="/RBX_Toolbox/oauth/terms.html" target="_blank" rel="noopener noreferrer"
+      >Terms of Service</a
+    >
+  </footer>
 </body>
 </html>

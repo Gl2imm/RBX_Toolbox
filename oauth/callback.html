@@ -1,16 +1,48 @@
 <!DOCTYPE html>
-<html>
-<head><title>Authorizing...</title></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RBX Toolbox Authorization</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      text-align: center;
+      padding: 2rem;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    a {
+      color: #007bff;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
 <body>
-  <p>Authorizing, please wait...</p>
+  <h2>Authorizing...</h2>
+  <p>If you're not redirected, <a id="manualLink" href="#">click here</a> to continue.</p>
+  <noscript>
+    <p><strong>JavaScript is required.</strong><br />
+    Please return to the RBX Toolbox app.</p>
+  </noscript>
+  <div id="error" class="hidden"></div>
+
   <script>
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const state = params.get("state");
+
     if (code) {
-      window.location.href = `http://localhost:8000?code=${code}&state=${state}`;
+      const target = `http://localhost:8000?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
+      document.getElementById("manualLink").href = target;
+      window.location.href = target;
     } else {
-      document.body.innerHTML = "<p>Error: No authorization code found.</p>";
+      const errorBox = document.getElementById("error");
+      errorBox.classList.remove("hidden");
+      errorBox.innerHTML = "<p><strong>Error:</strong> No authorization code was found. Please restart the login from the addon.</p>";
+      document.getElementById("manualLink").style.display = "none";
     }
   </script>
 </body>

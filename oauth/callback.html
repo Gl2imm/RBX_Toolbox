@@ -22,11 +22,17 @@
 </head>
 <body>
   <h2>Authorizing...</h2>
-  <p>If you're not redirected, <a id="manualLink" href="#">click here</a> to continue.</p>
+
+  <!-- This will only be shown if code is present -->
+  <div id="fallback" class="hidden">
+    <p>If you're not redirected, <a id="manualLink" href="#">click here</a> to continue.</p>
+  </div>
+
   <noscript>
     <p><strong>JavaScript is required.</strong><br />
     Please return to the RBX Toolbox app.</p>
   </noscript>
+
   <div id="error" class="hidden"></div>
 
   <script>
@@ -37,12 +43,12 @@
     if (code) {
       const target = `http://localhost:8000?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
       document.getElementById("manualLink").href = target;
+      document.getElementById("fallback").classList.remove("hidden");
       window.location.href = target;
     } else {
       const errorBox = document.getElementById("error");
       errorBox.classList.remove("hidden");
       errorBox.innerHTML = "<p><strong>Error:</strong> No authorization code was found. Please restart the login from the addon.</p>";
-      document.getElementById("manualLink").style.display = "none";
     }
   </script>
 </body>

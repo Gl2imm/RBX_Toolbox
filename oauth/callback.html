@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head><title>Authorizing...</title></head>
+<body>
+  <p>Authorizing, please wait...</p>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const state = params.get("state");
+    if (code) {
+      window.location.href = `http://localhost:8000?code=${code}&state=${state}`;
+    } else {
+      document.body.innerHTML = "<p>Error: No authorization code found.</p>";
+    }
+  </script>
+</body>
+</html>

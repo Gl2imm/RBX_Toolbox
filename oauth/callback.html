@@ -41,7 +41,7 @@
     const state = params.get("state");
 
     if (code) {
-      const target = `http://localhost:8000?$params`;
+      const target = `http://localhost:8000/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
       document.getElementById("manualLink").href = target;
       document.getElementById("fallback").classList.remove("hidden");
       window.location.href = target;

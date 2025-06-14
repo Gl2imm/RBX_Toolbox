@@ -296,7 +296,9 @@ class RbxOAuth2Client:
         """
         from . import constants
 
-        redirect_uri = f"http://localhost:{PORT}/{constants.RELATIVE_REDIRECT_PATH.lstrip('/')}"
+        redirect_uri = constants.REDIRECT_URI
+        ### For local server test use below line (Roblox will redirect to localhost instead of Github)
+        #redirect_uri = f"http://localhost:{PORT}/{constants.RELATIVE_REDIRECT_PATH.lstrip('/')}"
         auth_params = {
             "client_id": constants.CLIENT_ID,
             "redirect_uri": redirect_uri,

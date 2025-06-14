@@ -34,6 +34,7 @@ MAX_UPLOADS_PER_MIN = 25
 # OAuth2 Login
 ENV = "production"
 RELATIVE_REDIRECT_PATH = "/callback"
+REDIRECT_URI = "https://gl2imm.github.io/RBX_Toolbox/oauth/callback.html"
 ENVIRONMENTS = {
     "production": {
         "client_id": "3815580438818002246",

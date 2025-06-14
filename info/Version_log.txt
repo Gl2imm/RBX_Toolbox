@@ -2,6 +2,13 @@
                                                       Version History:
                                             ####################################
 
+v.6.0:
+    Huge Update for RBX Toolbox!
+    I am excited to announce that RBX Toolbox now officially supports OAuth 2.0, allowing you to connect the plugin directly to your 
+    Roblox account via Roblox OpenCloud. This integration follows Roblox’s official documentation and has been approved by Roblox, 
+    so no sketchy cookie-based logins, everything is secure and above board.
+    New Feature:
+    Upload to Roblox
 v.5.3:
     NOTE!! 
     This release introduces the Roblox OAuth2 functionality, allowing RBX Toolbox to be authorized directly with Roblox.

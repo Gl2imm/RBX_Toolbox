@@ -18,7 +18,7 @@ import bpy
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (5, 3, 0),  # to update in menu_ui as well
+    "version": (6, 1, 0),  # to update in menu_ui as well
     "blender": (3, 6, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",

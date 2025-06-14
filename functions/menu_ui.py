@@ -12,7 +12,7 @@ import update
 import update_aepbr
 import props
 
-addon_version = "v.5.3"
+addon_version = "v.6.0"
 #to update in __init__ as well
 
 
@@ -146,13 +146,6 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 button_text_logout = "Working..." if rbx.is_processing_login_or_logout else "Log out"
                 top_row_creator.operator(
                     oauth2_login_operators.RBX_OT_oauth2_logout.bl_idname, text=button_text_logout)
-
-        box = layout.box()
-        box.row().label(text="NOTE!!", icon="INFO")
-        box.row().label(text="The function is currently in review")
-        box.row().label(text="by Roblox and not yet live. I will")
-        box.row().label(text="push a new RBX Toolbox version to")
-        box.row().label(text="inform everyone when its live.")
 
 
 

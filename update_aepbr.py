@@ -5,7 +5,7 @@ import requests
 import zipfile
 from threading import Thread
 import shutil
-import glob_vars
+from. import glob_vars
 
 
 

@@ -1,5 +1,6 @@
 import bpy
-import glob_vars
+from RBX_Toolbox import glob_vars
+
 
 
 

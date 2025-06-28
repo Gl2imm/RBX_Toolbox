@@ -18,9 +18,11 @@
 
 # SPDX-License-Identifier: MIT
 
+import asyncio
 import sys
 from pathlib import Path
-
+from .lib.oauth2_client import RbxOAuth2Client
+from .lib import oauth2_client
 # Get the directory path of the current script
 add_on_directory = Path(__file__).parent
 
@@ -34,38 +36,31 @@ if "bpy" in locals():
     import importlib
 
     if "event_loop" in locals():
-        importlib.reload(event_loop)
+        importlib.reload(event_loop) # type: ignore
     if "status_indicators" in locals():
-        importlib.reload(status_indicators)
+        importlib.reload(status_indicators) # type: ignore
     if "roblox_properties" in locals():
-        importlib.reload(roblox_properties)
+        importlib.reload(roblox_properties) # type: ignore
     if "oauth2_login_operators" in locals():
-        importlib.reload(oauth2_login_operators)
+        importlib.reload(oauth2_login_operators) # type: ignore
     if "RBX_OT_upload" in locals():
-        importlib.reload(RBX_OT_upload)
+        importlib.reload(RBX_OT_upload) # type: ignore
     if "RbxOAuth2Client" in locals():
-        importlib.reload(RbxOAuth2Client)
+        importlib.reload(oauth2_client)
     if "get_selected_objects" in locals():
-        importlib.reload(get_selected_objects)
+        importlib.reload(get_selected_objects) # type: ignore
     if "constants" in locals():
-        importlib.reload(constants)
+        importlib.reload(constants) # type: ignore
     if "creator_details" in locals():
-        importlib.reload(creator_details)
+        importlib.reload(creator_details) # type: ignore
     if "RBX_OT_install_dependencies" in locals():
-        importlib.reload(RBX_OT_install_dependencies)
+        importlib.reload(RBX_OT_install_dependencies) # type: ignore
 
 import bpy
 from bpy.app.handlers import persistent
-from bpy.types import Panel, AddonPreferences
 from bpy.props import (
-    StringProperty,
     PointerProperty,
-    FloatProperty,
-    IntProperty,
-    BoolProperty,
 )
-
-import traceback
 
 # bl_info = {
 #     "name": "Upload to Roblox",
@@ -131,8 +126,10 @@ def register():
 def unregister():
     # We unregister in reverse order to ensure a class is not unregistered while
     # another still depends on it
+    
+    if bpy.app.handlers.load_post.count(load_post) > 0:
+        bpy.app.handlers.load_post.remove(load_post)
     for cls in reversed(get_classes()):
         bpy.utils.unregister_class(cls)
     del bpy.types.WindowManager.rbx
-
-    bpy.app.handlers.load_post.remove(load_post)
+    

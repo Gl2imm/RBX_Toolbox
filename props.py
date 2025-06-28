@@ -1,6 +1,6 @@
 import bpy
 import requests
-import glob_vars
+from . import glob_vars
 import xml.etree.ElementTree as ET
 
 
@@ -66,6 +66,38 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
                 ]
         )  # type: ignore
 
+
+
+
+
+
+    ### Import Character ###
+    rbx_username_entered: bpy.props.StringProperty(
+        name="Username Entered",
+        description="Username of the character entered in the field",
+        default="papa_boss332",
+        maxlen=100,
+    ) # type: ignore
+
+    rbx_split : bpy.props.BoolProperty(
+    name="Split accessories",
+    description="Split accessories property",
+    default = False
+    ) # type: ignore
+
+    ### Import Accessory ###
+    rbx_accessory_entered: bpy.props.StringProperty(
+        name="Accessory Entered",
+        description="Accessory entered in the field",
+        default="11996887739",
+        maxlen=100,
+    ) # type: ignore
+
+    rbx_incl_cages : bpy.props.BoolProperty(
+    name="Include Cages",
+    description="Include Cages property",
+    default = False
+    ) # type: ignore 
 
 
 

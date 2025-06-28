@@ -10,37 +10,29 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-import importlib
-import sys
 import os
-import bpy
+import sys
+import importlib
+import traceback
+
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (6, 1, 0),  # to update in menu_ui as well
+    "version": (6, 1, 0),  # to update in menu_ui as well #clean public lib, pycache and imports folder
     "blender": (3, 6, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
     "warning": "Subscribe to NYTV :)",
     "category": "Object"
 }
-
-
-# Determine addon path based on context (Scripting tab or installed addon)
-if __name__ == "__main__":
-    # Running in Scripting tab: use .blend file directory
-    addon_path = os.path.dirname(bpy.data.filepath)
-    package_name = None  # No package context in Scripting tab
-else:
-    # Running as installed addon: use script directory and set package name
-    addon_path = os.path.dirname(os.path.abspath(__file__))
-    package_name = os.path.basename(addon_path)  # e.g., "RBX_Toolbox"
+# Addon path and package name for installed addon
+addon_path = os.path.dirname(os.path.abspath(__file__))
+package_name = os.path.basename(addon_path)
 
 # Add addon path to sys.path if not already present
 if addon_path not in sys.path:
     sys.path.append(addon_path)
-
+    
 all_modules_names = [
     "glob_vars",
     "prefs",
@@ -50,6 +42,7 @@ all_modules_names = [
     "oauth",
     "functions.url_handler",
     "functions.hdri_sky",
+    "functions.rbx_import",
     "functions.ugc_bounds",
     "functions.cam_staging",
     "functions.dmy_buttons",
@@ -68,80 +61,48 @@ all_modules_names = [
 # When bpy is already in local, reload modules for iterative testing
 if "bpy" in locals():
     for module_name in all_modules_names:
-        full_module_name = f"{package_name}.{module_name}" if package_name else module_name
+        full_module_name = f"{package_name}.{module_name}"
         if full_module_name in sys.modules:
-            importlib.reload(sys.modules[full_module_name])
-
-# Import modules dynamically
-for module_name in all_modules_names:
-    try:
-        # Use package context for addons, plain module name for Scripting tab
-        full_module_name = f"{package_name}.{module_name}" if package_name else module_name
-        module = importlib.import_module(full_module_name)
-        globals()[module_name.replace(".", "_")] = module
-    except Exception as e:
-        print(f"Error importing {module_name}: {e}")
-
-# Import classes from connected modules
-from bpy.props import BoolProperty
+            try:
+                importlib.reload(sys.modules[full_module_name])
+                print(f"Reloaded module: {full_module_name}")
+            except ModuleNotFoundError:
+                print(f"Module {full_module_name} not found for reloading.")
+                
+                
+from . import glob_vars
+from .prefs import RBXToolsPreferences
+from .props import PROPERTIES_RBX
+from .functions.url_handler import URL_HANDLER
+from .update import RBX_INSTALL_UPDATE
+from .update_aepbr import RBX_UPDATE_AEPBR
+from .functions.ugc_bounds import BUTTON_BNDS
+from .functions.rbx_import import OBJECT_OT_add_object
+from .functions.hdri_sky import RBX_BUTTON_HDRI
+from .functions.cam_staging import BUTTON_CMR
+from .functions.dmy_buttons import BUTTON_DMMY
+from .functions.wear_r6_rig import BUTTON_WEAR
+from .functions.hair_buttons import BUTTON_HAIR
+from .functions.dmy_lc_buttons import RBX_BUTTON_LC
+from .functions.dmy_lc_buttons_anim import RBX_BUTTON_LC_ANIM
+from .functions.avatar_buttons import RBX_BUTTON_AVA
+from .functions.armature_buttons import BUTTON_BN
+from .functions.func_export import RBX_OPERATORS
+from .functions.funct_others import RBX_BUTTON_OF
+from .functions.menu_pie import RBX_MT_MENU
+from .functions.menu_pie import RBX_MT_MENU2
+from .functions.menu_pie import RBX_MT_MENU2_1
+from .functions.menu_pie import RBX_MT_MENU2_2
+from .functions.menu_pie import RBX_MT_MENU2_3
+from .functions.menu_pie import RBX_MT_MENU3
+from .functions.menu_pie import RBX_MT_MENU4
+from .functions.menu_ui import TOOLBOX_MENU
+from . import oauth
 from bpy.types import Scene
-if __name__ == "__main__":
-    import oauth
-    from functions.menu_ui import TOOLBOX_MENU
-    from functions.menu_pie import RBX_MT_MENU4
-    from functions.menu_pie import RBX_MT_MENU3
-    from functions.menu_pie import RBX_MT_MENU2_3
-    from functions.menu_pie import RBX_MT_MENU2_2
-    from functions.menu_pie import RBX_MT_MENU2_1
-    from functions.menu_pie import RBX_MT_MENU2
-    from functions.menu_pie import RBX_MT_MENU
-    from functions.funct_others import RBX_BUTTON_OF
-    from functions.func_export import RBX_OPERATORS
-    from functions.armature_buttons import BUTTON_BN
-    from functions.avatar_buttons import RBX_BUTTON_AVA
-    from functions.dmy_lc_buttons_anim import RBX_BUTTON_LC_ANIM
-    from functions.dmy_lc_buttons import RBX_BUTTON_LC
-    from functions.hair_buttons import BUTTON_HAIR
-    from functions.wear_r6_rig import BUTTON_WEAR
-    from functions.dmy_buttons import BUTTON_DMMY
-    from functions.cam_staging import BUTTON_CMR
-    from functions.hdri_sky import RBX_BUTTON_HDRI
-    from functions.ugc_bounds import BUTTON_BNDS
-    from update_aepbr import RBX_UPDATE_AEPBR
-    from update import RBX_INSTALL_UPDATE
-    from functions.url_handler import URL_HANDLER
-    from props import PROPERTIES_RBX
-    from prefs import RBXToolsPreferences
-    import glob_vars
-else:
-    from . import oauth
-    from .functions.menu_ui import TOOLBOX_MENU
-    from .functions.menu_pie import RBX_MT_MENU4
-    from .functions.menu_pie import RBX_MT_MENU3
-    from .functions.menu_pie import RBX_MT_MENU2_3
-    from .functions.menu_pie import RBX_MT_MENU2_2
-    from .functions.menu_pie import RBX_MT_MENU2_1
-    from .functions.menu_pie import RBX_MT_MENU2
-    from .functions.menu_pie import RBX_MT_MENU
-    from .functions.funct_others import RBX_BUTTON_OF
-    from .functions.func_export import RBX_OPERATORS
-    from .functions.armature_buttons import BUTTON_BN
-    from .functions.avatar_buttons import RBX_BUTTON_AVA
-    from .functions.dmy_lc_buttons_anim import RBX_BUTTON_LC_ANIM
-    from .functions.dmy_lc_buttons import RBX_BUTTON_LC
-    from .functions.hair_buttons import BUTTON_HAIR
-    from .functions.wear_r6_rig import BUTTON_WEAR
-    from .functions.dmy_buttons import BUTTON_DMMY
-    from .functions.cam_staging import BUTTON_CMR
-    from .functions.hdri_sky import RBX_BUTTON_HDRI
-    from .functions.ugc_bounds import BUTTON_BNDS
-    from update_aepbr import RBX_UPDATE_AEPBR
-    from update import RBX_INSTALL_UPDATE
-    from .functions.url_handler import URL_HANDLER
-    from .props import PROPERTIES_RBX
-    from .prefs import RBXToolsPreferences
-    from . import glob_vars
-    
+from bpy.props import BoolProperty
+import bpy
+
+
 # List all classes
 classes = (
     RBXToolsPreferences,
@@ -151,6 +112,7 @@ classes = (
     RBX_UPDATE_AEPBR,
     BUTTON_BNDS,
     RBX_BUTTON_HDRI,
+    OBJECT_OT_add_object,
     BUTTON_CMR,
     BUTTON_DMMY,
     BUTTON_WEAR,
@@ -172,22 +134,23 @@ classes = (
 )
 
 # CLASS REGISTER
-##########################################
 
 
 def register():
-    for c in classes:
-        bpy.utils.register_class(c)
     try:
         oauth.register()
-    except:
-        oauth.unregister()
-        oauth.register()
+    except Exception as e:
+        traceback.print_exc()
+        print(f"Error during OAuth registration: {e}")
+    for c in classes:
+        bpy.utils.register_class(c)
 
     bpy.types.Scene.rbx_prefs = bpy.props.PointerProperty(type=PROPERTIES_RBX)
     Scene.subpanel_readme = BoolProperty(default=False)
     Scene.subpanel_bounds = BoolProperty(default=False)
     Scene.subpanel_hdri = BoolProperty(default=False)
+    Scene.subpanel_imp_char = BoolProperty(default=False)
+    Scene.subpanel_supported = BoolProperty(default=False)
     Scene.subpanel_dummy = BoolProperty(default=False)
     Scene.subpanel_rigs = BoolProperty(default=False)
     Scene.subpanel_hair = BoolProperty(default=False)
@@ -209,16 +172,21 @@ def register():
 
 
 def unregister():
-    for c in classes:
-        bpy.utils.unregister_class(c)
     try:
         oauth.unregister()
-    except:
-        pass
+    except Exception as e:
+        traceback.print_exc()
+        print(f"Error during OAuth unregistration: {e}")
+        
+    for c in classes:
+        bpy.utils.unregister_class(c)
+        
     del bpy.types.Scene.rbx_prefs
     del Scene.subpanel_readme
     del Scene.subpanel_bounds
     del Scene.subpanel_hdri
+    del Scene.subpanel_imp_char
+    del Scene.subpanel_supported
     del Scene.subpanel_dummy
     del Scene.subpanel_rigs
     del Scene.subpanel_hair
@@ -236,31 +204,3 @@ def unregister():
     for km, kmi in glob_vars.addon_keymaps.values():
         km.keymap_items.remove(kmi)
     glob_vars.addon_keymaps.clear()
-
-### Only used in test mode, so it can clean up and reload addon without restarting Blender ###
-
-
-def cleanse_modules():
-    """search for your plugin modules in blender python sys.modules and remove them"""
-    all_modules = sys.modules
-    all_modules = dict(
-        sorted(all_modules.items(), key=lambda x: x[0]))  # sort them
-
-    for module_name in all_modules_names:
-        for k, v in all_modules.items():
-            if k.startswith(module_name):
-                # print(k)
-                try:
-                    del sys.modules[k]
-                except KeyError:
-                    continue
-    return None
-
-
-if __name__ == "__main__":
-    try:
-        register()
-    except ValueError:
-        unregister()
-        cleanse_modules()
-        register()

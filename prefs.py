@@ -1,6 +1,16 @@
 import bpy
 from bpy.props import StringProperty, IntProperty, FloatProperty, BoolProperty
+import platform
+from . import glob_vars
 
+
+
+print("**********************************************")
+print("RBX Toolbox Log")
+print("OS Platform: " + platform.system())
+print("Blender ver:", glob_vars.bldr_ver)
+print("Addon path:", glob_vars.addon_path)
+print("**********************************************")
 
 # OPERATOR
 ########################################
@@ -9,6 +19,19 @@ class RBXToolsPreferences(bpy.types.AddonPreferences):
 
     bl_idname = "RBX_Toolbox"
 
+
+
+    rbx_asset_folder: bpy.props.StringProperty(name="Folder",
+                                               description="Select Assets folder",
+                                               default="",
+                                               maxlen=1024,
+                                               subtype="DIR_PATH")  # type: ignore
+    
+
+
+
+
+    ### OAuth ###
     # The identifier of the selected creator (e.g., "U12345" or "G67890")
     creator: StringProperty(
         name="Selected Creator ID",
@@ -37,18 +60,16 @@ class RBXToolsPreferences(bpy.types.AddonPreferences):
         default="",
     ) # type: ignore
 
-
-    rbx_asset_folder: bpy.props.StringProperty(name="Folder",
-                                               description="Select Assets folder",
-                                               default="",
-                                               maxlen=1024,
-                                               subtype="DIR_PATH")  # type: ignore
-
     # These properties are not editable via preferences UI, they get reflected to and from properties in memory.
     # The only token we need to persist is the refresh token, since it gives all new tokens in the next session
     refresh_token: StringProperty() # type: ignore
     selected_creator_enum_index: IntProperty() # type: ignore
 
+
+
+
+
+    ### Upload to Roblox ###
     # export_scale is configurable via the Add-on preferences menu in Blender
     DEFAULT_EXPORT_SCALE = 0.01  # Blender Meters are 100:1 to Studio Studs
 

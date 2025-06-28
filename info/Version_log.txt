@@ -2,6 +2,16 @@
                                                       Version History:
                                             ####################################
 
+v.6.1:
+    The long waited impor function from Roblox is back again!
+    leveraging on the previously implemented oAuth RBX toolbox now can import items from Roblox marketplace.
+    Current version supports the following import:
+    Avatar Accessories
+    Layered Clothing (With or without cages)
+    Gears
+    Bundle items:
+    Shoes (With or without cages)
+    Note: Since this function uses oAuth - RBX Import tab will be hidden. Authorize Toolbox for this option to appear.
 v.6.0:
     Huge Update for RBX Toolbox!
     I am excited to announce that RBX Toolbox now officially supports OAuth 2.0, allowing you to connect the plugin directly to your 

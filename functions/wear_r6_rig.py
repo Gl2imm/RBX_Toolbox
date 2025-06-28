@@ -3,9 +3,7 @@ import os
 import asyncio
 import requests
 
-import glob_vars
-import prefs
-import props
+from RBX_Toolbox import glob_vars
 
 
 

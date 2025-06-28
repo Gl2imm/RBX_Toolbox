@@ -1,19 +1,21 @@
-from cProfile import label
 import traceback
 import bpy
 import os
 import glob
 import bmesh
-
-import glob_vars
+from RBX_Toolbox import glob_vars
 from glob_vars import addon_path
 from . import menu_pie
-import update
-import update_aepbr
-import props
+from RBX_Toolbox import update
+from RBX_Toolbox import update_aepbr
+from RBX_Toolbox import props
 
-addon_version = "v.6.0"
+
+
+addon_version = "v.6.1"
 #to update in __init__ as well
+#clean public lib, pycache and imports folder
+
 
 
 def get_aepbr_cur_ver():
@@ -146,39 +148,6 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 button_text_logout = "Working..." if rbx.is_processing_login_or_logout else "Log out"
                 top_row_creator.operator(
                     oauth2_login_operators.RBX_OT_oauth2_logout.bl_idname, text=button_text_logout)
-
-
-
-        '''To add this for RBX upload (need to refresh login)
-        import bpy
-        import time
-
-        def refresh_oauth_token():
-            print(f"[{time.strftime('%H:%M:%S')}] Refreshing OAuth token...")
-
-            To stop the timer, the function can return None. So to make it conditional:
-            if not is_user_logged_in():
-            print("User not logged in. Stopping timer.")
-            return None
-
-            # ⬇️ Your actual token refresh logic goes here
-            # Example:
-            # new_token = my_auth_client.refresh_token()
-            # store_token(new_token)
-
-            
-            from oauth.lib.oauth2_client import RbxOAuth2Client
-            window_manager = context.window_manager
-            rbx = window_manager.rbx
-            oauth2_client = RbxOAuth2Client(rbx)
-            await oauth2_client.refresh_login_if_needed()
-            access_token = oauth2_client.token_data["access_token"]
-
-            # ⏳ Reschedule this function to run again in 900 seconds (15 minutes)
-            return 900.0  # seconds
-        
-        Call the timer once during your add-on's register() or when user logs in
-        bpy.app.timers.register(refresh_oauth_token, first_interval=900.0)'''
 
 
 
@@ -322,6 +291,138 @@ class TOOLBOX_MENU(bpy.types.Panel):
             ##### Roblox Baseplate #####
             box = layout.box()
             box.operator('object.button_cmr', text = "Add Roblox Baseplate", icon='IMPORT').cmr = 'bsplt_append' 
+
+
+
+
+
+        ######### Import Characters and Accessories #########
+        if rbx.is_logged_in:
+            row = layout.row()
+            icon = 'DOWNARROW_HLT' if context.scene.subpanel_imp_char else 'RIGHTARROW'
+            row.prop(context.scene, 'subpanel_imp_char', icon=icon, icon_only=True)
+            row.label(text='Import From Roblox', icon='IMPORT')
+            # some data on the subpanel
+            if context.scene.subpanel_imp_char:
+                box = layout.box()
+                box.label(text = 'Enter ID, URL or Username')
+                box.prop(rbx_prefs, 'rbx_username_entered', text ='')
+                box.operator('object.add_character', text = "Preview").rbx_char = "preview_avatar"
+                rbx_cur_usr = glob_vars.get_login_info()["user_name"]
+                box.operator('object.add_character', text = f"Import My avatar ({rbx_cur_usr})", icon = 'TRACKING_REFINE_BACKWARDS').rbx_char = "my_avatar"
+                box.prop(rbx_prefs, 'rbx_split', text ='Separate Accessories')              
+                split = box.split(factor = 0.5)
+                col = split.column(align = True)            
+                col.operator('object.add_character', text = "Import").rbx_char = "import"
+                split.operator('object.add_character', text = "Open Folder").rbx_char = "folder_character"
+
+                ### Set preview
+                try:
+                    rbx_avat_img_prev = bpy.data.images[glob_vars.rbx_user_name_clean + '.png']
+                except:
+                    box.separator()
+                    box.separator()
+                    box.separator()
+                    box.label(text = '')
+                    box.label(text = '')
+                    box.label(text = '')
+                    box.label(text = '')
+                    box.label(text = '')
+                    box.label(text = '')
+                else:
+                    rbx_avat_img_prev.preview_ensure()
+                    box.template_icon(rbx_avat_img_prev.preview.icon_id, scale=10.0)
+
+
+                if glob_vars.rbx_char_error:
+                    box.label(text = glob_vars.rbx_char_error, icon='ERROR')
+                    try:
+                        rbx_asset_img_prev = bpy.data.images[glob_vars.rbx_user_name_clean + '.png']
+                    except:
+                        pass 
+
+
+
+                ######### Import Accessory #########    
+                box = layout.box()
+                box.label(text = 'Accessory ID or URL')
+                box.prop(rbx_prefs, 'rbx_accessory_entered', text ='')
+                box.operator('object.add_character', text = "Check Item (must)").rbx_char = "preview_accessory"  
+                if glob_vars.rbx_supported_type_category == "Layered Cloth" or glob_vars.rbx_supported_type_category == "Shoes":
+                    box.prop(rbx_prefs, 'rbx_incl_cages', text =' Include Cages in Import (take longer)')    
+                split = box.split(factor = 0.5)
+                col = split.column(align = True) 
+                col.enabled = glob_vars.rbx_supported_type          
+                col.operator('object.add_character', text = "Import").rbx_char = "import_accessory"
+                split.operator('object.add_character', text = "Open Folder").rbx_char = "folder_accessory"
+
+                '''# --- Top conditional row: Include Cages checkbox ---
+                if glob_vars.rbx_supported_type_category == "Layered Cloth":
+                    box.prop(rbx_prefs, 'rbx_incl_cages', text=' Include Cages in Import')
+                # --- Second row: Check + Import buttons ---
+                split = box.split(factor=0.5)
+                col_left = split.column(align=True)
+                col_left.operator('object.add_character', text="Check Item").rbx_char = "preview_accessory"
+                col_right = split.column(align=True)
+                col_right.enabled = glob_vars.rbx_supported_type
+                col_right.operator('object.add_character', text="Import").rbx_char = "import_accessory"
+                # --- Third row: empty left, Open Folder button on right ---
+                split = box.split(factor=0.5)
+                col_left = split.column(align=True)
+                col_right = split.column(align=True)
+                col_right.operator('object.add_character', text="Open Folder").rbx_char = "folder_accessory"'''
+
+                try:
+                    rbx_asset_img_prev = bpy.data.images[glob_vars.rbx_asset_name_clean + '.png']
+                except:
+                    box.separator()
+                    box.separator()
+                    box.separator()
+                    box.label(text = '')
+                    box.label(text = '')
+                    box.label(text = '')
+                    box.label(text = '')
+                    box.label(text = '')
+                    box.label(text = '')
+                else:
+                    rbx_asset_img_prev.preview_ensure()
+                    box.template_icon(rbx_asset_img_prev.preview.icon_id, scale=10.0)
+                
+
+                box.label(text = f'Name: {glob_vars.rbx_asset_name if glob_vars.rbx_asset_name else ""}')
+                box.label(text = f'Creator: {glob_vars.rbx_asset_creator if glob_vars.rbx_asset_creator else ""}')
+                box.label(text = f'Type: {glob_vars.rbx_asset_type if glob_vars.rbx_asset_type else ""}')
+                box.label(text = f'Import: {"Supported" if glob_vars.rbx_supported_type else "Not Supported"}')
+
+                        
+                if glob_vars.rbx_asset_error:
+                    box.label(text = glob_vars.rbx_asset_error, icon='ERROR')
+                    try:
+                        rbx_asset_img_prev = bpy.data.images[glob_vars.rbx_asset_name_clean + '.png']
+                    except:
+                        pass 
+                
+                box = layout.box()
+                row = box.row()
+                icon = 'DISCLOSURE_TRI_DOWN' if context.scene.subpanel_supported else 'DISCLOSURE_TRI_RIGHT'
+                row.prop(context.scene, 'subpanel_supported', icon=icon, icon_only=True)
+                row.label(text='Supported Accessories:', icon='CHECKMARK')
+                # some data on the subpanel
+                if context.scene.subpanel_supported:
+                    row = box.row()
+                    #row.label(text='', icon='BLANK1')  # Small indent
+                    row.label(text='Avatar Accessories', icon='DOT')
+                    row = box.row()
+                    row.label(text='Layered Clothing', icon='DOT')
+                    row = box.row()
+                    row.label(text='Cages', icon='DOT')
+                    row = box.row()
+                    row.label(text='Gears', icon='DOT')
+                    row = box.row()
+                    row.label(text='Bundle Items:', icon='PACKAGE')
+                    row = box.row()
+                    row.label(text='Shoes', icon='DOT') 
+
 
 
 

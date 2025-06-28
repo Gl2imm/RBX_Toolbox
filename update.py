@@ -6,7 +6,7 @@ import zipfile
 import subprocess
 from threading import Thread
 import shutil
-import glob_vars
+from . import glob_vars
 
 
 if glob_vars.update_test == True:
@@ -171,7 +171,7 @@ class RBX_INSTALL_UPDATE(bpy.types.Operator):
             for area in context.screen.areas:
                 if area.type == 'VIEW_3D':  # Adjust if your panel is in a different area
                     area.tag_redraw()
-
+        
         
         if operator_state == "ERROR":
             self.report({'ERROR'}, f"Error: {error_message}")

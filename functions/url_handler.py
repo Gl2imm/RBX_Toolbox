@@ -1,6 +1,6 @@
 import bpy
 import webbrowser
-import glob_vars
+from RBX_Toolbox import glob_vars
 
 
 

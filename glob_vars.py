@@ -99,13 +99,6 @@ bldr_ver = bpy.app.version_string.split('.')
 bldr_fdr = bldr_ver[0] + '.' + bldr_ver[1]
 
 
-print("**********************************************")
-print("RBX Toolbox Log")
-print("OS Platform: " + platform.system())
-print("Blender ver:", bldr_ver)
-print("Addon path:", addon_path)
-print("**********************************************")
-
 
 if platform.system() == 'Windows':
     fbs = '\\'
@@ -135,15 +128,31 @@ info = 'info' #info folder
 
 
 
-cams = ['Camera_F','Camera_B','Camera_L','Camera_R']
+### RBX Import
+rbx_import_main_folder = "RBX_Import"
+rbx_imported_char_fldr = "Characters/"
+rbx_imported_acc_fldr = "Accessories/"
+rbx_supported_type = False
+rbx_user_name = None
+rbx_user_name_clean = None
+rbx_char_error = None
+
+rbx_asset_error = None
+rbx_asset_name = None
+rbx_asset_name_clean = None
+rbx_asset_creator = None
+rbx_asset_type = None
+rbx_supported_type_category = None
+rbx_asset_id = None
+rbx_is_bundle = False
+
+
+
+
 bn_selection = None
 bn_error = None
 msh_selection = None
 msh_error = None
-rbx_username = None
-rbx_accessory = None
-rbx_asset_netw_error = None
-rbx_char_netw_error = None
 rbx_face_netw_error = None
 rbx_shirt_netw_error = None
 rbx_pants_netw_error = None
@@ -153,6 +162,177 @@ rbx_pants_name = None
 rbx_face_filename = None
 rbx_shirt_filename = None
 rbx_pants_filename = None
+cams = ['Camera_F','Camera_B','Camera_L','Camera_R']
 
 # PIE Menu
 addon_keymaps = {}
+
+
+
+
+
+
+#https://create.roblox.com/docs/reference/engine/enums/AssetType
+rbx_asset_types = {
+    1 :'Image',
+    2 :'T-Shirt',
+    3 :'Audio',
+    4 :'Mesh',
+    5 :'Lua',
+    6 :'None',
+    7 :'None',
+    8 :'Hat',
+    9 :'Place',
+    10 :'Model',
+    11 :'Shirt',
+    12 :'Pants',
+    13 :'Decal',
+    17 :'Head',
+    18 :'Face',
+    19 :'Gear',
+    20 :'None',
+    21 :'Badge',
+    22 :'None',
+    23 :'None',
+    24 :'Animation',
+    25 :'None',
+    26 :'None',
+    27 :'Torso',
+    28 :'RightArm',
+    29 :'LeftArm',
+    30 :'LeftLeg',
+    31 :'RightLeg',
+    32 :'Package',
+    33 :'None',
+    34 :'GamePass',
+    35 :'None',
+    36 :'None',
+    37 :'None',
+    38 :'Plugin',
+    39 :'None',
+    40 :'MeshPart',
+    41 :'HairAccessory',
+    42 :'FaceAccessory',
+    43 :'NeckAccessory',
+    44 :'ShoulderAccessory',
+    45 :'FrontAccessory',
+    46 :'BackAccessory',
+    47 :'WaistAccessory',
+    48 :'ClimbAnimation',
+    49 :'DeathAnimation',
+    50 :'FallAnimation',
+    51 :'IdleAnimation',
+    52 :'JumpAnimation',
+    53 :'RunAnimation',
+    54 :'SwimAnimation',
+    55 :'WalkAnimation',
+    56 :'PoseAnimation',
+    57 :'EarAccessory',
+    58 :'EyeAccessory',
+    59 :'None',
+    60 :'None',
+    61 :'EmoteAnimation',
+    62 :'Video',
+    64 :'TShirtAccessory',
+    65 :'ShirtAccessory',
+    66 :'PantsAccessory',
+    67 :'JacketAccessory',
+    68 :'SweaterAccessory',
+    69 :'ShortsAccessory',
+    70 :'LeftShoeAccessory',
+    71 :'RightShoeAccessory',
+    72 :'DressSkirtAccessory',
+    73 :'FontFamily',
+    74 :'None',
+    75 :'None',
+    76 :'EyebrowAccessory',
+    77 :'EyelashAccessory',
+    78 :'MoodAnimation',
+    79 :'DynamicHead'
+    }
+
+rbx_bundle_types = {
+    1 :'Bundle - BodyParts',
+    2 :'Bundle - Animations',
+    3 :'Bundle - Shoes',
+    4 :'Bundle - DynamicHead',
+    5 :'Bundle - DynamicHeadAvatar'
+    }
+
+### Only when you getting direct assets or LC, not bundles
+supported_assets = {
+    "Gear"          : [19],
+    "Accessory"     : [8,41,42,43,44,45,46,47],
+    "Layered Cloth" : [64,65,66,67,68,69,70,71,72],
+    #"Dynamic Head"  : [79]
+    }
+
+supported_bundles = {
+    "Shoes"          : [3],
+    #"Dynamic Head"   : [4]
+    }
+
+### Only when you getting bundled item list of items
+supported_bundled_items = {
+    70 : 'Left_Shoe',
+    71 : 'Right_Shoe',
+    #79 : 'Dynamic Head'
+    }
+
+### Which sets need for the accessory
+rbx_asset_sets_rbxm = {
+    "Gear"          : ['Obj','texture'],
+    "Accessory"     : ['Obj','texture'],
+    #"Dynamic Head"  : ['Obj','texture'],
+    "Layered Cloth" : ['Obj','base_color','Metallic','Roughness','Normal'],
+    "Cages"         : ['inner_cage','outer_cage']
+}
+
+### If one of this set is missing - raise error
+rbxm_raise_error_if_not_found = {
+    "Gear"          : ['Obj','texture'],
+    "Accessory"     : ['Obj','texture'],
+    "Dynamic Head"  : ['Obj'],
+    "Layered Cloth" : ['Obj','base_color'],
+    "Cages"         : ['inner_cage','outer_cage']
+}
+
+
+
+
+### Regex finding expressions
+regex_values_norm = {
+    "Obj"           : r"meshid.*?\W*(prop)",
+    "texture"       : r"textureid.*?\W*(prop)",
+    "base_color"    : r"colormap.*?\W*(prop)",
+    "Metallic"      : r"metalnessmap.*?\W*(prop)",
+    "Roughness"     : r"roughnessmap.*?\W*(prop)",
+    "Normal"        : r"normalmap.*?\W*(prop)",
+    "inner_cage"    : r"referencemeshid.*?\W*(prop)",
+    "outer_cage"    : r"cagemeshid.*?\W*(prop)"
+}
+
+regex_values_rbx = {
+    "Obj"           : r'meshid.*?prop',
+    "texture"       : r'textureid.*?prop',
+    "base_color"    : r"colormap.*?\W*(prop)",
+    "Metallic"      : r"metalnessmap.*?\W*(prop)",
+    "Roughness"     : r"roughnessmap.*?\W*(prop)",
+    "Normal"        : r"normalmap.*?\W*(prop)",
+    "inner_cage"    : r"referencemeshid.*?\W*(prop)",
+    "outer_cage"    : r"cagemeshid.*?\W*(prop)"
+}
+
+regex_values_rbxmx = {
+    "Obj"           : r'"meshid"><url>.*?\W*(<)',
+    "texture"       : r'"textureid"><url>.*?\W*(<)',
+    "base_color"    : r'"colormap"><url>.*?\W*(<)',
+    "Metallic"      : r'"metalnessmap"><url>.*?\W*(<)',
+    "Roughness"     : r'"roughnessmap"><url>.*?\W*(<)',
+    "Normal"        : r'"normalmap"><url>.*?\W*(<)',
+    "inner_cage"    : r'"referencemeshid"><url>.*?\W*(<)',
+    "outer_cage"    : r'"cagemeshid"><url>.*?\W*(<)'
+}
+
+
+

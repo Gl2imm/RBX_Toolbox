@@ -199,15 +199,18 @@ class RbxOAuth2Client:
         """
         Logs out the user by revoking all tokens associated with the session and clearing the token data.
         """
-        refresh_token = RbxOAuth2Client.token_data.get("refresh_token")
-        if not refresh_token:
-            token_data_json = get_add_on_preferences(bpy.context.preferences).saved_token_data_json
-            RbxOAuth2Client.token_data = json.loads(token_data_json)
-        
-        refresh_token = RbxOAuth2Client.token_data.get("refresh_token")
+        token_data = RbxOAuth2Client.token_data
+        refresh_token = token_data.get("refresh_token")
 
         if not refresh_token:
-            raise NotLoggedInError("An active login session is required to refresh tokens")
+            # Try to load the token data from preferences
+            token_data_json = get_add_on_preferences(bpy.context.preferences).saved_token_data_json
+            try:
+                token_data = json.loads(token_data_json)
+                RbxOAuth2Client.token_data = token_data
+                refresh_token = token_data.get("refresh_token")
+            except (json.JSONDecodeError, AttributeError):
+                return
 
         from . import constants
         context = bpy.context

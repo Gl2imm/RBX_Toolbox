@@ -23,9 +23,9 @@ lts_title = None
 
 
 ## Tests
-update_test = False # Set to True to test out update process without uploading new version to Github
-rbx_update_test_down_link = "https://github.com/Gl2imm/RBX_Toolbox/releases/download/v.5.0/RBX_Toolbox_v.5.0.zip"
-
+update_test = False # Set to True to test out update process without uploading new version to Github (nothing else need change)
+rbx_update_test_down_link = "https://github.com/Gl2imm/RBX_Toolbox/releases/download/v.6.1/RBX_Toolbox_v.6.1.zip"
+need_restart_blender = False
 
 ## Client Info ##
 def get_addon_preferences():
@@ -145,6 +145,7 @@ rbx_asset_type = None
 rbx_supported_type_category = None
 rbx_asset_id = None
 rbx_is_bundle = False
+rbx_is_bundled_item = False
 
 
 
@@ -252,7 +253,7 @@ rbx_asset_types = {
     }
 
 rbx_bundle_types = {
-    1 :'Bundle - BodyParts',
+    1 :'Bundle - Character',
     2 :'Bundle - Animations',
     3 :'Bundle - Shoes',
     4 :'Bundle - DynamicHead',
@@ -264,26 +265,42 @@ supported_assets = {
     "Gear"          : [19],
     "Accessory"     : [8,41,42,43,44,45,46,47],
     "Layered Cloth" : [64,65,66,67,68,69,70,71,72],
-    #"Dynamic Head"  : [79]
+    "Dynamic Head"  : [79],
+    "Body Parts"    : [27,28,29,30,31]
     }
 
 supported_bundles = {
     "Shoes"          : [3],
-    #"Dynamic Head"   : [4]
+    "Dynamic Head"   : [4],
+    "Character"      : [1]
     }
+
+### If the Asset is actually part of bundle (cannot get data for this item as asset)
+part_of_bundle_items = [79,27,28,29,30,31]
 
 ### Only when you getting bundled item list of items
 supported_bundled_items = {
     70 : 'Left_Shoe',
     71 : 'Right_Shoe',
-    #79 : 'Dynamic Head'
+    79 : 'Dynamic Head',
+    27 : 'Torso',
+    28 : 'RightArm',
+    29 : 'LeftArm',
+    30 : 'LeftLeg',
+    31 : 'RightLeg',
     }
 
 ### Which sets need for the accessory
 rbx_asset_sets_rbxm = {
     "Gear"          : ['Obj','texture'],
     "Accessory"     : ['Obj','texture'],
-    #"Dynamic Head"  : ['Obj','texture'],
+    "Dynamic Head"  : ['Obj','texture'],
+    "Character"     : ['Obj','texture'],
+    "Torso"         : ['Obj','texture'],
+    "RightArm"      : ['Obj','texture'],
+    "LeftArm"       : ['Obj','texture'],
+    "LeftLeg"       : ['Obj','texture'],
+    "RightLeg"      : ['Obj','texture'],
     "Layered Cloth" : ['Obj','base_color','Metallic','Roughness','Normal'],
     "Cages"         : ['inner_cage','outer_cage']
 }
@@ -293,6 +310,12 @@ rbxm_raise_error_if_not_found = {
     "Gear"          : ['Obj','texture'],
     "Accessory"     : ['Obj','texture'],
     "Dynamic Head"  : ['Obj'],
+    "Character"     : ['Obj','texture'],
+    "Torso"         : ['Obj','texture'],
+    "RightArm"      : ['Obj','texture'],
+    "LeftArm"       : ['Obj','texture'],
+    "LeftLeg"       : ['Obj','texture'],
+    "RightLeg"      : ['Obj','texture'],
     "Layered Cloth" : ['Obj','base_color'],
     "Cages"         : ['inner_cage','outer_cage']
 }

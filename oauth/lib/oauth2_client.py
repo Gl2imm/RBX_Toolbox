@@ -250,6 +250,7 @@ class RbxOAuth2Client:
                 creator_details.save_creator_details(
                     context.window_manager, context.preferences)
                 print("User logged out and session state saved.")
+                
 
     async def refresh_login_if_needed(self):
         refresh_token = RbxOAuth2Client.token_data.get("refresh_token")

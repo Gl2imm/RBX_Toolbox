@@ -2,8 +2,20 @@
                                                       Version History:
                                             ####################################
 
+v.6.2:
+    Added support to Import from Roblox for the following items
+    Bundle items:
+    Characters
+    Dynamic Heads
+    Body Parts (will import as whole bundle)
+    Fixing:
+    Fixed addon update function (currently it does not work if oAuth files are in use)
+    Note: Im aware that some users have issues with addon update function, this is due some modules in oAuth files are running
+    and preventing old files to be deleted. You may still experience issues during this update as well, but from next updates onward
+    this should not happened. If you have issues during this update the only solution for now is completely uninstall toolbox from
+    blender addons and install this version via zip file. 
 v.6.1:
-    The long waited impor function from Roblox is back again!
+    The long waited import function from Roblox is back again!
     leveraging on the previously implemented oAuth RBX toolbox now can import items from Roblox marketplace.
     Current version supports the following import:
     Avatar Accessories

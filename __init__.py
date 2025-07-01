@@ -18,7 +18,7 @@ import traceback
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (6, 1, 0),  # to update in menu_ui as well #clean public lib, pycache and imports folder
+    "version": (6, 2, 0),  # to update in menu_ui as well #clean public lib, pycache and imports folder
     "blender": (3, 6, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -163,6 +163,7 @@ def register():
     Scene.subpanel_export = BoolProperty(default=False)
     Scene.subpanel_upload = BoolProperty(default=False)
     Scene.subpanel_pie = BoolProperty(default=False)
+    Scene.subpanel_support = BoolProperty(default=False)
     kc = bpy.context.window_manager.keyconfigs.addon
     km = kc.keymaps.new(name='Window', space_type='EMPTY')
     kmi = km.keymap_items.new('wm.call_menu_pie', 'Y', 'PRESS',
@@ -199,6 +200,7 @@ def unregister():
     del Scene.subpanel_export
     del Scene.subpanel_upload
     del Scene.subpanel_pie
+    del Scene.subpanel_support
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.addon
     for km, kmi in glob_vars.addon_keymaps.values():

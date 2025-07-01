@@ -12,9 +12,10 @@ from RBX_Toolbox import props
 
 
 
-addon_version = "v.6.1"
+addon_version = "v.6.2"
 #to update in __init__ as well
 #clean public lib, pycache and imports folder
+#set debug to false
 
 
 
@@ -53,7 +54,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 box = layout.box()
                 box.label(text = "Update Available: " + glob_vars.lts_ver)
                 box.operator('object.url_handler', text = "Release Notes " + glob_vars.lts_ver, icon='DOCUMENTS').rbx_link = "update"
-                if update.operator_state == "IDLE":
+                if update.operator_state == "IDLE" and not glob_vars.need_restart_blender:
                     box.operator("wm.install_update", text="Install Update", icon='IMPORT')
                     '''elif update.operator_state == "DOWNLOADING":
                     box.label(text=f"Downloading... {update.download_progress:.2f}%")'''
@@ -70,6 +71,10 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     box = layout.box()
                     box.alert = True  # 🔴 Makes the button red
                     box.label(text=f"Error: {update.error_message}", icon='ERROR')
+                if glob_vars.need_restart_blender:
+                    box.row().label(text="Logging out complete!", icon="CHECKMARK")
+                    box.alert = True  # 🔴 Makes the button red
+                    box.operator("wm.install_update", text="Restart Blender").restart_only = True
 
 
 
@@ -308,13 +313,15 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 box.label(text = 'Enter ID, URL or Username')
                 box.prop(rbx_prefs, 'rbx_username_entered', text ='')
                 box.operator('object.add_character', text = "Preview").rbx_char = "preview_avatar"
-                rbx_cur_usr = glob_vars.get_login_info()["user_name"]
-                box.operator('object.add_character', text = f"Import My avatar ({rbx_cur_usr})", icon = 'TRACKING_REFINE_BACKWARDS').rbx_char = "my_avatar"
-                box.prop(rbx_prefs, 'rbx_split', text ='Separate Accessories')              
+                box.prop(rbx_prefs, 'rbx_split', text ='Separate Accessories')
                 split = box.split(factor = 0.5)
                 col = split.column(align = True)            
                 col.operator('object.add_character', text = "Import").rbx_char = "import"
                 split.operator('object.add_character', text = "Open Folder").rbx_char = "folder_character"
+                rbx_cur_usr = glob_vars.get_login_info()["user_name"]
+                box.operator('object.add_character', text = f"Import My avatar ({rbx_cur_usr})", icon = 'TRACKING_REFINE_BACKWARDS').rbx_char = "my_avatar"
+                
+                 
 
                 ### Set preview
                 try:
@@ -420,6 +427,12 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     row.label(text='Gears', icon='DOT')
                     row = box.row()
                     row.label(text='Bundle Items:', icon='PACKAGE')
+                    row = box.row()
+                    row.label(text='Characters', icon='DOT')
+                    row = box.row()
+                    row.label(text='Body Parts (import whole bundle)', icon='DOT') 
+                    row = box.row()
+                    row.label(text='Dynamic Heads', icon='DOT') 
                     row = box.row()
                     row.label(text='Shoes', icon='DOT') 
 
@@ -1355,5 +1368,29 @@ class TOOLBOX_MENU(bpy.types.Panel):
         row.operator('object.url_handler', text = "Discord Support Server", icon='URL').rbx_link = "discord"
         row = layout.row() 
         row.operator('object.url_handler', text = "Buy me a Coffee! ;)", icon='URL').rbx_link = "buy coffee"
+
+        row = layout.row()
+        icon = 'DOWNARROW_HLT' if context.scene.subpanel_support else 'RIGHTARROW'
+        row.prop(context.scene, 'subpanel_support', icon=icon, icon_only=True)
+        row.label(text='Support with Robux', icon='FUND')
+        # some data on the subpanel
+        if context.scene.subpanel_support:
+            box = layout.box()
+            split_sup = box.split(factor = 0.2)
+            col_sup = split_sup.column(align = True)       
+            col_sup.label(text="", icon="LAYERGROUP_COLOR_04")
+            split_sup.operator("object.url_handler", text = "Supporter (10 Bobuc)").rbx_link = 'tips 10'
+            split_sup = box.split(factor = 0.2)
+            col_sup = split_sup.column(align = True)       
+            col_sup.label(text="", icon="LAYERGROUP_COLOR_03")
+            split_sup.operator("object.url_handler", text = "Hero (50 Bobuc)").rbx_link = 'tips 50'
+            split_sup = box.split(factor = 0.2)
+            col_sup = split_sup.column(align = True)       
+            col_sup.label(text="", icon="LAYERGROUP_COLOR_06")
+            split_sup.operator("object.url_handler", text = "Legend (500 Bobuc)").rbx_link = 'tips 500'
+            split_sup = box.split(factor = 0.2)
+            col_sup = split_sup.column(align = True)       
+            col_sup.label(text="", icon="LAYERGROUP_COLOR_07")
+            split_sup.operator("object.url_handler", text = "Epic (1000 Bobuc)").rbx_link = 'tips 1000'
         
     

@@ -191,63 +191,56 @@ def check_thumbnail_api_state(url, itm_type:str, max_retries=3, delay=1.0):
     is_asset = True if itm_type == "Accessory" else False
     is_avatar = True if itm_type == "Avatar" else False
     data = None
+    error = None
     if is_asset:
-        rbx_asset_error = None
         glob_vars.rbx_asset_error = None 
-    if is_avatar:
-        rbx_char_error = None
+    else:
         glob_vars.rbx_char_error = None 
     for attempt in range(max_retries):
         try:
             response = requests.get(url)
         except Exception as e:
+            error = f"Thumbnail api check exception: {e}"
             if is_asset:
-                rbx_asset_error = f"Thumbnail api check exception: {e}"
-                glob_vars.rbx_asset_error = rbx_asset_error
-                return data, rbx_asset_error
-            if is_avatar:
-                rbx_char_error = f"Thumbnail api check exception: {e}"
-                glob_vars.rbx_char_error = rbx_char_error
-                return data, rbx_char_error
+                glob_vars.rbx_asset_error = error
+            else:
+                glob_vars.rbx_char_error = error
+            return data, error
 
         if response.status_code != 200:
+            error = f"{response.status_code}: Error contacting thumbnail API"
             if is_asset:
-                rbx_asset_error = f"{response.status_code}: Error contacting thumbnail API"
-                glob_vars.rbx_asset_error = rbx_asset_error
-                return data, rbx_asset_error
-            if is_avatar:
-                rbx_char_error = f"{response.status_code}: Error contacting thumbnail API"
-                glob_vars.rbx_char_error = rbx_char_error
-                return data, rbx_char_error
+                glob_vars.rbx_asset_error = error
+            else:
+                glob_vars.rbx_char_error = error
+            return data, error
 
         data = response.json()
         state = data.get("state") or data.get("data", [{}])[0].get("state")
 
         if state == "Completed":
-            if is_asset:
-                return data, rbx_asset_error
-            if is_avatar:
-                return data, rbx_char_error
+            return data, error
+        
         elif state == "Blocked":
             if is_asset:
-                rbx_asset_error = "Thumbnail API: Banned Item - unable to get image"
-                glob_vars.rbx_asset_error = rbx_asset_error
-                return data, rbx_asset_error
-            if is_avatar:
-                rbx_char_error = "Thumbnail API: Banned User - unable to get image"
-                glob_vars.rbx_char_error = rbx_char_error
-                return data, rbx_char_error
+                error = "Thumbnail API: Banned Item - unable to get image"
+            else:
+                error = "Thumbnail API: Banned User - unable to get image"
+                if is_asset:
+                    glob_vars.rbx_asset_error = error
+                else:
+                    glob_vars.rbx_char_error = error
+                return data, error
         print(f"Thumbnail API returning state: {data.get('state') or data.get('data', [{}])[0].get('state')}. Retrying... Attempt {attempt+1} of {max_retries}")
         time.sleep(delay)
 
+    error = f"Thumbnail API did not return 'Completed' state after {max_retries} retries"
     if is_asset:
-        rbx_asset_error = f"Thumbnail API did not return 'Completed' state after {max_retries} retries"
-        glob_vars.rbx_asset_error = rbx_asset_error
-        return data, rbx_asset_error
-    if is_avatar:
-        rbx_char_error = f"Thumbnail API did not return 'Completed' state after {max_retries} retries"
-        glob_vars.rbx_char_error = rbx_char_error
-        return data, rbx_char_error
+        glob_vars.rbx_asset_error = error
+    else:
+        glob_vars.rbx_char_error = error
+    return data, error
+
 
 
 ### Get User Avatar
@@ -403,6 +396,8 @@ def check_supported_type(rbx_asset_type_id, rbx_is_bundle):
             rbx_supported_type = False
             glob_vars.rbx_supported_type = rbx_supported_type
     return rbx_supported_type, rbx_supported_type_category
+
+
 
 
 
@@ -638,14 +633,12 @@ def get_catalog_bundle_data(rbx_asset_id, headers, rbx_char):
                 glob_vars.rbx_asset_name = rbx_asset_name
                 glob_vars.rbx_asset_creator = rbx_asset_creator
         else:
-            if data.status_code == 400:
+            if data.status_code == 404:
                 rbx_asset_error = f"{data.status_code}: Invalid Bundle ID"
             else:
                 rbx_asset_error = f"{data.status_code}: Error getting Catalog Bundle Data"
             glob_vars.rbx_asset_error = rbx_asset_error   
-    return rbx_asset_name, rbx_asset_type_id, rbx_asset_creator,rbx_bundledItems, rbx_asset_error
-
-
+    return rbx_asset_name, rbx_asset_type_id, rbx_asset_creator, rbx_bundledItems, rbx_asset_error
 
 
 ### Get Accessories Hashes Links
@@ -664,6 +657,165 @@ def get_outfit_hashes(outfit_id):
             rbx_asset_error = f"{rbx_outfit_hsh_urls.status_code}: Error getting Outfit hashes"
             glob_vars.rbx_asset_error = rbx_asset_error 
     return rbx_outfit_hsh_urls, rbx_asset_error
+
+
+### Check which bundle the bundled item is belon to
+def find_bundle_id_from_bundled_item(bundled_item_id):
+    rbx_bundle_id = None
+    rbx_asset_error = None
+    rbx_bundle_name = None
+    glob_vars.rbx_asset_error = None
+    url = f"https://catalog.roblox.com/v1/assets/{bundled_item_id}/bundles?limit=10&sortOrder=Asc"  
+    try:
+        response = requests.get(url)
+    except:     
+        rbx_asset_error = "Error Connecting to Catalog API"
+        glob_vars.rbx_asset_error = rbx_asset_error
+    else:
+        if response.status_code == 200:
+            data = response.json()
+            data = data.get("data")[0]
+            rbx_bundle_id = data.get("id")
+            rbx_bundle_name = data.get("name")
+        if response.status_code == 400:
+            rbx_asset_error = f"{response.status_code}: Invalid Asset ID"
+        else:
+            rbx_asset_error = f"{response.status_code}: Error getting Catalog Asset Data"
+        glob_vars.rbx_asset_error = rbx_asset_error 
+    return rbx_bundle_id, rbx_bundle_name, rbx_asset_error
+
+
+def filter_bundled_items(rbx_bundledItems):
+    rbx_outfits = ["UserOutfit"]
+    rbx_skippable_names = ["Default Mood"]
+    rbx_bundledItems_name_and_id_filtered_dict = {} # item_name : item_id
+    rbx_bundledItemsoutfits_name_and_id_filtered_list = [] # item_name : item_id
+
+    for rbx_bundled_item in rbx_bundledItems:
+        rbx_temp_outfit_dict = {} # item_name : item_id
+        rbx_bundled_item_id = rbx_bundled_item["id"]
+        rbx_bundled_item_name = rbx_bundled_item["name"]
+        rbx_bundled_item_type = rbx_bundled_item["type"]
+        if rbx_bundled_item_type in rbx_outfits:
+            rbx_temp_outfit_dict[rbx_bundled_item_name] = rbx_bundled_item_id
+            rbx_bundledItemsoutfits_name_and_id_filtered_list.append(rbx_temp_outfit_dict)
+        if rbx_bundled_item_type != "Asset":
+            continue
+        if rbx_bundled_item_name in rbx_skippable_names:
+            continue
+        rbx_bundledItems_name_and_id_filtered_dict[rbx_bundled_item_name] = rbx_bundled_item_id
+    return rbx_bundledItems_name_and_id_filtered_dict, rbx_bundledItemsoutfits_name_and_id_filtered_list
+
+
+def check_supported_bundled_items(filtered_dict_of_bundled_items:dict, headers, rbx_char):
+    rbx_bundledItems_name_and_type_supported_list_of_dict = []
+    rbx_supported_bundled_items = glob_vars.supported_bundled_items
+    rbx_asset_error = None
+    rbx_bundled_asset_type_name = None
+    glob_vars.rbx_asset_error = rbx_asset_error
+
+    for item_name, item_id in filtered_dict_of_bundled_items.items():
+        rbx_tmp_dict = {}
+        rbx_bundled_asset_name, rbx_bundled_asset_type_id, rbx_asset_creator, rbx_asset_error = get_catalog_asset_data(item_id, headers, rbx_char)
+        if not rbx_asset_error:
+            rbx_bundled_asset_type = rbx_supported_bundled_items.get(rbx_bundled_asset_type_id)
+            if rbx_bundled_asset_type == None:
+                ### Check if asset attached to the bundle is supported
+                rbx_supported_type, rbx_bundled_asset_type = check_supported_type(rbx_bundled_asset_type_id, False)
+                if rbx_bundled_asset_type == None:
+                    rbx_asset_error = f"Error. Unsupported item found (Asset ID: {rbx_bundled_asset_type_id})"
+                    glob_vars.rbx_asset_error = rbx_asset_error
+                    break
+            ### get bundled item its own asset type name (for textures finding later)
+            for type_name, values_list in glob_vars.supported_assets.items():
+                if rbx_bundled_asset_type_id in values_list:
+                    rbx_bundled_asset_type_name = type_name
+                    break
+
+            rbx_tmp_dict["name"] = item_name
+            rbx_tmp_dict["id"] = item_id
+            rbx_tmp_dict["assetType"] = rbx_bundled_asset_type
+            rbx_tmp_dict["assetTypeName"] = rbx_bundled_asset_type_name
+            rbx_bundledItems_name_and_type_supported_list_of_dict.append(rbx_tmp_dict)
+        else:
+            break
+    return rbx_bundledItems_name_and_type_supported_list_of_dict,rbx_asset_error
+
+
+
+
+### Accessories to download and save all files found in rbxm (bundles only)
+def download_and_save_all_bundle_files_from_id(items_dict:dict, rbx_asset_own_path, rbx_supported_type_category, rbx_bundle_asset_id, rbx_bundled_asset_name_clean, headers):
+    ### item_id - its an ID found in RBXM for Tex and OBJ
+    ### rbx_bundle_asset_id - actual ID of an item itself
+    for item,item_id in items_dict.items():
+        
+        ### Handle Dynamic Heads (only OBJ, tex will not come here)
+        if rbx_supported_type_category == "Dynamic Head" and 'Obj' in item:
+            dprint("CHECKED is DYNAMIC HEAD")
+            #use original item ID instead of mesh ID found, because mesh asset dont have UVs
+            asset_data, rbx_asset_error = get_asset_data(item_id, headers)
+
+        ### Handle all OBJ separately (elif - gear OBJ will not go here)
+        elif 'Obj' in item:
+            #use original item ID instead of mesh ID found, because mesh asset dont have UVs
+            rbx_asset_hsh_urls, rbx_asset_error = get_asset_hashes(rbx_bundle_asset_id)
+            if not rbx_asset_error: 
+                asset_hsh = rbx_asset_hsh_urls['obj']
+                asset_url = get_cdn_url(asset_hsh)
+                asset_data, rbx_asset_error = download(asset_url,item,"Accessory")
+            else:
+                break
+
+        ### Handle all Cages separately (it is also OBJ and also using 3 thumb API to get OBJ file)
+        elif 'cage' in item:
+            #use original item ID instead of mesh ID found, because mesh asset dont have UVs
+            rbx_asset_hsh_urls, rbx_asset_error = get_asset_hashes(item_id)
+            if not rbx_asset_error: 
+                asset_hsh = rbx_asset_hsh_urls['obj']
+                asset_url = get_cdn_url(asset_hsh)
+                asset_data, rbx_asset_error = download(asset_url,item,"Accessory")
+            else:
+                break
+        
+        ### all other items download via assetdelivery API
+        else:
+            asset_data, rbx_asset_error = get_asset_data(item_id, headers)
+
+        ### Save downloaded files ###
+        if not rbx_asset_error:
+            if 'Obj' in item:
+                tmp_file_path = os.path.join(rbx_asset_own_path, rbx_bundled_asset_name_clean + ".obj")
+            elif 'cage' in item:
+                tmp_file_path = os.path.join(rbx_asset_own_path, rbx_bundled_asset_name_clean + f"_{item}.obj")
+            else:
+                tmp_file_path = os.path.join(rbx_asset_own_path, rbx_bundled_asset_name_clean + f"_{item}.png")
+
+            ### Save file ###
+            if not rbx_asset_error:
+                save_to_file(tmp_file_path,asset_data,item,"Accessory")
+            else:
+                break
+
+
+### Write extensions into MTL (roblox mtl dont show .png, so blender images not displaying)
+def write_png_ext_into_mtl(mtl_file, tex_hsh:list):
+    error = None
+    glob_vars.rbx_asset_error = None
+    try:
+        with open(mtl_file, 'r', encoding='UTF-8') as f:
+            text = f.read()
+    except:
+        error = "Error writing to MTL file"
+        glob_vars.rbx_asset_error = error
+    else:
+        with open(mtl_file, 'w', encoding='UTF-8') as f:
+            for i in range(len(tex_hsh)):
+                text = text.replace(tex_hsh[i], tex_hsh[i] + ".png")
+            f.write(text)
+    return error
+    
+
 
 
 
@@ -737,7 +889,7 @@ def blender_api_assets_reposition(move_x_axis: float = False):
         bpy.ops.transform.translate(value=(move_x_axis, 0, 0), orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(True, False, False))
 
     
-def blender_api_assets_remove_doubles():   
+def blender_api_assets_remove_doubles():
     ### Removing doubles ###
     if bpy.context.mode == 'OBJECT':
         bpy.ops.object.editmode_toggle()
@@ -755,7 +907,114 @@ def blender_api_assets_remove_doubles():
 
 
 
+'''if float(glob_vars.bldr_fdr) < 3.4:
+    rbx_MixNode = rbx_nodes.new('ShaderNodeMixRGB')
+    rbx_MixNode.inputs[1].default_value = (rbx_shade_r, rbx_shade_g, rbx_shade_b, 1)
+    else:
+    rbx_MixNode = rbx_nodes.new('ShaderNodeMix')
+    rbx_MixNode.data_type='RGBA'
+    rbx_MixNode.inputs[6].default_value = (rbx_shade_r, rbx_shade_g, rbx_shade_b, 1)
+    rbx_MixNode.location = (-200,300)
 
+    rbx_img = rbx_nodes['Image Texture']
+    rbx_img.location = (-500,300)
+    rbx_img_link = rbx_img.outputs[0].links[0] #existing link to bsdf
+    rbx_mat.node_tree.links.remove(rbx_img_link) #remove existing link to bsdf
+
+    if float(glob_vars.bldr_fdr) < 3.4:
+    rbx_mat.node_tree.links.new(rbx_img.outputs[1], rbx_MixNode.inputs[0]) #Alpha
+    rbx_mat.node_tree.links.new(rbx_img.outputs[0], rbx_MixNode.inputs[2]) #Color
+    rbx_mat.node_tree.links.new(rbx_MixNode.outputs[0], bsdf.inputs[0])
+    else:
+    rbx_mat.node_tree.links.new(rbx_img.outputs[1], rbx_MixNode.inputs[0]) #Alpha
+    rbx_mat.node_tree.links.new(rbx_img.outputs[0], rbx_MixNode.inputs[7]) #Color
+    rbx_mat.node_tree.links.new(rbx_MixNode.outputs[2], bsdf.inputs[0])'''
+
+
+### remove alpha textures and add a mix node to properly display transparency
+def blender_api_transparent_textures():
+    if float(glob_vars.bldr_fdr) < 3.4:
+        obj = bpy.context.selected_objects[0]
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.context.view_layer.objects.active = None
+        bpy.data.objects[obj.name].select_set(True)
+        bpy.context.view_layer.objects.active = bpy.data.objects[obj.name]
+    else:
+        obj = bpy.context.active_object
+
+    if obj is None or obj.type != 'MESH':
+        print("Please select a mesh object.")
+    else:
+        for slot in obj.material_slots:
+            mat = slot.material
+            if mat is None or not mat.use_nodes:
+                print(f"Skipping empty or non-node material in slot: {slot.name}")
+                continue
+            
+            # Setup backface culling
+            mat.show_transparent_back = False
+            mat.use_backface_culling = True 
+
+            nodes = mat.node_tree.nodes
+            links = mat.node_tree.links
+
+            # Find the Principled BSDF node
+            bsdf_node = None
+            for node in nodes:
+                if node.type == 'BSDF_PRINCIPLED':
+                    bsdf_node = node
+                    break
+
+            if bsdf_node is None:
+                print(f"No Principled BSDF found in material: {mat.name}")
+                continue
+
+            base_color_input = bsdf_node.inputs[0]
+            alpha_input = bsdf_node.inputs[4]
+
+            # Get base color image texture
+            base_color_link = base_color_input.links[0] if base_color_input.is_linked else None
+            base_color_tex = base_color_link.from_node if base_color_link else None
+
+            # Remove transparency node connected to alpha input (if exists)
+            if alpha_input.is_linked:
+                alpha_link = alpha_input.links[0]
+                alpha_node = alpha_link.from_node
+                links.remove(alpha_link)
+                nodes.remove(alpha_node)
+                print(f"Removed transparency texture node in material: {mat.name}")
+            else:
+                print(f"No alpha texture to remove in material: {mat.name}")
+
+            if not base_color_tex or base_color_tex.type != 'TEX_IMAGE':
+                print(f"Material {mat.name}: Base color is not connected to an image texture.")
+                continue
+
+            # Remove link from base color texture to BSDF base color
+            links.remove(base_color_link)
+
+            # Create MixRGB node
+            mix_node = nodes.new(type='ShaderNodeMixRGB')
+            mix_node.blend_type = 'MIX'
+            mix_node.label = 'Alpha Mix'
+            rbx_shade_r = 0.361304
+            rbx_shade_g = 0.3564
+            rbx_shade_b = 0.371238
+            mix_node.inputs[1].default_value = (rbx_shade_r, rbx_shade_g, rbx_shade_b, 1)  # fallback color
+            #mix_node.location = ((base_color_tex.location.x + bsdf_node.location.x) / 8 * 5, base_color_tex.location.y - 0)
+            mix_node.location = (bsdf_node.location.x - 200, base_color_tex.location.y - 0)
+
+            # Connect image color → Mix input 2
+            links.new(base_color_tex.outputs['Color'], mix_node.inputs[2])
+
+            # Connect image alpha → Mix Fac
+            if 'Alpha' in base_color_tex.outputs:
+                links.new(base_color_tex.outputs['Alpha'], mix_node.inputs[0])
+            else:
+                print(f"Material {mat.name}: Texture has no Alpha output.")
+
+            # Connect Mix → BSDF base color
+            links.new(mix_node.outputs['Color'], bsdf_node.inputs[0])
 
 
 
@@ -796,9 +1055,9 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper): # type: ignore
             "Authorization": f"Bearer {access_token}"
         }
 
-
         ### Create import characters folder
         create_folders(rbx_char, addon_path)
+
 
 
 
@@ -864,6 +1123,7 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper): # type: ignore
             glob_vars.rbx_asset_creator = None
             glob_vars.rbx_asset_type = None
             rbx_prefs.rbx_incl_cages = False
+            glob_vars.rbx_is_bundled_item = False
 
             ### Extract Accessory ID
             rbx_asset_id, rbx_is_bundle, rbx_asset_error = check_accessory_field_and_extract_id(rbx_accessory_entered)
@@ -884,7 +1144,7 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper): # type: ignore
                     rbx_asset_name, rbx_asset_type_id, rbx_asset_creator,rbx_bundledItems, rbx_asset_error = get_catalog_bundle_data(rbx_asset_id, headers, rbx_char)
                 dprint("rbx_asset_name: " , rbx_asset_name)
                 dprint("rbx_asset_type_id: " , rbx_asset_type_id)
-                dprint("rbx_asset_type_id: " , rbx_asset_type_id)
+                dprint("rbx_is_bundled_item: " , glob_vars.rbx_is_bundled_item)
 
             
             ### Get Item Type
@@ -936,140 +1196,35 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper): # type: ignore
                 glob_vars.rbx_supported_type_category = rbx_supported_type_category
                 dprint("rbx_supported_type: " , rbx_supported_type)
                 dprint("rbx_supported_type_category: " , rbx_supported_type_category)
+            
+            if not rbx_asset_error: #check if asset is actually part of bundle
+                if rbx_asset_type_id in glob_vars.part_of_bundle_items:
+                    rbx_is_bundle = True
+                    glob_vars.rbx_is_bundle = rbx_is_bundle
+                    glob_vars.rbx_is_bundled_item = True
 
 
             
             
 
-
-
-
-
-
-
-
-
-
-
-
-        def filter_bundled_items(rbx_bundledItems):
-            rbx_outfits = ["UserOutfit"]
-            rbx_skippable_names = ["Default Mood"]
-            rbx_bundledItems_name_and_id_filtered_dict = {} # item_name : item_id
-            rbx_bundledItemsoutfits_name_and_id_filtered_list = [] # item_name : item_id
-
-            for rbx_bundled_item in rbx_bundledItems:
-                rbx_temp_outfit_dict = {} # item_name : item_id
-                rbx_bundled_item_id = rbx_bundled_item["id"]
-                rbx_bundled_item_name = rbx_bundled_item["name"]
-                rbx_bundled_item_type = rbx_bundled_item["type"]
-                if rbx_bundled_item_type in rbx_outfits:
-                    rbx_temp_outfit_dict[rbx_bundled_item_name] = rbx_bundled_item_id
-                    rbx_bundledItemsoutfits_name_and_id_filtered_list.append(rbx_temp_outfit_dict)
-                if rbx_bundled_item_type != "Asset":
-                    continue
-                if rbx_bundled_item_name in rbx_skippable_names:
-                    continue
-                rbx_bundledItems_name_and_id_filtered_dict[rbx_bundled_item_name] = rbx_bundled_item_id
-            return rbx_bundledItems_name_and_id_filtered_dict, rbx_bundledItemsoutfits_name_and_id_filtered_list
-
-
-
-
-
-        def check_supported_bundled_items(filtered_dict_of_bundled_items:dict, headers, rbx_char):
-            rbx_bundledItems_name_and_type_supported_list_of_dict = []
-            rbx_supported_bundled_items = glob_vars.supported_bundled_items
-            rbx_asset_error = None
-            rbx_bundled_asset_type_name = None
-            glob_vars.rbx_asset_error = rbx_asset_error
-
-            for item_name, item_id in filtered_dict_of_bundled_items.items():
-                rbx_tmp_dict = {}
-                rbx_bundled_asset_name, rbx_bundled_asset_type_id, rbx_asset_creator, rbx_asset_error = get_catalog_asset_data(item_id, headers, rbx_char)
-                if not rbx_asset_error:
-                    rbx_bundled_asset_type = rbx_supported_bundled_items.get(rbx_bundled_asset_type_id)
-                    if rbx_bundled_asset_type == None:
-                        rbx_asset_error = f"Error. Unsupported item found (Asset ID: {rbx_bundled_asset_type_id})"
-                        glob_vars.rbx_asset_error = rbx_asset_error
-                        break
-                    ### get bundled item its own asset type name (for textures finding later)
-                    for type_name, values_list in glob_vars.supported_assets.items():
-                        if rbx_bundled_asset_type_id in values_list:
-                            rbx_bundled_asset_type_name = type_name
-                            break
-
-                    rbx_tmp_dict["name"] = item_name
-                    rbx_tmp_dict["id"] = item_id
-                    rbx_tmp_dict["assetType"] = rbx_bundled_asset_type
-                    rbx_tmp_dict["assetTypeName"] = rbx_bundled_asset_type_name
-                    rbx_bundledItems_name_and_type_supported_list_of_dict.append(rbx_tmp_dict)
-                else:
-                    break
-            return rbx_bundledItems_name_and_type_supported_list_of_dict,rbx_asset_error
-
-
-
-
-        ### Accessories to download and save all files found in rbxm (bundles only)
-        def download_and_save_all_bundle_files_from_id(items_dict:dict, rbx_asset_own_path, rbx_supported_type_category, rbx_bundle_asset_id, rbx_bundled_asset_name_clean, headers):
-            ### item_id - its an ID found in RBXM for Tex and OBJ
-            ### rbx_bundle_asset_id - actual ID of an item itself
-            for item,item_id in items_dict.items():
-                
-                ### Handle Dynamic Heads (only OBJ, tex will not come here)
-                if rbx_supported_type_category == "Dynamic Head" and 'Obj' in item:
-                    dprint("CHECKED is DYNAMIC HEAD")
-                    #use original item ID instead of mesh ID found, because mesh asset dont have UVs
-                    asset_data, rbx_asset_error = get_asset_data(item_id, headers)
-
-                ### Handle all OBJ separately (elif - gear OBJ will not go here)
-                elif 'Obj' in item:
-                    #use original item ID instead of mesh ID found, because mesh asset dont have UVs
-                    rbx_asset_hsh_urls, rbx_asset_error = get_asset_hashes(rbx_bundle_asset_id)
-                    if not rbx_asset_error: 
-                        asset_hsh = rbx_asset_hsh_urls['obj']
-                        asset_url = get_cdn_url(asset_hsh)
-                        asset_data, rbx_asset_error = download(asset_url,item,"Accessory")
-                    else:
-                        break
-
-                ### Handle all Cages separately (it is also OBJ and also using 3 thumb API to get OBJ file)
-                elif 'cage' in item:
-                    #use original item ID instead of mesh ID found, because mesh asset dont have UVs
-                    rbx_asset_hsh_urls, rbx_asset_error = get_asset_hashes(item_id)
-                    if not rbx_asset_error: 
-                        asset_hsh = rbx_asset_hsh_urls['obj']
-                        asset_url = get_cdn_url(asset_hsh)
-                        asset_data, rbx_asset_error = download(asset_url,item,"Accessory")
-                    else:
-                        break
-                
-                ### all other items download via assetdelivery API
-                else:
-                    asset_data, rbx_asset_error = get_asset_data(item_id, headers)
-
-
-                ### Save downloaded files ###
-                if not rbx_asset_error:
-                    if 'Obj' in item:
-                        tmp_file_path = os.path.join(rbx_asset_own_path, rbx_bundled_asset_name_clean + ".obj")
-                    elif 'cage' in item:
-                        tmp_file_path = os.path.join(rbx_asset_own_path, rbx_bundled_asset_name_clean + f"_{item}.obj")
-                    else:
-                        tmp_file_path = os.path.join(rbx_asset_own_path, rbx_bundled_asset_name_clean + f"_{item}.png")
-
-                    ### Save file ###
-                    if not rbx_asset_error:
-                        save_to_file(tmp_file_path,asset_data,item,"Accessory")
-                    else:
-                        break
 
 
 
         ##### Accessory Import #####
         ### This button should be disabled if accessory is not supported
         if rbx_char == 'import_accessory':
+
+            ### if item is part of bundle, find bundle ID and bundle name
+            if glob_vars.rbx_is_bundled_item:
+                ### find original bundle ID
+                rbx_bundle_id, rbx_bundle_name, rbx_asset_error = find_bundle_id_from_bundled_item(glob_vars.rbx_asset_id)
+                glob_vars.rbx_asset_id = rbx_bundle_id
+
+                ### Clean Accessory Name
+                if not rbx_asset_error:
+                    rbx_asset_name_clean = replace_restricted_char(rbx_bundle_name)
+                    glob_vars.rbx_asset_name_clean = rbx_asset_name_clean
+
             
             ###########################################
             # ### Handle all bundles
@@ -1085,8 +1240,6 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper): # type: ignore
 
                     rbx_bundledItems_name_and_type_supported_list_of_dict,rbx_asset_error = check_supported_bundled_items(rbx_bundledItems_name_and_id_filtered_dict, headers, rbx_char)
                     dprint("rbx_bundledItems_name_and_type_supported_list_of_dict: ", rbx_bundledItems_name_and_type_supported_list_of_dict)
-                    
-                
 
                 ### Create Accessory own folder
                 if rbx_asset_error == None:
@@ -1190,34 +1343,83 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper): # type: ignore
                                         move_x_axis_float = 8.0
                                     blender_api_assets_reposition(move_x_axis=move_x_axis_float)
                         rbx_bundle_loop_counter +=1
+                
 
-
-                '''###########################################
+                ###########################################
                 #### Handle all other bundles
                 else:
-                    ### Get hashes URLs for all outfit IDs in the bundle
-                    rbx_outfit_count = 0
-                    for outfit_dict in rbx_bundledItemsoutfits_name_and_id_filtered_list:
-                        ## take only 1st outfit (for now, to check later)
-                        if rbx_outfit_count > 0:
-                            continue
-                        outfit_name = outfit_dict.keys()[0] # this dict should have only 1 record name and id
-                        outfit_id = outfit_dict.get(outfit_name)
-                        rbx_outfit_hsh_urls, rbx_asset_error = get_outfit_hashes(outfit_id)
-                        rbx_outfit_count += 1
-
-                    ###
-                    def get_urls_from_hashes(hashed_urls_data:dict):
-                        obj_hsh = rbx_outfit_hsh_urls['obj']
-                        tex_hsh_lst = rbx_outfit_hsh_urls['textures']
-
-
-
                     if not rbx_asset_error:
-                        asset_hsh = rbx_outfit_hsh_urls['obj']
+                        ### Get hashes URLs for all outfit IDs in the bundle
+                        rbx_outfit_count = 0
+                        for outfit_dict in rbx_bundledItemsoutfits_name_and_id_filtered_list:
+                            ## take only 1st outfit (for now, to check later)
+                            if rbx_outfit_count > 0:
+                                continue
+                            outfit_name = list(outfit_dict.keys())[0] # this dict should have only 1 record name and id
+                            outfit_id = outfit_dict.get(outfit_name)
+                            rbx_outfit_hsh_urls, rbx_asset_error = get_outfit_hashes(outfit_id)
+                            rbx_outfit_count += 1
 
-                        asset_url = get_cdn_url(asset_hsh)
-                        asset_data, rbx_asset_error = download(asset_url,item,"Accessory")'''
+                    ### Get hashed URLs of item
+                    if not rbx_asset_error: 
+                        outfit_obj_hsh = rbx_outfit_hsh_urls['obj']
+                        outfit_mtl_hsh = rbx_outfit_hsh_urls['mtl']
+                        outfit_tex_hsh = rbx_outfit_hsh_urls['textures']
+                        
+                        ### Get All URLs ###
+                        outfit_mtl_url = get_cdn_url(outfit_mtl_hsh)
+                        outfit_obj_url = get_cdn_url(outfit_obj_hsh)
+
+                        ### Add all Tex URL to list ###
+                        outfit_tex_url = []
+                        if outfit_tex_hsh:
+                            for i in range(len(outfit_tex_hsh)):
+                                tmp_tex_url = get_cdn_url(outfit_tex_hsh[i])
+                                outfit_tex_url.append(tmp_tex_url)
+
+                        dprint("outfit_mtl_url: ", outfit_mtl_url)
+                        dprint("outfit_obj_url: ", outfit_obj_url)
+                        dprint("outfit_tex_url: ", outfit_tex_url)
+                    
+                    ### Download files ###
+                    if not rbx_asset_error:
+                        data, rbx_asset_error = download(outfit_mtl_url,"mtl", "Accessory")
+                        ### Save file ###
+                        if not rbx_asset_error: 
+                            rbx_mtl_file = os.path.join(rbx_asset_own_path, glob_vars.rbx_asset_name_clean + ".mtl")
+                            save_to_file(rbx_mtl_file, data, "mtl", "Accessory")
+                            if outfit_tex_hsh:
+                                rbx_asset_error = write_png_ext_into_mtl(rbx_mtl_file, outfit_tex_hsh)
+
+                    ### Download files ###       
+                    if not rbx_asset_error:
+                        data, rbx_asset_error = download(outfit_obj_url,"Obj", "Accessory")
+                        ### Save file ###
+                        if not rbx_asset_error: 
+                            rbx_obj_file = os.path.join(rbx_asset_own_path, glob_vars.rbx_asset_name_clean + ".obj")
+                            save_to_file(rbx_obj_file, data, "Obj", "Accessory")
+
+                    ### Save textures
+                    if not rbx_asset_error:
+                        if outfit_tex_url:  #some items no texture at all (not sure how)
+                            for i in range(len(outfit_tex_url)):
+                                data, rbx_asset_error = download(outfit_tex_url[i],"Texture", "Accessory")
+                                if not rbx_asset_error:
+                                    rbx_tex_file = os.path.join(rbx_asset_own_path, outfit_tex_hsh[i] + ".png")
+                                    save_to_file(rbx_tex_file, data, "Texture", "Accessory")
+                                else:
+                                    break
+                    
+                    ### Start Bundle Import ###
+                    if not rbx_asset_error:
+                        blender_api_import_obj(rbx_obj_file)
+                        blender_api_transparent_textures()
+                        blender_api_assets_reposition()
+                        blender_api_assets_remove_doubles()
+
+
+
+
 
             ### Handle all other accessories
             else:
@@ -1259,9 +1461,6 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper): # type: ignore
                         dprint(": " , )
                         print(f"{item} ID found in RBXM: ", asset_item_id)
 
-                    ### Create Temp MTL file ###
-                    #rbx_mtl_file = os.path.join(rbx_asset_own_path, glob_vars.rbx_asset_name_clean + ".mtl")
-
                     ### Download and save all files
                     if rbx_asset_error == None:
                         download_and_save_all_files_from_id(rbx_asset_items_dict, rbx_asset_own_path, headers)
@@ -1272,6 +1471,7 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper): # type: ignore
                         obj_filepath = os.path.join(rbx_asset_own_path, glob_vars.rbx_asset_name_clean + ".obj")
                         blender_api_import_obj(obj_filepath)
                         blender_api_assets_new_material(rbx_asset_own_path, rbx_asset_items_dict, glob_vars.rbx_asset_name_clean)
+                        blender_api_transparent_textures()
                         blender_api_assets_reposition()
                         blender_api_assets_remove_doubles()
 
@@ -1389,98 +1589,15 @@ class OBJECT_OT_add_object(bpy.types.Operator,AddObjectHelper): # type: ignore
                         if "map_Ka" in text:
                             text = text.replace("map_Ka","#map_Ka") ## Remove transparency
                         f.write(text)
-                    
-                    if glob_vars.bldr_ver[0] < '4':
-                        bpy.ops.import_scene.obj(filepath=rbx_obj_file)
-                    else:
-                        bpy.ops.wm.obj_import(filepath=rbx_obj_file)
 
 
+                ### Start Character Import ###
+                if not rbx_char_error:
+                    blender_api_import_obj(rbx_obj_file)
+                    blender_api_transparent_textures()
+                    blender_api_assets_reposition()
+                    blender_api_assets_remove_doubles()
 
-
-                ### Selecting Character ###
-                rbx_object = bpy.context.selected_objects[0]
-                bpy.ops.object.select_all(action='DESELECT')
-                bpy.context.view_layer.objects.active = None
-                bpy.data.objects[rbx_object.name].select_set(True)
-                bpy.context.view_layer.objects.active = bpy.data.objects[rbx_object.name]
-                                        
-                ### Position Character ###
-                bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
-                bpy.ops.view3d.snap_selected_to_cursor(use_offset=False)
-                #bpy.ops.transform.translate(value=(0, 0, 3.28467), orient_axis_ortho='X', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True))
-                bpy.ops.transform.translate(value=(-0.240462, 0, 2.88554), orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True))
-                bpy.ops.transform.rotate(value=3.14159, orient_axis='Z', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True))
-                
-                ### Setting up materials ###
-                for rbx_mat_slot in bpy.context.object.material_slots:
-                    rbx_mat_slot.material.show_transparent_back = False
-                    rbx_mat_slot.material.use_backface_culling = True 
-                
-                ### Setting up materials for New Heads and Skinned characters ###    
-                with open(rbx_mtl_file, 'r', encoding='UTF-8') as f:
-                    lines = f.readlines()
-                    for i in range(len(lines)):
-                        if "newmtl" in lines[i]:
-                            mat_nm = lines[i].split("newmtl")
-                            mat_nm = mat_nm[1].strip()
-                            for x in range(i,i+2):
-                                if "Material Color" in lines[x]:
-                                    for n in range(x,len(lines)):
-                                        if "Ka" in lines[n]:
-                                            rbx_shade = lines[n].split(" ")
-                                            rbx_shade_r = rbx_shade[1].strip()
-                                            rbx_shade_g = rbx_shade[2].strip()
-                                            rbx_shade_b = rbx_shade[3].strip()
-                                            if (rbx_shade_r, rbx_shade_g, rbx_shade_b) != ('1','1','1'):
-                                                rbx_shade_r = float(rbx_shade_r) - 0.187934
-                                                rbx_shade_g = float(rbx_shade_g) - 0.28103
-                                                rbx_shade_b = float(rbx_shade_b) - 0.269785                                                  
-                                                for rbx_mat_slot in bpy.context.object.material_slots:
-                                                    if mat_nm in rbx_mat_slot.name:
-                                                        rbx_mat = rbx_mat_slot.material
-                                                        rbx_nodes = rbx_mat.node_tree.nodes
-                                                        bsdf = rbx_nodes['Principled BSDF']
-                                                        
-                                                        if float(glob_vars.bldr_fdr) < 3.4:
-                                                            rbx_MixNode = rbx_nodes.new('ShaderNodeMixRGB')
-                                                            rbx_MixNode.inputs[1].default_value = (rbx_shade_r, rbx_shade_g, rbx_shade_b, 1)
-                                                        else:
-                                                            rbx_MixNode = rbx_nodes.new('ShaderNodeMix')
-                                                            rbx_MixNode.data_type='RGBA'
-                                                            rbx_MixNode.inputs[6].default_value = (rbx_shade_r, rbx_shade_g, rbx_shade_b, 1)
-                                                        rbx_MixNode.location = (-200,300)
-                                                        
-                                                        rbx_img = rbx_nodes['Image Texture']
-                                                        rbx_img.location = (-500,300)
-                                                        rbx_img_link = rbx_img.outputs[0].links[0] #existing link to bsdf
-                                                        rbx_mat.node_tree.links.remove(rbx_img_link) #remove existing link to bsdf
-                                                        
-                                                        if float(glob_vars.bldr_fdr) < 3.4:
-                                                            rbx_mat.node_tree.links.new(rbx_img.outputs[1], rbx_MixNode.inputs[0]) #Alpha
-                                                            rbx_mat.node_tree.links.new(rbx_img.outputs[0], rbx_MixNode.inputs[2]) #Color
-                                                            rbx_mat.node_tree.links.new(rbx_MixNode.outputs[0], bsdf.inputs[0])
-                                                        else:
-                                                            rbx_mat.node_tree.links.new(rbx_img.outputs[1], rbx_MixNode.inputs[0]) #Alpha
-                                                            rbx_mat.node_tree.links.new(rbx_img.outputs[0], rbx_MixNode.inputs[7]) #Color
-                                                            rbx_mat.node_tree.links.new(rbx_MixNode.outputs[2], bsdf.inputs[0])
-                                            break
-    
-                ### Removing doubles ###
-                if bpy.context.mode == 'OBJECT':
-                    bpy.ops.object.editmode_toggle()
-                    bpy.ops.mesh.select_all(action='SELECT')                
-                elif bpy.context.mode == 'EDIT_MESH':
-                    bpy.ops.mesh.select_all(action='SELECT')
-                bpy.ops.mesh.remove_doubles()
-                #bpy.ops.mesh.normals_make_consistent(inside=False)
-                bpy.ops.object.editmode_toggle()
-                bpy.ops.mesh.customdata_custom_splitnormals_clear()
-                if float(glob_vars.bldr_fdr) < 4.1:
-                    bpy.context.object.data.use_auto_smooth = False
-                else:
-                    bpy.ops.object.shade_flat()
-                bpy.ops.object.shade_smooth()
 
             ### Split Accessories ###
             if rbx_split == True:

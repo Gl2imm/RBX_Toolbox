@@ -6,6 +6,7 @@ import zipfile
 import subprocess
 from threading import Thread
 import shutil
+import asyncio
 from . import glob_vars
 
 
@@ -36,6 +37,23 @@ def restart_blender(self):
     bpy.ops.wm.quit_blender()
 
 
+# This asynchronous method is invoked as a separate coroutine from the main thread
+async def oauth_logout(context):
+    """oAuth Logout"""
+    need_restart_blender = False
+    from oauth.lib.oauth2_client import RbxOAuth2Client
+    window_manager = context.window_manager
+    rbx = window_manager.rbx
+    oauth2_client = RbxOAuth2Client(rbx)
+
+    if rbx.is_logged_in:
+        await oauth2_client.logout()
+        need_restart_blender = True
+    print("Successfully logged out for update RBX Toolbox")
+    return need_restart_blender
+
+
+
 
 
 class RBX_INSTALL_UPDATE(bpy.types.Operator):
@@ -62,17 +80,32 @@ class RBX_INSTALL_UPDATE(bpy.types.Operator):
             self.restart_blender()
             return {'FINISHED'}
         
+
+
         # Start the download in a separate thread
         if operator_state == "IDLE":
-            current_operator = self  # Store the operator instance
-            operator_state = "DOWNLOADING"
-            download_progress = 0
-            error_message = ""
-            self.download_thread = Thread(target=self.download_file)
-            self.download_thread.start()
-            context.window_manager.modal_handler_add(self)
-            self._timer = context.window_manager.event_timer_add(0.1, window=context.window)
-            return {'RUNNING_MODAL'}
+
+            # Run async function from sync context and Logout
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            need_restart_blender = loop.run_until_complete(oauth_logout(context))
+            if need_restart_blender:
+                glob_vars.need_restart_blender = need_restart_blender
+                return {'FINISHED'}
+            
+            else:
+                current_operator = self  # Store the operator instance
+                operator_state = "DOWNLOADING"
+                download_progress = 0
+                error_message = ""
+                self.download_thread = Thread(target=self.download_file)
+                self.download_thread.start()
+                context.window_manager.modal_handler_add(self)
+                self._timer = context.window_manager.event_timer_add(0.1, window=context.window)
+                return {'RUNNING_MODAL'}
         
         ### This is after addon installed and the button changes to Restart Blender
         elif operator_state == "FINISHED":

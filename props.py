@@ -70,6 +70,96 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
 
 
 
+    #######################
+    #### RBX IMPORT V2 ####
+    #######################
+
+    ### Item Type Selector (import) ###    
+    rbx_item_field_type_selector : bpy.props.EnumProperty(
+        name = "Item Type",
+        description = "Item Type Selector",
+        default='OP1',
+        items = [('OP1', "Accessory", ""),
+                 ('OP2', "Bundle (Characters)", ""),
+                 ('OP3', "Bundle (Shoes)", ""),
+                 ('OP4', "Layered Cloth", ""),
+                 ('OP5', "Store Model", "")
+                ]
+        )     # type: ignore
+    
+    ### Import Character ###
+    rbx_item_field_entry: bpy.props.StringProperty(
+        name="Item Field Entry",
+        description="Username, URL or Item ID entered in the field",
+        default="1244794402",
+        maxlen=100,
+    ) # type: ignore
+
+    rbx_bndl_char_choice_at_origin : bpy.props.BoolProperty(
+    name="Spawn at Origin",
+    description="Spawn at Origin property",
+    default = True
+    ) # type: ignore
+
+    rbx_bndl_char_choice_add_meshes : bpy.props.BoolProperty(
+    name="Meshes",
+    description="Meshes property",
+    default = False
+    ) # type: ignore
+
+    rbx_bndl_char_choice_add_textures : bpy.props.BoolProperty(
+    name="Textures",
+    description="Textures property",
+    default = False
+    ) # type: ignore
+
+    rbx_bndl_char_choice_add_cages : bpy.props.BoolProperty(
+    name="Cages",
+    description="Cages property",
+    default = False
+    ) # type: ignore
+
+    rbx_bndl_char_choice_add_attachment : bpy.props.BoolProperty(
+    name="Accessory Attachments",
+    description="Accessory Attachments property",
+    default = False
+    ) # type: ignore
+
+    rbx_bndl_char_choice_add_motor6d_attachment : bpy.props.BoolProperty(
+    name="Motor6D Attachments",
+    description="Motor6D Attachments property",
+    default = False
+    ) # type: ignore
+
+    rbx_bndl_char_choice_add_bones : bpy.props.BoolProperty(
+    name="Armature",
+    description="Armature property",
+    default = False
+    ) # type: ignore
+
+    rbx_bndl_char_choice_add_ver_col : bpy.props.BoolProperty(
+    name="Vertex Colors",
+    description="Vertex Colors property",
+    default = False
+    ) # type: ignore
+
+    rbx_bndl_char_choice_clean_tmp_meshes : bpy.props.BoolProperty(
+    name="Cleanup tmp files (rbxm)",
+    description="Cleanup tmp files property",
+    default = False
+    ) # type: ignore
+
+
+
+
+
+
+
+
+
+
+
+
 
     ### Import Character ###
     rbx_username_entered: bpy.props.StringProperty(

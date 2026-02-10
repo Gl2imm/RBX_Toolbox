@@ -12,7 +12,8 @@ from RBX_Toolbox import props
 
 
 
-addon_version = "v.6.2"
+
+addon_version = "v.6.3"
 #to update in __init__ as well
 #clean public lib, pycache and imports folder
 #set debug to false
@@ -435,6 +436,47 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     row.label(text='Dynamic Heads', icon='DOT') 
                     row = box.row()
                     row.label(text='Shoes', icon='DOT') 
+
+
+
+
+
+        ######### Import Characters and Accessories V2 #########
+        if rbx.is_logged_in:
+            row = layout.row()
+            icon = 'DOWNARROW_HLT' if context.scene.subpanel_imp_char_v2 else 'RIGHTARROW'
+            row.prop(context.scene, 'subpanel_imp_char_v2', icon=icon, icon_only=True)
+            row.label(text='Import From Roblox (Boosted)', icon='IMPORT')
+            # some data on the subpanel
+            if context.scene.subpanel_imp_char_v2:
+                box = layout.box()
+                box.label(text = 'Enter ID or URL')
+                box.prop(rbx_prefs, 'rbx_item_field_entry', text ='')
+
+                split = box.split(factor = 0.3)
+                col = split.column(align = True)         
+                col.label(text = 'Item Type: ')
+                split.prop(rbx_prefs, 'rbx_item_field_type_selector', text = "")
+                if rbx_prefs.rbx_item_field_type_selector == "OP2": #Bundle
+                    box.label(text = "Import Options:")
+                    box.prop(rbx_prefs, 'rbx_bndl_char_choice_at_origin') 
+                    box.prop(rbx_prefs, 'rbx_bndl_char_choice_add_meshes')
+                    row = box.row()
+                    row.enabled = rbx_prefs.rbx_bndl_char_choice_add_meshes
+                    row.prop(rbx_prefs, 'rbx_bndl_char_choice_add_textures')
+                    box.prop(rbx_prefs, 'rbx_bndl_char_choice_add_cages')
+                    box.prop(rbx_prefs, 'rbx_bndl_char_choice_add_attachment')
+                    box.prop(rbx_prefs, 'rbx_bndl_char_choice_add_motor6d_attachment')
+                    row = box.row()
+                    row.enabled = False
+                    row.prop(rbx_prefs, 'rbx_bndl_char_choice_add_bones', text="Armature (in development)")
+                    box.prop(rbx_prefs, 'rbx_bndl_char_choice_add_ver_col')
+                    box.prop(rbx_prefs, 'rbx_bndl_char_choice_clean_tmp_meshes')
+                    box.operator('object.add_character_v2', text = "Import").rbx_imp = "import"
+                    box.operator('object.add_character_v2', text = "Open Folder").rbx_imp = "open_imp_folder"
+                    if glob_vars.rbx_imp_error:
+                        box.label(text = glob_vars.rbx_imp_error, icon='ERROR')
+
 
 
 

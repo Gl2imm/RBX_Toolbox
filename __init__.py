@@ -15,10 +15,11 @@ import sys
 import importlib
 import traceback
 
+
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (6, 2, 0),  # to update in menu_ui as well #clean public lib, pycache and imports folder
+    "version": (6, 3, 0),  # to update in menu_ui as well #clean public lib, pycache and imports folder
     "blender": (3, 6, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -56,6 +57,7 @@ all_modules_names = [
     "functions.funct_others",
     "functions.menu_pie",
     "functions.menu_ui",
+    "func_import_v2.rbx_import_bundle_char",
 ]
 
 # When bpy is already in local, reload modules for iterative testing
@@ -97,10 +99,12 @@ from .functions.menu_pie import RBX_MT_MENU2_3
 from .functions.menu_pie import RBX_MT_MENU3
 from .functions.menu_pie import RBX_MT_MENU4
 from .functions.menu_ui import TOOLBOX_MENU
+from .func_import_v2.rbx_import_bundle_char import RBX_IMPORT_V2
 from . import oauth
+import bpy
 from bpy.types import Scene
 from bpy.props import BoolProperty
-import bpy
+
 
 
 # List all classes
@@ -113,6 +117,7 @@ classes = (
     BUTTON_BNDS,
     RBX_BUTTON_HDRI,
     OBJECT_OT_add_object,
+    RBX_IMPORT_V2,
     BUTTON_CMR,
     BUTTON_DMMY,
     BUTTON_WEAR,
@@ -150,6 +155,7 @@ def register():
     Scene.subpanel_bounds = BoolProperty(default=False)
     Scene.subpanel_hdri = BoolProperty(default=False)
     Scene.subpanel_imp_char = BoolProperty(default=False)
+    Scene.subpanel_imp_char_v2 = BoolProperty(default=False)
     Scene.subpanel_supported = BoolProperty(default=False)
     Scene.subpanel_dummy = BoolProperty(default=False)
     Scene.subpanel_rigs = BoolProperty(default=False)
@@ -187,6 +193,7 @@ def unregister():
     del Scene.subpanel_bounds
     del Scene.subpanel_hdri
     del Scene.subpanel_imp_char
+    del Scene.subpanel_imp_char_v2
     del Scene.subpanel_supported
     del Scene.subpanel_dummy
     del Scene.subpanel_rigs

@@ -2,7 +2,7 @@ import bpy
 import os
 import requests
 from bpy_extras.object_utils import AddObjectHelper
-from RBX_Toolbox import glob_vars
+from RBX_Toolbox import glob_vars # type: ignore
 from glob_vars import addon_path
 import asyncio
 import time

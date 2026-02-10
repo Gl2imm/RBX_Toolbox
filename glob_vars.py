@@ -132,6 +132,7 @@ info = 'info' #info folder
 rbx_import_main_folder = "RBX_Import"
 rbx_imported_char_fldr = "Characters/"
 rbx_imported_acc_fldr = "Accessories/"
+rbx_import_v2_bundles = "Bundles"
 rbx_supported_type = False
 rbx_user_name = None
 rbx_user_name_clean = None
@@ -146,6 +147,8 @@ rbx_supported_type_category = None
 rbx_asset_id = None
 rbx_is_bundle = False
 rbx_is_bundled_item = False
+
+rbx_imp_error = None
 
 
 
@@ -167,9 +170,6 @@ cams = ['Camera_F','Camera_B','Camera_L','Camera_R']
 
 # PIE Menu
 addon_keymaps = {}
-
-
-
 
 
 
@@ -357,5 +357,7 @@ regex_values_rbxmx = {
     "outer_cage"    : r'"cagemeshid"><url>.*?\W*(<)'
 }
 
+
+rbx_pbr_materials = ["ColorMap","MetalnessMap","NormalMap","RoughnessMap"]
 
 

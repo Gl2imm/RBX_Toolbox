@@ -240,7 +240,31 @@ def get_asset_data(rbx_asset_id, headers, RobloxAssetFormat:str = None):
 
 
 
-
+def filter_asset_ids(headers, rbx_bundledItems, rbx_tmp_rbxm_filepath):
+	rbx_filtered_assets_id_only = []
+	glob_vars.rbx_imp_error = None
+	rbx_imp_error = None
+	for asset in rbx_bundledItems:
+		asset_id = asset.get("id")
+		asset_type = asset.get("type")
+		asset_name = asset.get("name")
+		if asset_type != "Asset":
+			continue
+		if asset_name == "Default Mood":    #skip animation
+			continue
+		rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
+		rbx_filtered_assets_id_only.append(asset_id)
+		
+		### Get rbxm files and save them
+		if not rbx_imp_error:
+			asset_data, rbx_imp_error = get_asset_data(asset_id, headers)
+			try:
+				with open(f"{rbx_tmp_rbxm_file}", "wb") as f:
+					f.write(asset_data) 
+			except:
+				rbx_imp_error = "Error saving temp RBXM file"
+				glob_vars.rbx_imp_error = rbx_imp_error
+				return rbx_filtered_assets_id_only, rbx_imp_error
 
 
 
@@ -628,6 +652,7 @@ class RBX_IMPORT_V2(bpy.types.Operator,AddObjectHelper): # type: ignore
 		################
 		################
 
+
 		
 		rbx_asset_id, rbx_imp_error = item_field_extract_id(rbx_item_field_entry)
 		dprint("rbx_asset_id: ", rbx_asset_id)
@@ -641,31 +666,7 @@ class RBX_IMPORT_V2(bpy.types.Operator,AddObjectHelper): # type: ignore
 
 
 			if not rbx_imp_error:     
-				rbx_filtered_assets_id_only = []
-
-				### Filter out bundled items to assets only
-				for asset in rbx_bundledItems:
-					asset_id = asset.get("id")
-					asset_type = asset.get("type")
-					asset_name = asset.get("name")
-					if asset_type != "Asset":
-						continue
-					if asset_name == "Default Mood":    #skip animation
-						continue
-					rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
-					rbx_filtered_assets_id_only.append(asset_id)
-					
-					### Get rbxm files and save them
-					if not rbx_imp_error:
-						asset_data, rbx_imp_error = get_asset_data(asset_id, headers)
-						try:
-							with open(f"{rbx_tmp_rbxm_file}", "wb") as f:
-								f.write(asset_data) 
-						except:
-							rbx_imp_error = "Error saving temp RBXM file"
-							glob_vars.rbx_imp_error = rbx_imp_error
-							return
-
+				rbx_filtered_assets_id_only, rbx_imp_error = filter_asset_ids(headers, rbx_bundledItems, rbx_tmp_rbxm_filepath)
 
 				### iterate all rbxm files and get all data from them
 				all_bones_data = {}
@@ -673,294 +674,274 @@ class RBX_IMPORT_V2(bpy.types.Operator,AddObjectHelper): # type: ignore
 
 				if not rbx_imp_error:
 					for rbxm_id in rbx_filtered_assets_id_only:
-						mesh_parts_to_process = []	#should resets every rbxm file loop
-						is_body_part = False
-						is_dynamic_head = False
-						is_accessory = False
-						is_classic_pants = False
-						is_classic_shirt = False
-
 						rbxm_file_path = os.path.join(rbx_tmp_rbxm_filepath, str(rbxm_id) + ".rbxm")
 						rbxm_file = RobloxFile.Open(rbxm_file_path)
+						
+						rbx_avatar_bundle_parts = [
+								"LeftUpperArm", "LeftLowerArm", "LeftHand",
+								"RightUpperArm", "RightLowerArm", "RightHand",
+								"LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+								"RightUpperLeg", "RightLowerLeg", "RightFoot",
+								"UpperTorso", "LowerTorso", "Head"
+							]
 
 						R15Fixed = rbxm_file.FindFirstChild[Folder]("R15Fixed")
-						special_mesh_part = rbxm_file.FindFirstChild[SpecialMesh]("Mesh")
-						class_shirt = rbxm_file.FindFirstChildOfClass[Shirt]()
-						class_pants = rbxm_file.FindFirstChildOfClass[Pants]()
-						class_accessory = rbxm_file.FindFirstChildOfClass[Accessory]()
 
-						### Body parts
-						if R15Fixed:
-							is_body_part = True
-							rbx_avatar_bundle_parts = [
-									"LeftUpperArm", "LeftLowerArm", "LeftHand",
-									"RightUpperArm", "RightLowerArm", "RightHand",
-									"LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
-									"RightUpperLeg", "RightLowerLeg", "RightFoot",
-									"UpperTorso", "LowerTorso"
-								]
-							
-							### iterate all mesh parts found in rbxm
-							for mesh_name in rbx_avatar_bundle_parts:
-								dprint(f"Checking mesh_name: {mesh_name} in RBXM ID: {rbxm_id}")
-								mesh_part = R15Fixed.FindFirstChild[MeshPart](mesh_name)
-								dprint("mesh_part: ", mesh_part)
-								if mesh_part:
-									mesh_parts_to_process.append((mesh_part, mesh_name))
-							dprint("mesh_parts_to_process: ", mesh_parts_to_process)
-
-
-						### Dynamic Head
-						elif special_mesh_part:
-							is_dynamic_head = True
-							dprint("Special Mesh exist, mesh is a dynamic head")
-							dprint("")
-							mesh_name = "Head"
-							### need to download separate head rbxm, its not in the bundle
-							asset_data, rbx_imp_error = get_asset_data(rbxm_id, headers, RobloxAssetFormat="avatar_meshpart_head")
-							if not rbx_imp_error:
-								with open(f"{rbxm_file_path}", "wb") as f:
-									f.write(asset_data)
-								rbxm_file = RobloxFile.Open(rbxm_file_path) 
-								mesh_part = rbxm_file.FindFirstChild[MeshPart](mesh_name)
-								if mesh_part:
-									mesh_parts_to_process.append((mesh_part, mesh_name))
-							else:
-								return {'FINISHED'}
-							
-						
-						### Classic Shirt
-						elif class_shirt:
-							is_classic_shirt = True
-							dprint("CLASSIC SHIRT FOUND")
-
-						
-						### Classic pants
-						elif class_pants:
-							is_classic_pants = True
-							dprint("CLASSIC PANTS FOUND")
-
-
-						### Accessory
-						elif class_accessory:
-							is_accessory = True
-							dprint("Accessory FOUND")
-							mesh_part = class_accessory.FindFirstChild[MeshPart]("Handle")
-							mesh_name = str(class_accessory.Name)
-							dprint("MESH NAME: ", mesh_name)
-							dprint(f"Accessory Children: {[c.Name + ' (' + str(c.ClassName) + ')' for c in class_accessory.GetChildren()]}")
-							if mesh_part:
-								mesh_parts_to_process.append((mesh_part, mesh_name))
-								dprint(f"Added {mesh_name} to processing list.")
-							else:
-								dprint(f"WARNING: Handle (MeshPart) not found in {mesh_name}!")
-								part_handle = class_accessory.FindFirstChild("Handle")
-								if part_handle:
-									dprint(f"Found Handle with ClassName: {part_handle.ClassName}")
-								else:
-									dprint("Handle completely missing!")
-
-
-
-						for mesh_part, mesh_name in mesh_parts_to_process:
-							dprint(f"Processing mesh: {mesh_name}")
+						### iterate all mesh parts found in rbxm
+						for mesh_name in rbx_avatar_bundle_parts:
+							dprint(f"Checking mesh_name: {mesh_name} in RBXM ID: {rbxm_id}")
 							rbx_textures = {}
-							
-							rbx_SurfaceAppearance = mesh_part.FindFirstChild[SurfaceAppearance]("SurfaceAppearance")
-							dprint(f"Checked SurfaceAppearance for {mesh_name}")
-							try:
-								part_MeshId = strip_rbxassetid(mesh_part.Properties["MeshId"].Value)
-								dprint(f"Got MeshId for {mesh_name}: {part_MeshId}")
-							except Exception as e:
-								dprint(f"Error getting MeshId for {mesh_name}: {e}")
-								continue
-							if rbx_SurfaceAppearance:
-								for tex_name in glob_vars.rbx_pbr_materials:
-									part_TextureID = strip_rbxassetid(rbx_SurfaceAppearance.Properties[tex_name].Value)
-									if part_TextureID == "":
+							is_dynamic_head = False
+							rbx_SurfaceAppearance = False
+
+							if rbx_imp_error:
+								return {'FINISHED'}
+							if not R15Fixed:    #can be none (for Dynamic Heads)
+								#check if its head
+								mesh_part = rbxm_file.FindFirstChild[SpecialMesh]("Mesh")
+								if mesh_part:
+									if mesh_name != "Head":
 										continue
-									if tex_name == "MetalnessMap":
-										tex_name = "MetallicMap"
-									rbx_textures[tex_name.removesuffix("Map")] = part_TextureID
-							else:
-								rbx_tex_id_value = mesh_part.Properties["TextureID"].Value
-								if not rbx_tex_id_value or str(rbx_tex_id_value) == "":
-									rbx_textures = None
+									dprint("Special Mesh exist, mesh is a dynamic head")
+									dprint("")
+									is_dynamic_head = True
+									asset_data, rbx_imp_error = get_asset_data(rbxm_id, headers, RobloxAssetFormat="avatar_meshpart_head")
+									if not rbx_imp_error:
+										with open(f"{rbxm_file_path}", "wb") as f:
+											f.write(asset_data)
+										rbxm_file = RobloxFile.Open(rbxm_file_path) 
+										mesh_part = rbxm_file.FindFirstChild[MeshPart](mesh_name)
+									else:
+										return {'FINISHED'}
+								
+									
+
+								#check if its shirts
 								else:
-									part_TextureID = strip_rbxassetid(rbx_tex_id_value)
-									rbx_textures["Color"] = part_TextureID
-							part_cframe = mesh_part.Properties["CFrame"].Value
-							part_cframe_pivot = mesh_part.Properties["PivotOffset"].Value
-							dprint("part_MeshId: ", part_MeshId)
-							dprint("part_TextureID: ", part_TextureID)
-							dprint("")
+									print("CHECKING ACCESSORY CLASSES")
+									rbx_accessories_classes = [Shirt,Pants,Accessory]
+									for accessory_class in rbx_accessories_classes:
+										accessory_part = rbxm_file.FindFirstChildOfClass[accessory_class]()
+										if accessory_part:
+											if str(accessory_part.ClassName) == "Shirt":
+												print("SHIRT FOUND")
+												pass
+											elif str(accessory_part.ClassName) == "Pants":
+												print("PANTS FOUND")
+												pass
+											elif str(accessory_part.ClassName) == "Accessory":
+												print("ACCESSORY FOUND")
+												mesh_part = accessory_part.FindFirstChild[MeshPart]("Handle")
+												mesh_name = str(accessory_part.Name)
+												print("MESH NAME: ", mesh_name)
 
-							bundle_own_folder = os.path.join(bundles_folder, rbx_asset_name_clean)
-							if not os.path.exists(bundle_own_folder):
-								os.makedirs(bundle_own_folder)
+									'''shirt_part = rbxm_file.FindFirstChild[Shirt]("Shirt")
+									print("CHECKING SHIRTS")
+									if shirt_part:
+										continue
+									
+									#check if its accessories
+									else:
+										accessory_part = rbxm_file.FindFirstChild[Accessory]("")
+										print("CHECKING Accessories: ", accessory_part.Name)
+										if accessory_part:
+											mesh_part = rbxm_file.FindFirstChild[MeshPart]("Handle")
+											print("ACCESSORY FOUND: ", mesh_part.Name)'''
 
-								
-							### download mesh file
-							if not rbx_imp_error:
-								dprint("Downloading mesh")
+
+									
+							
+							else:
+								mesh_part = R15Fixed.FindFirstChild[MeshPart](mesh_name)
+							if mesh_part:
+								rbx_SurfaceAppearance = mesh_part.FindFirstChild[SurfaceAppearance]("SurfaceAppearance")
+								part_MeshId = strip_rbxassetid(mesh_part.Properties["MeshId"].Value)
+								if rbx_SurfaceAppearance:
+									for tex_name in glob_vars.rbx_pbr_materials:
+										part_TextureID = strip_rbxassetid(rbx_SurfaceAppearance.Properties[tex_name].Value)
+										if part_TextureID == "":
+											continue
+										if tex_name == "MetalnessMap":
+											tex_name = "MetallicMap"
+										rbx_textures[tex_name.removesuffix("Map")] = part_TextureID
+								else:
+									rbx_tex_id_value = mesh_part.Properties["TextureID"].Value
+									if not rbx_tex_id_value or str(rbx_tex_id_value) == "":
+										rbx_textures = None
+									else:
+										part_TextureID = strip_rbxassetid(rbx_tex_id_value)
+										rbx_textures["Color"] = part_TextureID
+								part_cframe = mesh_part.Properties["CFrame"].Value
+								part_cframe_pivot = mesh_part.Properties["PivotOffset"].Value
 								dprint("part_MeshId: ", part_MeshId)
-								dprint("rbx_imp_error: ", rbx_imp_error)
-								mesh_file_path = os.path.join(rbx_tmp_rbxm_filepath, mesh_part.Name + ".mesh")
-								asset_data, rbx_imp_error = get_asset_data(part_MeshId, headers)
+								dprint("part_TextureID: ", part_TextureID)
 								dprint("")
-							if not rbx_imp_error:
-								rbx_imp_error = save_to_file(mesh_file_path, asset_data)
-								### add to list meshes to clean up
-								rbx_meshes_to_clean_up_lst.append(mesh_part.Name)
+
+								bundle_own_folder = os.path.join(bundles_folder, rbx_asset_name_clean)
+								if not os.path.exists(bundle_own_folder):
+									os.makedirs(bundle_own_folder)
+
+									
+								### download mesh file
+								if not rbx_imp_error:
+									dprint("Downloading mesh")
+									dprint("part_MeshId: ", part_MeshId)
+									dprint("rbx_imp_error: ", rbx_imp_error)
+									mesh_file_path = os.path.join(rbx_tmp_rbxm_filepath, mesh_part.Name + ".mesh")
+									asset_data, rbx_imp_error = get_asset_data(part_MeshId, headers)
+									dprint("")
+								if not rbx_imp_error:
+									rbx_imp_error = save_to_file(mesh_file_path, asset_data)
+									### add to list meshes to clean up
+									rbx_meshes_to_clean_up_lst.append(mesh_part.Name)
 
 
 
 
-						
-							if not rbx_imp_error:
-								with open(mesh_file_path, "rb") as f:
-									data = f.read()
-								mesh_data = mesh_reader.RBXMeshParser.parse(data)
-								
+							
+								if not rbx_imp_error:
+									with open(mesh_file_path, "rb") as f:
+										data = f.read()
+									mesh_data = mesh_reader.RBXMeshParser.parse(data)
+									
 
-								blender_api_create_collection(rbx_asset_name_clean)
+									blender_api_create_collection(rbx_asset_name_clean)
 
-								### In case textures selected but meshes are not
-								if rbx_bndl_char_choice_add_textures and not rbx_bndl_char_choice_add_meshes:
-									rbx_bndl_char_choice_add_meshes = True
+									### In case textures selected but meshes are not
+									if rbx_bndl_char_choice_add_textures and not rbx_bndl_char_choice_add_meshes:
+										rbx_bndl_char_choice_add_meshes = True
 
-								if rbx_bndl_char_choice_add_meshes:
-									rbx_obj = blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, part_cframe, part_cframe_pivot, rbx_bndl_char_choice_at_origin, mesh_reader, funct)
-
-
-
-									### Add vertex colors
-									if rbx_bndl_char_choice_add_ver_col:
-										dprint("Adding Vertex Color for Meshes, OBJ: ", rbx_obj)
-										dprint("")
-										blender_api_add_ver_col(rbx_obj, mesh_data)
+									if rbx_bndl_char_choice_add_meshes:
+										rbx_obj = blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, part_cframe, part_cframe_pivot, rbx_bndl_char_choice_at_origin, mesh_reader, funct)
 
 
-
-									### Download textures and set material
-									if rbx_bndl_char_choice_add_textures:
-										dprint("Downloading Textures")
-										if not rbx_textures:
-											dprint("rbx_textures is empty, skipping")
-											dprint("")
-											pass
-										else:
-											### download tex file
-											if not rbx_imp_error:
-												dprint("rbx_textures: ", rbx_textures)
-												dprint("")
-												new_rbx_textures = rbx_textures.copy()
-												for tex_name, tex_id in rbx_textures.items():
-													tex_file_path = os.path.join(bundle_own_folder, mesh_part.Name + "_" + tex_name + ".png")
-													asset_data, rbx_imp_error = get_asset_data(tex_id, headers)
-													if not rbx_imp_error:
-														rbx_imp_error = save_to_file(tex_file_path, asset_data)
-														if not rbx_imp_error:
-															new_rbx_textures[tex_name] = tex_file_path
-												rbx_textures = new_rbx_textures
-
-											if not rbx_imp_error:
-												blender_api_assets_new_material(rbx_obj, mesh_part, rbx_textures, rbx_asset_name_clean, rbx_SurfaceAppearance)
-
-
-								
-								if rbx_bndl_char_choice_add_cages:
-									cage_part = mesh_part.FindFirstChild[WrapTarget](mesh_name + "WrapTarget")
-									### Accessories dont have cages, so skip
-									if cage_part:
-										blender_api_create_collection("Cages", rbx_asset_name_clean)
-										if cage_part:
-											dprint("cage_part: ", cage_part)
-											cage_inner_MeshId = strip_rbxassetid(cage_part.Properties["CageMeshId"].Value)
-											cage_cframe = cage_part.Properties["CageOrigin"].Value
-											cage_cframe_pivot = cage_part.Properties["ImportOrigin"].Value
-											dprint("cage_inner_MeshId: ", cage_inner_MeshId)
-
-											bundle_own_folder = os.path.join(bundles_folder, rbx_asset_name_clean)
-											if not os.path.exists(bundle_own_folder):
-												os.makedirs(bundle_own_folder)
-												
-											### download mesh file
-											if not rbx_imp_error:
-												cage_mesh_file_path = os.path.join(rbx_tmp_rbxm_filepath, cage_part.Name + ".mesh")
-												asset_data, rbx_imp_error = get_asset_data(cage_inner_MeshId, headers)
-											if not rbx_imp_error:
-												rbx_imp_error = save_to_file(cage_mesh_file_path, asset_data)
-												### add to list meshes to clean up
-												rbx_meshes_to_clean_up_lst.append(cage_part.Name)
-
-
-										### read meshes
-										with open(cage_mesh_file_path, "rb") as f:
-											data = f.read()
-										cage_data = mesh_reader.RBXMeshParser.parse(data)
-
-										### add obj to blender
-										rbx_obj = blender_api_add_meshes_as_obj(bundle_own_folder, cage_part, cage_data, cage_cframe, cage_cframe_pivot, rbx_bndl_char_choice_at_origin, mesh_reader, funct)
 
 										### Add vertex colors
 										if rbx_bndl_char_choice_add_ver_col:
-											dprint("Adding Vertex Color for Cages, OBJ: ", rbx_obj)
+											dprint("Adding Vertex Color for Meshes, OBJ: ", rbx_obj)
 											dprint("")
-											blender_api_add_ver_col(rbx_obj, cage_data)
-
-
-								if rbx_bndl_char_choice_add_attachment:
-									blender_api_create_collection("Accessory Attachments", rbx_asset_name_clean)
-									mesh_part_children = mesh_part.GetChildren()
-									for child in mesh_part_children:
-										if str(child.ClassName) == "Attachment":
-											if not "RigAttachment" in str(child.Name):
-												mesh_part_attachment = child
-												dprint("mesh_part_attachment: ", mesh_part_attachment)
-												mesh_part_attachment_cframe = mesh_part_attachment.Properties["CFrame"].Value
-
-												blender_api_add_attachments(mesh_part_attachment, mesh_part_attachment_cframe, part_cframe, part_cframe_pivot, rbx_bndl_char_choice_at_origin, funct)
-												
-					
-
-		
-
-
-								if rbx_bndl_char_choice_add_motor6d_attachment:
-									blender_api_create_collection("Motor6D Attachments", rbx_asset_name_clean)
-									mesh_part_children = mesh_part.GetChildren()
-									for child in mesh_part_children:
-										if str(child.ClassName) == "Attachment":
-											if "RigAttachment" in str(child.Name):
-												mesh_part_motor6d_attachment = child
-												dprint("mesh_part_motor6d_attachment: ", mesh_part_motor6d_attachment)
-												mesh_part_motor6d_attachment_cframe = mesh_part_motor6d_attachment.Properties["CFrame"].Value
-
-												blender_api_add_attachments(mesh_part_motor6d_attachment, mesh_part_motor6d_attachment_cframe, part_cframe, part_cframe_pivot, rbx_bndl_char_choice_at_origin, funct)
+											blender_api_add_ver_col(rbx_obj, mesh_data)
 
 
 
+										### Download textures and set material
+										if rbx_bndl_char_choice_add_textures:
+											dprint("Downloading Textures")
+											if not rbx_textures:
+												dprint("rbx_textures is empty, skipping")
+												dprint("")
+												pass
+											else:
+												### download tex file
+												if not rbx_imp_error:
+													dprint("rbx_textures: ", rbx_textures)
+													dprint("")
+													new_rbx_textures = rbx_textures.copy()
+													for tex_name, tex_id in rbx_textures.items():
+														tex_file_path = os.path.join(bundle_own_folder, mesh_part.Name + "_" + tex_name + ".png")
+														asset_data, rbx_imp_error = get_asset_data(tex_id, headers)
+														if not rbx_imp_error:
+															rbx_imp_error = save_to_file(tex_file_path, asset_data)
+															if not rbx_imp_error:
+																new_rbx_textures[tex_name] = tex_file_path
+													rbx_textures = new_rbx_textures
 
-								if rbx_bndl_char_choice_add_bones:
-									mesh_bones_array = mesh_data["bones"]
-									# Collect bones into global dict
-									for bone in mesh_bones_array:
-										if bone["name"] not in all_bones_data:
-											all_bones_data[bone["name"]] = bone
+												if not rbx_imp_error:
+													blender_api_assets_new_material(rbx_obj, mesh_part, rbx_textures, rbx_asset_name_clean, rbx_SurfaceAppearance)
 
 
-									if rbx_bndl_char_choice_add_meshes:
-										# Collect vertex/weight info for this mesh
-										skin_info = []
-										for vert_idx, (si, w) in enumerate(zip(mesh_data["skinIndices"], mesh_data["skinWeights"])):
-											bone_name = mesh_bones_array[si]["name"]
-											skin_info.append((vert_idx, bone_name, w))
+									
+									if rbx_bndl_char_choice_add_cages:
+										cage_part = mesh_part.FindFirstChild[WrapTarget](mesh_name + "WrapTarget")
+										### Accessories dont have cages, so skip
+										if cage_part:
+											blender_api_create_collection("Cages", rbx_asset_name_clean)
+											if cage_part:
+												dprint("cage_part: ", cage_part)
+												cage_inner_MeshId = strip_rbxassetid(cage_part.Properties["CageMeshId"].Value)
+												cage_cframe = cage_part.Properties["CageOrigin"].Value
+												cage_cframe_pivot = cage_part.Properties["ImportOrigin"].Value
+												dprint("cage_inner_MeshId: ", cage_inner_MeshId)
 
-										all_mesh_skin_data.append({
-											"object": rbx_obj,
-											"skin_info": skin_info
-										})
+												bundle_own_folder = os.path.join(bundles_folder, rbx_asset_name_clean)
+												if not os.path.exists(bundle_own_folder):
+													os.makedirs(bundle_own_folder)
+													
+												### download mesh file
+												if not rbx_imp_error:
+													cage_mesh_file_path = os.path.join(rbx_tmp_rbxm_filepath, cage_part.Name + ".mesh")
+													asset_data, rbx_imp_error = get_asset_data(cage_inner_MeshId, headers)
+												if not rbx_imp_error:
+													rbx_imp_error = save_to_file(cage_mesh_file_path, asset_data)
+													### add to list meshes to clean up
+													rbx_meshes_to_clean_up_lst.append(cage_part.Name)
+
+
+											### read meshes
+											with open(cage_mesh_file_path, "rb") as f:
+												data = f.read()
+											cage_data = mesh_reader.RBXMeshParser.parse(data)
+
+											### add obj to blender
+											rbx_obj = blender_api_add_meshes_as_obj(bundle_own_folder, cage_part, cage_data, cage_cframe, cage_cframe_pivot, rbx_bndl_char_choice_at_origin, mesh_reader, funct)
+
+											### Add vertex colors
+											if rbx_bndl_char_choice_add_ver_col:
+												dprint("Adding Vertex Color for Cages, OBJ: ", rbx_obj)
+												dprint("")
+												blender_api_add_ver_col(rbx_obj, cage_data)
+
+
+									if rbx_bndl_char_choice_add_attachment:
+										blender_api_create_collection("Accessory Attachments", rbx_asset_name_clean)
+										mesh_part_children = mesh_part.GetChildren()
+										for child in mesh_part_children:
+											if str(child.ClassName) == "Attachment":
+												if not "RigAttachment" in str(child.Name):
+													mesh_part_attachment = child
+													dprint("mesh_part_attachment: ", mesh_part_attachment)
+													mesh_part_attachment_cframe = mesh_part_attachment.Properties["CFrame"].Value
+
+													blender_api_add_attachments(mesh_part_attachment, mesh_part_attachment_cframe, part_cframe, part_cframe_pivot, rbx_bndl_char_choice_at_origin, funct)
+													
+
+			
+
+
+									if rbx_bndl_char_choice_add_motor6d_attachment:
+										blender_api_create_collection("Motor6D Attachments", rbx_asset_name_clean)
+										mesh_part_children = mesh_part.GetChildren()
+										for child in mesh_part_children:
+											if str(child.ClassName) == "Attachment":
+												if "RigAttachment" in str(child.Name):
+													mesh_part_motor6d_attachment = child
+													dprint("mesh_part_motor6d_attachment: ", mesh_part_motor6d_attachment)
+													mesh_part_motor6d_attachment_cframe = mesh_part_motor6d_attachment.Properties["CFrame"].Value
+
+													blender_api_add_attachments(mesh_part_motor6d_attachment, mesh_part_motor6d_attachment_cframe, part_cframe, part_cframe_pivot, rbx_bndl_char_choice_at_origin, funct)
+
+
+
+
+									if rbx_bndl_char_choice_add_bones:
+										mesh_bones_array = mesh_data["bones"]
+										# Collect bones into global dict
+										for bone in mesh_bones_array:
+											if bone["name"] not in all_bones_data:
+												all_bones_data[bone["name"]] = bone
+
+
+										if rbx_bndl_char_choice_add_meshes:
+											# Collect vertex/weight info for this mesh
+											skin_info = []
+											for vert_idx, (si, w) in enumerate(zip(mesh_data["skinIndices"], mesh_data["skinWeights"])):
+												bone_name = mesh_bones_array[si]["name"]
+												skin_info.append((vert_idx, bone_name, w))
+
+											all_mesh_skin_data.append({
+												"object": rbx_obj,
+												"skin_info": skin_info
+											})
 
 
 					if rbx_bndl_char_choice_add_bones:

@@ -58,6 +58,7 @@ all_modules_names = [
     "functions.menu_pie",
     "functions.menu_ui",
     "func_import_v2.rbx_import_bundle_char",
+    "func_import_v2.rbx_import_discovery",
 ]
 
 # When bpy is already in local, reload modules for iterative testing
@@ -100,6 +101,7 @@ from .functions.menu_pie import RBX_MT_MENU3
 from .functions.menu_pie import RBX_MT_MENU4
 from .functions.menu_ui import TOOLBOX_MENU
 from .func_import_v2.rbx_import_bundle_char import RBX_IMPORT_V2
+from .func_import_v2.rbx_import_discovery import RBX_OT_import_discovery, RBX_OT_import_reset, RBX_OT_import_discovery_download, RBX_OT_import_discovery_options, RBX_OT_import_discovery_open_folder
 from . import oauth
 import bpy
 from bpy.types import Scene
@@ -118,6 +120,11 @@ classes = (
     RBX_BUTTON_HDRI,
     OBJECT_OT_add_object,
     RBX_IMPORT_V2,
+    RBX_OT_import_discovery,
+    RBX_OT_import_reset,
+    RBX_OT_import_discovery_download,
+    RBX_OT_import_discovery_options,
+    RBX_OT_import_discovery_open_folder,
     BUTTON_CMR,
     BUTTON_DMMY,
     BUTTON_WEAR,
@@ -156,6 +163,7 @@ def register():
     Scene.subpanel_hdri = BoolProperty(default=False)
     Scene.subpanel_imp_char = BoolProperty(default=False)
     Scene.subpanel_imp_char_v2 = BoolProperty(default=False)
+    Scene.subpanel_imp_beta = BoolProperty(default=False)
     Scene.subpanel_supported = BoolProperty(default=False)
     Scene.subpanel_dummy = BoolProperty(default=False)
     Scene.subpanel_rigs = BoolProperty(default=False)
@@ -194,6 +202,7 @@ def unregister():
     del Scene.subpanel_hdri
     del Scene.subpanel_imp_char
     del Scene.subpanel_imp_char_v2
+    del Scene.subpanel_imp_beta
     del Scene.subpanel_supported
     del Scene.subpanel_dummy
     del Scene.subpanel_rigs

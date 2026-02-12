@@ -89,7 +89,7 @@ class RBXMeshParser:
             uvs.extend(uv)
             faces.append(i)
 
-        return {"vertices": vertices, "normals": normals, "uvs": uvs, "faces": faces, "lods": [0, face_count]}
+        return {"version": version.split(" ")[1], "vertices": vertices, "normals": normals, "uvs": uvs, "faces": faces, "lods": [0, face_count]}
 
     @staticmethod
     def parse_bin(buffer: bytes, version: str):

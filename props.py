@@ -101,10 +101,25 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     default = True
     ) # type: ignore
 
+    def update_mesh_dependencies(self, context):
+        """
+        Update callback to enforce checkbox dependencies.
+        If Meshes are disabled, Textures should be disabled (and unchecked).
+        If Meshes AND Cages are disabled, Vertex Colors should be disabled (and unchecked).
+        """
+        # If Meshes are unchecked, uncheck Textures
+        if not self.rbx_bndl_char_choice_add_meshes:
+            self.rbx_bndl_char_choice_add_textures = False
+            
+        # If both Meshes and Cages are unchecked, uncheck Vertex Colors
+        if not self.rbx_bndl_char_choice_add_meshes and not self.rbx_bndl_char_choice_add_cages:
+            self.rbx_bndl_char_choice_add_ver_col = False
+
     rbx_bndl_char_choice_add_meshes : bpy.props.BoolProperty(
     name="Meshes",
     description="Meshes property",
-    default = False
+    default = False,
+    update = update_mesh_dependencies
     ) # type: ignore
 
     rbx_bndl_char_choice_add_textures : bpy.props.BoolProperty(
@@ -116,7 +131,8 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     rbx_bndl_char_choice_add_cages : bpy.props.BoolProperty(
     name="Cages",
     description="Cages property",
-    default = False
+    default = False,
+    update = update_mesh_dependencies
     ) # type: ignore
 
     rbx_bndl_char_choice_add_attachment : bpy.props.BoolProperty(
@@ -403,7 +419,57 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
         ) # type: ignore
 
 
+    ### Import Beta (Discovery) ###
+    rbx_import_beta_active : bpy.props.BoolProperty(
+    name="Import Beta Active",
+    description="Import Beta Active property",
+    default = False
+    ) # type: ignore
 
+    def get_items_callback(self, context, category):
+        items = []
+        if category in glob_vars.discovered_items_data:
+            for item in glob_vars.discovered_items_data[category]:
+                # Identifier (Asset ID), Name (Asset Name), Description
+                items.append((str(item['id']), item['name'], f"Asset ID: {item['id']}"))
+        
+        # Add "All Items" if there are multiple items
+        if len(items) > 1:
+            items.append(('ALL', "All Items", "Process all items in this category"))
+            
+        if not items:
+            items.append(('NONE', "None", "No items found"))
+        return items
+
+    rbx_enum_body_parts : bpy.props.EnumProperty(
+        name = "Body Parts",
+        description = "Discovered Body Parts",
+        items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Body Parts")
+    ) # type: ignore
+
+    rbx_enum_accessory : bpy.props.EnumProperty(
+        name = "Accessory",
+        description = "Discovered Accessories",
+        items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Accessory")
+    ) # type: ignore
+
+    rbx_enum_dynamic_head : bpy.props.EnumProperty(
+        name = "Dynamic Head",
+        description = "Discovered Dynamic Heads",
+        items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Dynamic Head")
+    ) # type: ignore
+
+    rbx_enum_layered_cloth : bpy.props.EnumProperty(
+        name = "Layered Cloth",
+        description = "Discovered Layered Clothing",
+        items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Layered Cloth")
+    ) # type: ignore
+    
+    rbx_enum_gear : bpy.props.EnumProperty(
+        name = "Gear",
+        description = "Discovered Gear",
+        items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Gear")
+    ) # type: ignore
 
     ##### OTHER FUNCTIONS ##### 
     ### NORMALS ###    

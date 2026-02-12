@@ -38,7 +38,7 @@ def blender_matrix_axis_conversion(matrix: mathutils.Matrix, loc_vector_only: bo
 	identity_matrix = mathutils.Matrix.Identity(4)	#creates no rotations 4x4 matrix
 	## transform from roblox -Z forward to blender Y forward and from Y up to Z up
 	### transformation pattern
-	transform_to_blender = bpy_extras.io_utils.axis_conversion(from_forward='Z', from_up='Y', to_forward='-Y', to_up='Z').to_4x4()
+	transform_to_blender = bpy_extras.io_utils.axis_conversion(from_forward='-Z', from_up='Y', to_forward='-Y', to_up='Z').to_4x4()
 
 	### conversion of blender matrix to new pattern
 	transformed_blender_matrix = transform_to_blender @ matrix

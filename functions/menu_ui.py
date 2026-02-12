@@ -477,6 +477,91 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     if glob_vars.rbx_imp_error:
                         box.label(text = glob_vars.rbx_imp_error, icon='ERROR')
 
+        ######### Import (Beta) #########
+        if rbx.is_logged_in:
+            row = layout.row()
+            icon = 'DOWNARROW_HLT' if context.scene.subpanel_imp_beta else 'RIGHTARROW'
+            row.prop(context.scene, 'subpanel_imp_beta', icon=icon, icon_only=True)
+            row.label(text='Import (Beta)', icon='IMPORT')
+            # some data on the subpanel
+            if context.scene.subpanel_imp_beta:
+                box = layout.box()
+                box.label(text = 'Enter ID or URL')
+                
+                row = box.row()
+                row.enabled = not rbx_prefs.rbx_import_beta_active
+                row.prop(rbx_prefs, 'rbx_item_field_entry', text ='')
+
+                row = box.row()
+                row.enabled = not rbx_prefs.rbx_import_beta_active
+                row.operator('object.rbx_import_discovery', text = "Asset Discovery")
+                
+                box_reset = box.box()
+                if rbx_prefs.rbx_import_beta_active:
+                     box_reset.alert = True
+                box_reset.operator('object.rbx_import_reset', text = "Reset")
+
+                # Discovered Items UI
+                if hasattr(glob_vars, 'discovered_items_data') and glob_vars.discovered_items_data:
+                    # Check if any category has items
+                    has_items = any(glob_vars.discovered_items_data.values())
+                    
+                    if has_items:
+                        box = layout.box()
+                        box.label(text="Discovered Items:", icon='PREFERENCES')
+                        
+                        # Asset Details
+                        if glob_vars.rbx_asset_name:
+                            box.label(text=f"Name: {glob_vars.rbx_asset_name}")
+                        if glob_vars.rbx_asset_type:
+                            box.label(text=f"Type: {glob_vars.rbx_asset_type}")
+                        if glob_vars.rbx_asset_creator:
+                            box.label(text=f"Creator: {glob_vars.rbx_asset_creator}")
+                        
+                        # Import the configuration
+                        from RBX_Toolbox.func_import_v2 import rbx_import_discovery as discovery_config
+
+                        # Helper to draw a category box
+                        def draw_discovery_category(layout, category_name, icon, enum_prop, download_operator_text):
+                            box = layout.box()
+                            
+                            # Header Row: Label + Options Button
+                            row_header = box.row()
+                            row_header.label(text=category_name, icon=icon)
+                            row_header.operator("object.rbx_import_discovery_options", text="", icon='PREFERENCES').category = category_name
+                            
+                            box.prop(rbx_prefs, enum_prop, text="")
+                            
+                            # Checkboxes and options are now handling in the pop-up operator
+                            
+                            box.separator()
+                            box.operator('object.rbx_import_discovery_download', text=download_operator_text).category = category_name
+                            box.operator('object.rbx_import_discovery_open_folder', text="Open Folder").category = category_name
+
+                        # Define categories to display
+                        categories_to_draw = []
+                        if glob_vars.discovered_items_data.get("Body Parts"):
+                            categories_to_draw.append(("Body Parts", 'OUTLINER_OB_ARMATURE', "rbx_enum_body_parts", "Download Body Parts"))
+                        if glob_vars.discovered_items_data.get("Accessory"):
+                            categories_to_draw.append(("Accessory", 'MOD_CLOTH', "rbx_enum_accessory", "Download Accessories"))
+                        if glob_vars.discovered_items_data.get("Dynamic Head"):
+                            categories_to_draw.append(("Dynamic Head", 'MONKEY', "rbx_enum_dynamic_head", "Download Dynamic Heads"))
+                        if glob_vars.discovered_items_data.get("Layered Cloth"):
+                            categories_to_draw.append(("Layered Cloth", 'MOD_CLOTH', "rbx_enum_layered_cloth", "Download Layered Cloth"))
+                        if glob_vars.discovered_items_data.get("Gear"):
+                            categories_to_draw.append(("Gear", 'MODIFIER', "rbx_enum_gear", "Download Gear"))
+
+                        # Stack Layout (Vertical)
+                        for cat_name, icon, enum, dl_text in categories_to_draw:
+                            draw_discovery_category(layout, cat_name, icon, enum, dl_text)
+                            
+                        # Download Everything Button - Only show if more than one category
+                        if len(categories_to_draw) > 1:
+                            box_dl_all = layout.box()
+                            box_dl_all.label(text="Process All:", icon='IMPORT')
+                            box_dl_all.label(text="Select checkboxes in above menus")
+                            box_dl_all.operator('object.rbx_import_discovery_download', text="Download Everything").category = "ALL_CATEGORIES"
+
 
 
 

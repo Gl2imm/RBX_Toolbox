@@ -11,6 +11,9 @@ from RBX_Toolbox import glob_vars
 from glob_vars import addon_path
 
 
+#394650 - bundle with dynamic head (User)
+#192 - korblox bundle, head is accessory (Roblox)
+#306 - pirate bundle, no head (Roblox)
 
 
 # Get the folder where this script (__file__) lives and add subfolders so PythonNET can find dependencies
@@ -296,12 +299,18 @@ def blender_api_import_obj(obj_filepath):
 
 
 
-def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cframe, cframe_pivot, rbx_choice_at_origin, mesh_reader, funct):
-	obj_file_path = os.path.join(bundle_own_folder, mesh_part.Name + ".obj")
-	mesh_reader.write_obj_from_mesh_json(mesh_data, obj_file_path, lod_index=0, object_name=mesh_part.Name)
+def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cframe, cframe_pivot, rbx_choice_at_origin, mesh_reader, funct, mesh_name=None):
+	if mesh_name:
+		true_name = mesh_name
+	else:
+		true_name = mesh_part.Name
+
+	obj_file_path = os.path.join(bundle_own_folder, true_name + ".obj")
+	mesh_reader.write_obj_from_mesh_json(mesh_data, obj_file_path, lod_index=0, object_name=true_name)
 
 	blender_api_import_obj(obj_file_path)
 	rbx_obj = bpy.context.selected_objects[0]
+	rbx_obj.name = true_name
 	bpy.ops.object.select_all(action='DESELECT')
 	bpy.context.view_layer.objects.active = None
 	bpy.data.objects[rbx_obj.name].select_set(True)
@@ -581,8 +590,10 @@ class RBX_IMPORT_V2(bpy.types.Operator,AddObjectHelper): # type: ignore
 		clr.AddReference(robloxfile_dll) # type: ignore
 		# this is import from dll in runtime
 		if not TYPE_CHECKING:
-			from RobloxFiles import RobloxFile, Folder, MeshPart, WrapTarget, Attachment, SpecialMesh, SurfaceAppearance, Shirt, Pants, Accessory   # type: ignore
+			from RobloxFiles import RobloxFile, Folder, MeshPart, Part, WrapTarget, Attachment, SpecialMesh, SurfaceAppearance, Shirt, Pants, Accessory   # type: ignore
+			from RobloxFiles.DataTypes import Vector3, CFrame
 		from . import mesh_reader
+		importlib.reload(mesh_reader)
 		from . import conversion_funct as funct
 		importlib.reload(funct)
 
@@ -679,6 +690,9 @@ class RBX_IMPORT_V2(bpy.types.Operator,AddObjectHelper): # type: ignore
 						is_accessory = False
 						is_classic_pants = False
 						is_classic_shirt = False
+						mesh_name = ""
+						class_accessory = None
+						special_mesh = None
 
 						rbxm_file_path = os.path.join(rbx_tmp_rbxm_filepath, str(rbxm_id) + ".rbxm")
 						rbxm_file = RobloxFile.Open(rbxm_file_path)
@@ -706,12 +720,26 @@ class RBX_IMPORT_V2(bpy.types.Operator,AddObjectHelper): # type: ignore
 								mesh_part = R15Fixed.FindFirstChild[MeshPart](mesh_name)
 								dprint("mesh_part: ", mesh_part)
 								if mesh_part:
-									mesh_parts_to_process.append((mesh_part, mesh_name))
+									mesh_parts_to_process.append((mesh_part, mesh_name, False, None))
+							
+								if mesh_part:
+									mesh_parts_to_process.append((mesh_part, mesh_name, False, None))
+							
+								if mesh_part:
+									mesh_parts_to_process.append((mesh_part, mesh_name, False, None))
+							
+							# Also check for Head in R15Fixed
+							mesh_name = "Head"
+							mesh_part = R15Fixed.FindFirstChild[MeshPart](mesh_name)
+							if mesh_part:
+								dprint(f"Found Standard Head in R15Fixed")
+								mesh_parts_to_process.append((mesh_part, mesh_name, False, None))
+							
 							dprint("mesh_parts_to_process: ", mesh_parts_to_process)
 
 
 						### Dynamic Head
-						elif special_mesh_part:
+						if special_mesh_part:
 							is_dynamic_head = True
 							dprint("Special Mesh exist, mesh is a dynamic head")
 							dprint("")
@@ -724,8 +752,9 @@ class RBX_IMPORT_V2(bpy.types.Operator,AddObjectHelper): # type: ignore
 								rbxm_file = RobloxFile.Open(rbxm_file_path) 
 								mesh_part = rbxm_file.FindFirstChild[MeshPart](mesh_name)
 								if mesh_part:
-									mesh_parts_to_process.append((mesh_part, mesh_name))
+									mesh_parts_to_process.append((mesh_part, mesh_name, False, None))
 							else:
+								dprint("Failed to download avatar_meshpart_head, returning...")
 								return {'FINISHED'}
 							
 						
@@ -745,31 +774,79 @@ class RBX_IMPORT_V2(bpy.types.Operator,AddObjectHelper): # type: ignore
 						elif class_accessory:
 							is_accessory = True
 							dprint("Accessory FOUND")
+							
+							# Check for initial MeshPart Handle
 							mesh_part = class_accessory.FindFirstChild[MeshPart]("Handle")
-							mesh_name = str(class_accessory.Name)
+
+							# If MeshPart Handle is missing, try to fetch the optimized usage "avatar_meshpart_accessory"
+							if not mesh_part:
+								dprint(f"MeshPart Handle not found for Accessory. Attempting to fetch avatar_meshpart_accessory version...")
+								# Attempt to download with special header
+								# We use a temporary error var to avoid clobbering the main one if this optional step fails
+								asset_data_acc, rbx_acc_error = get_asset_data(rbxm_id, headers, RobloxAssetFormat="avatar_meshpart_accessory")
+								
+								if not rbx_acc_error and asset_data_acc:
+									try:
+										with open(f"{rbxm_file_path}", "wb") as f:
+											f.write(asset_data_acc)
+										# Reload the file and re-find the accessory
+										rbxm_file = RobloxFile.Open(rbxm_file_path)
+										class_accessory = rbxm_file.FindFirstChildOfClass[Accessory]()
+										if class_accessory:
+											mesh_part = class_accessory.FindFirstChild[MeshPart]("Handle")
+											if mesh_part:
+												dprint("Successfully upgraded Accessory to MeshPart!")
+									except Exception as e:
+										dprint(f"Error processing upgraded accessory file: {e}")
+										# If reloading fails, we might be in trouble since we overwrote the file. 
+										# But this is a risk we optimize for.
+										pass
+								else:
+									dprint("Failed to fetch avatar_meshpart_accessory version or no data returned. Falling back.")
+
+							if not class_accessory:
+								dprint("Error: Accessory missing after attempt to upgrade/reload! Skipping.")
+								continue
+
+							mesh_name = str(class_accessory.Name) # Use Accessory Name
+							# DEBUG: Trace mesh_name origin
+							dprint(f"DEBUG: Processing Accessory {class_accessory.Name}")
+							dprint(f"DEBUG: Current mesh_name variable: {mesh_name}")
 							dprint("MESH NAME: ", mesh_name)
 							dprint(f"Accessory Children: {[c.Name + ' (' + str(c.ClassName) + ')' for c in class_accessory.GetChildren()]}")
 							if mesh_part:
-								mesh_parts_to_process.append((mesh_part, mesh_name))
+								mesh_parts_to_process.append((mesh_part, mesh_name, True, class_accessory))
 								dprint(f"Added {mesh_name} to processing list.")
 							else:
 								dprint(f"WARNING: Handle (MeshPart) not found in {mesh_name}!")
-								part_handle = class_accessory.FindFirstChild("Handle")
-								if part_handle:
-									dprint(f"Found Handle with ClassName: {part_handle.ClassName}")
+								part_handle = class_accessory.FindFirstChild("Handle", False)
+								if part_handle and part_handle.ClassName == "Part":
+									dprint(f"Fnoud Handle with ClassName: {part_handle.ClassName}")
+									mesh_parts_to_process.append((part_handle, mesh_name, True, class_accessory))
 								else:
 									dprint("Handle completely missing!")
 
 
 
-						for mesh_part, mesh_name in mesh_parts_to_process:
+
+						for mesh_part, mesh_name, is_acc, acc_obj in mesh_parts_to_process:
 							dprint(f"Processing mesh: {mesh_name}")
 							rbx_textures = {}
+							part_TextureID = ""
 							
 							rbx_SurfaceAppearance = mesh_part.FindFirstChild[SurfaceAppearance]("SurfaceAppearance")
 							dprint(f"Checked SurfaceAppearance for {mesh_name}")
 							try:
-								part_MeshId = strip_rbxassetid(mesh_part.Properties["MeshId"].Value)
+								special_mesh = None
+								if mesh_part.ClassName == "Part":
+									special_mesh = mesh_part.FindFirstChildOfClass[SpecialMesh]()
+									if not special_mesh:
+										dprint(f"Skip: Part {mesh_name} has no SpecialMesh")
+										continue
+									part_MeshId = strip_rbxassetid(special_mesh.Properties["MeshId"].Value)
+								else:
+									part_MeshId = strip_rbxassetid(mesh_part.Properties["MeshId"].Value)
+								
 								dprint(f"Got MeshId for {mesh_name}: {part_MeshId}")
 							except Exception as e:
 								dprint(f"Error getting MeshId for {mesh_name}: {e}")
@@ -783,13 +860,33 @@ class RBX_IMPORT_V2(bpy.types.Operator,AddObjectHelper): # type: ignore
 										tex_name = "MetallicMap"
 									rbx_textures[tex_name.removesuffix("Map")] = part_TextureID
 							else:
-								rbx_tex_id_value = mesh_part.Properties["TextureID"].Value
+								if special_mesh:
+									rbx_tex_id_value = special_mesh.Properties["TextureId"].Value
+								else:
+									rbx_tex_id_value = mesh_part.Properties["TextureID"].Value
 								if not rbx_tex_id_value or str(rbx_tex_id_value) == "":
 									rbx_textures = None
 								else:
 									part_TextureID = strip_rbxassetid(rbx_tex_id_value)
 									rbx_textures["Color"] = part_TextureID
 							part_cframe = mesh_part.Properties["CFrame"].Value
+							# Apply Accessory Grip (AttachmentPoint) inverse if available and this is an accessory handle
+							if is_acc and acc_obj and "AttachmentPoint" in acc_obj.Properties:
+								grip = acc_obj.Properties["AttachmentPoint"]
+								if grip.Value != CFrame():
+									part_cframe = part_cframe * grip.Value.Inverse()
+									dprint(f"DEBUG: Applied Grip Inverse. New CFrame: {part_cframe}")
+								else:
+									dprint("DEBUG: Grip is Identity or None")
+							
+							# Apply SpecialMesh Offset if available
+							if special_mesh and "Offset" in special_mesh.Properties:
+								offset = special_mesh.Properties["Offset"]
+								if offset.Value != Vector3(0,0,0):
+									dprint(f"DEBUG: Found SpecialMesh Offset: {offset.Value}")
+									part_cframe = part_cframe + offset.Value
+									dprint(f"DEBUG: Applied Offset. New CFrame: {part_cframe}")
+									
 							part_cframe_pivot = mesh_part.Properties["PivotOffset"].Value
 							dprint("part_MeshId: ", part_MeshId)
 							dprint("part_TextureID: ", part_TextureID)
@@ -830,7 +927,7 @@ class RBX_IMPORT_V2(bpy.types.Operator,AddObjectHelper): # type: ignore
 									rbx_bndl_char_choice_add_meshes = True
 
 								if rbx_bndl_char_choice_add_meshes:
-									rbx_obj = blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, part_cframe, part_cframe_pivot, rbx_bndl_char_choice_at_origin, mesh_reader, funct)
+									rbx_obj = blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, part_cframe, part_cframe_pivot, rbx_bndl_char_choice_at_origin, mesh_reader, funct, mesh_name=mesh_name)
 
 
 

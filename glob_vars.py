@@ -149,6 +149,7 @@ rbx_is_bundle = False
 rbx_is_bundled_item = False
 
 rbx_imp_error = None
+discovered_items_data = {}
 
 
 

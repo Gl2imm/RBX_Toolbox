@@ -34,3 +34,9 @@ resources/openapi.json - open cloud api
 ## Constraints
 - Do not use deprecated "Legacy" endpoints unless explicitly requested.
 - Always include the correct `x-api-key` header in example requests.
+
+## Undocumented Findings (Use with Caution)
+- **Asset Delivery API**: When using `https://apis.roblox.com/asset-delivery-api/v1/assetId/{id}`, you can request specific formats by setting the `Roblox-AssetFormat` header:
+  - `avatar_meshpart_head`: Returns a MeshPart-compatible head (instead of SpecialMesh).
+  - `avatar_meshpart_accessory`: Returns a MeshPart-compatible accessory (instead of SpecialMesh).
+  - Note: This is part of Web API v2 behavior and is NOT yet part of the official Open Cloud spec. Use only if necessary for importers/tools.

@@ -1,3 +1,4 @@
+
 ---
 trigger: always_on
 ---
@@ -75,6 +76,12 @@ end
 ### API Error Handling
 * **Network Calls:** All Roblox API requests from Python must be wrapped in `try/except` blocks to handle connection failures or 403 errors gracefully.
 
+### .NET Library Usage (RobloxFiles)
+* **Dictionaries:** When using `rbxm_net_lib` objects (e.g., `Properties`), remember they are .NET `IReadOnlyDictionary` objects, not Python dictionaries. 
+  * **Incorrect:** `obj.Properties.get("Key")` (Throws AttributeError)
+  * **Correct:** Check existence with `if "Key" in obj.Properties:` then access via `obj.Properties["Key"]`.
+* **Reference:** Check `func_import_v2/Roblox engine API reference_for_Antigravity.txt` or `roblox-cloud` skill for API details if unsure.
+
 ---
 
 ## 4. Documentation & Comments
@@ -98,3 +105,57 @@ bpy.ops.object.mode_set(mode='OBJECT')
 * **Python:** Use **4 spaces** (Standard PEP 8).
 * **Luau:** Use **Tabs** (Roblox Standard).
 * **Consistency:** Do not mix tabs and spaces in the same file.
+
+---
+
+## 6. Roblox to Blender Coordinate Conversion
+
+To explain the XYZ conversion between Roblox and Blender, use the following breakdown.
+
+### The Core Coordinate Mismatch
+The fundamental difference lies in which axis represents "Up" and which axis represents "Forward."
+
+| Feature | Roblox Engine | Blender |
+| :--- | :--- | :--- |
+| Up Axis | +Y (0, 1, 0) | +Z (0, 0, 1) |
+| Forward Axis | -Z (0, 0, -1) | -Y (0, -1, 0)* |
+| Right Axis | +X (1, 0, 0) | +X (1, 0, 0) |
+| Handedness | Right-Handed | Right-Handed |
+
+*Note: In Blender, the "Front" View (Numpad 1) looks along the +Y axis. Therefore, for a character to look at the camera in Front View, they must face -Y.*
+
+### The Conversion Formula (Math)
+To convert a position vector or vertex from Roblox space to Blender space, you effectively need to rotate the world 90 degrees around the X-axis.
+
+From Roblox $(x, y, z)$ $\rightarrow$ To Blender $(x', y', z')$:
+
+$$
+\begin{bmatrix} x' \\ y' \\ z' \end{bmatrix} = \begin{bmatrix} 1 & 0 & 0 \\ 0 & 0 & -1 \\ 0 & 1 & 0 \end{bmatrix} \begin{bmatrix} x \\ y \\ z \end{bmatrix}
+$$
+
+**Simplified Logic:**
+*   Blender X = Roblox X
+*   Blender Y = Roblox -Z (Swaps depth to horizontal plane)
+*   Blender Z = Roblox Y (Swaps height to vertical axis)
+
+### Practical Instructions
+
+**A. If Importing Animations/CFrames manually:**
+You must apply a rotational offset matrix. In Roblox Lua, this looks like:
+
+```lua
+local ROB_TO_BLENDER_ROTATION = CFrame.fromEulerAnglesXYZ(math.rad(90), 0, 0)
+-- Apply this to the CFrame to align it with Blender's world space
+```
+
+**B. If Exporting FBX (The "Auto" Fix):**
+When exporting from Blender to Roblox, do not manually rotate the mesh. Instead, change the Export Settings in the operator panel:
+*   Forward: -Z Forward
+*   Up: Y Up
+
+This forces Blender's internal exporter to apply the matrix transform automatically.
+
+**C. Scale Factor:**
+*   Roblox: 1 Stud
+*   Blender: 1 Meter
+*   Conversion: usually 1 Stud $\approx$ 0.28 Meters (historically), but most modern pipelines use 1 Stud = 1 Meter for simplicity. Ensure you check if the imported model is 100x too small (needs 0.01 scaling) or correct.

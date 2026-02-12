@@ -1,0 +1,14 @@
+CHANGELOG.md,sha256=6ezzSsolQxse8Ifbuq5m9feGxA2httj-1C2qHAao1WE,965
+aiolimiter-1.0.0.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+aiolimiter-1.0.0.dist-info/LICENSE.txt,sha256=c4us74SLnliQwFWMcf6GUQKJoA4N53aG_NS28LFzH-4,1072
+aiolimiter-1.0.0.dist-info/METADATA,sha256=X-YLzYQtYqyrVH3UtMtsbbuyqXTW7wRAT5ZElUubLVQ,4807
+aiolimiter-1.0.0.dist-info/RECORD,,
+aiolimiter-1.0.0.dist-info/REQUESTED,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+aiolimiter-1.0.0.dist-info/WHEEL,sha256=y3eDiaFVSNTPbgzfNn0nYn5tEn1cX6WrdetDlQM4xWw,83
+aiolimiter/__init__.py,sha256=oMOR4udfaZatr725ybxfk-NeVnTIzvqbb4h9ns_aSSE,415
+aiolimiter/__pycache__/__init__.cpython-311.pyc,,
+aiolimiter/__pycache__/compat.cpython-311.pyc,,
+aiolimiter/__pycache__/leakybucket.cpython-311.pyc,,
+aiolimiter/compat.py,sha256=deENHWJw9qJLLvpYOpFS6Lvwa9O80fpQrXJLDP-dwX8,925
+aiolimiter/leakybucket.py,sha256=abfcMDp-opMR_e8k2Q4jPil9tRaETyH2djY_aaIukwI,4172
+aiolimiter/py.typed,sha256=23PdwU7M-tlmOJftbeQnCGVoWqOElTTT9-FlvDeHl_k,113

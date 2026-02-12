@@ -1,0 +1,114 @@
+newmtl Player2Mtl
+Material Color
+Ka 1 1 1
+Kd 1 1 1
+Ks 0.0627451 0.0627451 0.0627451 
+
+d 1
+
+Ns 0
+
+#map_Ka NYTV_tex-0.png
+map_Kd NYTV_tex-0.png
+ NYTV_tex-0.png
+
+newmtl Player1Mtl
+Material Color
+Ka 0.917647 0.721569 0.572549
+Kd 0.917647 0.721569 0.572549
+Ks 0.0791695 0.062253 0.0493964 
+
+d 1
+
+Ns 255
+
+#map_Ka NYTV_tex-5.png
+map_Kd NYTV_tex-5.png
+ NYTV_tex-5.png
+
+map_Ns NYTV_tex-2.png
+
+newmtl Handle4Mtl
+Material Color
+Ka 1 1 1
+Kd 1 1 1
+Ks 0.0627451 0.0627451 0.0627451 
+
+d 1
+
+Ns 0
+
+#map_Ka NYTV_tex-7.png
+map_Kd NYTV_tex-7.png
+ NYTV_tex-7.png
+
+newmtl Handle3Mtl
+Material Color
+Ka 1 1 1
+Kd 1 1 1
+Ks 0.0627451 0.0627451 0.0627451 
+
+d 1
+
+Ns 0
+
+#map_Ka NYTV_tex-4.png
+map_Kd NYTV_tex-4.png
+ NYTV_tex-4.png
+
+newmtl Handle5Mtl
+Material Color
+Ka 1 1 1
+Kd 1 1 1
+Ks 0.0627451 0.0627451 0.0627451 
+
+d 1
+
+Ns 0
+
+#map_Ka NYTV_tex-3.png
+map_Kd NYTV_tex-3.png
+ NYTV_tex-3.png
+
+newmtl Handle2Mtl
+Material Color
+Ka 1 1 1
+Kd 1 1 1
+Ks 0.0627451 0.0627451 0.0627451 
+
+d 1
+
+Ns 0
+
+#map_Ka NYTV_tex-8.png
+map_Kd NYTV_tex-8.png
+ NYTV_tex-8.png
+
+newmtl Handle6Mtl
+Material Color
+Ka 1 1 1
+Kd 1 1 1
+Ks 0.0627451 0.0627451 0.0627451 
+
+d 1
+
+Ns 0
+
+#map_Ka NYTV_tex-1.png
+map_Kd NYTV_tex-1.png
+ NYTV_tex-1.png
+
+newmtl Handle1Mtl
+Material Color
+Ka 1 1 1
+Kd 1 1 1
+Ks 0.0627451 0.0627451 0.0627451 
+
+d 1
+
+Ns 0
+
+#map_Ka NYTV_tex-6.png
+map_Kd NYTV_tex-6.png
+ NYTV_tex-6.png
+

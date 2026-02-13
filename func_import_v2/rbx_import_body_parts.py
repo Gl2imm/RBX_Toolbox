@@ -255,17 +255,23 @@ def download_body_parts(context, category_name="Body Parts"):
             if is_identity:
                 actual_at_origin = False
 
-            rbx_obj = func_blndr_api.blender_api_add_meshes_as_obj(
-                bundle_own_folder, mesh_part, mesh_data, cframe, part_cframe_pivot, 
-                actual_at_origin, mesh_reader, funct, mesh_name=mesh_name
-            )
+            # Force meshes if textures are requested (Logic from Reference)
+            if rbx_bndl_char_choice_add_textures and not rbx_bndl_char_choice_add_meshes:
+                rbx_bndl_char_choice_add_meshes = True
+
+            rbx_obj = None
+            if rbx_bndl_char_choice_add_meshes:
+                rbx_obj = func_blndr_api.blender_api_add_meshes_as_obj(
+                    bundle_own_folder, mesh_part, mesh_data, cframe, part_cframe_pivot, 
+                    actual_at_origin, mesh_reader, funct, mesh_name=mesh_name
+                )
             
             # Add Vertex Colors
-            if rbx_bndl_char_choice_add_ver_col:
+            if rbx_bndl_char_choice_add_meshes and rbx_bndl_char_choice_add_ver_col and rbx_obj:
                  func_blndr_api.blender_api_add_ver_col(rbx_obj, mesh_data)
 
             # Add Textures
-            if rbx_bndl_char_choice_add_meshes and rbx_bndl_char_choice_add_textures:
+            if rbx_bndl_char_choice_add_meshes and rbx_bndl_char_choice_add_textures and rbx_obj:
                  rbx_import_textures.download_and_apply_textures(
                      mesh_part, mesh_name, bundle_own_folder, headers, rbx_obj, asset_clean_name
                  )

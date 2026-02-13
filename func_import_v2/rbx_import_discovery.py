@@ -22,6 +22,16 @@ if TYPE_CHECKING:
 DEBUG = True
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
+
+category_checkboxes = {
+    "Body Parts": ["rbx_enum_body_parts"],
+    "Accessory": ["rbx_accessory_entered", "rbx_incl_cages", "rbx_split"],
+    "Dynamic Head": ["rbx_enum_dynamic_head", "rbx_face_enum"],
+    "Layered Cloth": ["rbx_enum_layered_cloth", "rbx_bnds_lc_enum", "rbx_lc_dum_enum", "rbx_lc_spl_enum", "rbx_lc_dum_anim_enum", "rbx_lc_anim_enum"],
+    "Gear": ["rbx_enum_gear"],
+    "Store Model": []
+}
+
 class RBX_OT_import_discovery(bpy.types.Operator):
     """Asset Discovery"""
     bl_idname = "object.rbx_import_discovery"

@@ -1,0 +1,20 @@
+# VS Code
+.vscode/
+
+# AI / agent tools
+.agent/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+tmp/
+temp/

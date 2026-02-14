@@ -18,8 +18,8 @@ def get_catalog_bundle_data(rbx_asset_id, headers):
 	url = f"https://catalog.roblox.com/v1/catalog/items/{rbx_asset_id}/details?itemType=Bundle"
 	try:
 		data = requests.get(url, headers=headers)
-	except:     
-		rbx_imp_error = "Error Getting Catalog Bundle Data"
+	except Exception as e:     
+		rbx_imp_error = f"Error Getting Catalog Bundle Data: {str(e)}"
 		glob_vars.rbx_imp_error = rbx_imp_error
 	else:
 		if data.status_code == 200:

@@ -88,26 +88,34 @@ class RBX_OT_import_discovery(bpy.types.Operator):
             rbx_asset_name, rbx_asset_type_id, rbx_asset_creator, rbx_bundledItems, rbx_imp_error = func_rbx_api.get_catalog_bundle_data(rbx_asset_id, headers)
             
             # If Bundle failed, try as Single Asset
-            if rbx_imp_error and "404" in rbx_imp_error:
-                dprint("Bundle not found, trying as Single Asset...")
-                asset_name, asset_type_id, asset_creator, asset_error = func_rbx_api.get_catalog_asset_data(rbx_asset_id, headers)
-                
-                if asset_name:
-                    dprint(f"Found Single Asset: {asset_name} (Type: {asset_type_id})")
-                    rbx_imp_error = None # Clear error
-                    rbx_asset_name = asset_name
-                    rbx_asset_type_id = asset_type_id 
-                    rbx_asset_creator = asset_creator
+            if rbx_imp_error:
+                inStr = str(rbx_imp_error)
+                if "404" in inStr:
+                    dprint("Bundle not found, trying as Single Asset...")
+                    asset_name, asset_type_id, asset_creator, asset_error = func_rbx_api.get_catalog_asset_data(rbx_asset_id, headers)
                     
-                    # Create a "fake" bundled item list for the single asset to reuse existing logic
-                    rbx_bundledItems = [{
-                        'id': int(rbx_asset_id),
-                        'name': rbx_asset_name,
-                        'type': 'Asset',
-                        'assetType': asset_type_id
-                    }]
+                    if asset_name:
+                        dprint(f"Found Single Asset: {asset_name} (Type: {asset_type_id})")
+                        rbx_imp_error = None # Clear error
+                        rbx_asset_name = asset_name
+                        rbx_asset_type_id = asset_type_id 
+                        rbx_asset_creator = asset_creator
+                        
+                        # Create a "fake" bundled item list for the single asset to reuse existing logic
+                        rbx_bundledItems = [{
+                            'id': int(rbx_asset_id),
+                            'name': rbx_asset_name,
+                            'type': 'Asset',
+                            'assetType': asset_type_id
+                        }]
+                    else:
+                        dprint("Single Asset check failed:", asset_error)
+                        self.report({'ERROR'}, f"Discovery Failed: {asset_error}")
+                        return {'CANCELLED'}
                 else:
-                    dprint("Single Asset check failed:", asset_error)
+                    # Some other error occurred
+                    self.report({'ERROR'}, f"Bundle Discovery Failed: {rbx_imp_error}")
+                    return {'CANCELLED'}
 
             dprint("rbx_bundledItems: ", rbx_bundledItems)
             
@@ -166,7 +174,7 @@ class RBX_OT_import_reset(bpy.types.Operator):
         # Using the default property value or a standard placeholder
         # rbx_prefs.property_unset("rbx_item_field_entry") # This resets to default
         # Or manually:
-        rbx_prefs.rbx_item_field_entry = "Input ID or URL" 
+        # rbx_prefs.rbx_item_field_entry = "Input ID or URL"  
         
         # Clear discovered items
         glob_vars.discovered_items_data = {}
@@ -187,12 +195,13 @@ class RBX_OT_import_discovery_download(bpy.types.Operator):
         self.report({'INFO'}, f"Download triggered for category: {self.category}")
         
         # Reload modules to ensure latest code is used
-        from . import rbx_import_body_parts
-        importlib.reload(rbx_import_body_parts)
+        # Reload modules to ensure latest code is used
+        from . import rbx_import_download_manager
+        importlib.reload(rbx_import_download_manager)
         
         if self.category == "Body Parts" or self.category == "ALL_CATEGORIES":
             self.report({'INFO'}, "Downloading Body Parts...")
-            rbx_import_body_parts.download_body_parts(context, category_name="Body Parts")
+            rbx_import_download_manager.download_body_parts(context, category_name="Body Parts")
 
         return {'FINISHED'}
 

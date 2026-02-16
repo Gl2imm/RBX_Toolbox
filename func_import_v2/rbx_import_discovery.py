@@ -25,8 +25,8 @@ dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 category_checkboxes = {
     "Body Parts": ["rbx_enum_body_parts"],
-    "Accessory": ["rbx_accessory_entered", "rbx_incl_cages", "rbx_split"],
-    "Dynamic Head": ["rbx_enum_dynamic_head", "rbx_face_enum"],
+    "Accessory": [],
+    "Dynamic Head": ["rbx_enum_dynamic_head"],
     "Layered Cloth": ["rbx_enum_layered_cloth", "rbx_bnds_lc_enum", "rbx_lc_dum_enum", "rbx_lc_spl_enum", "rbx_lc_dum_anim_enum", "rbx_lc_anim_enum"],
     "Gear": ["rbx_enum_gear"],
     "Store Model": []
@@ -39,6 +39,9 @@ class RBX_OT_import_discovery(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
+        # Clear previous errors
+        glob_vars.rbx_imp_error = None
+
         from pythonnet import load
         load('coreclr')
         import clr
@@ -97,6 +100,7 @@ class RBX_OT_import_discovery(bpy.types.Operator):
                     if asset_name:
                         dprint(f"Found Single Asset: {asset_name} (Type: {asset_type_id})")
                         rbx_imp_error = None # Clear error
+                        glob_vars.rbx_imp_error = None
                         rbx_asset_name = asset_name
                         rbx_asset_type_id = asset_type_id 
                         rbx_asset_creator = asset_creator
@@ -145,11 +149,11 @@ class RBX_OT_import_discovery(bpy.types.Operator):
                                 })
                                 break # Stop after finding the category
             
-            # Logic: If Character Bundle (Type 1) AND No Dynamic Head -> Use Default (ID 946)
+            # Logic: If Character Bundle (Type 1) AND No Dynamic Head -> Use Default (ID 10638267973)
             if rbx_asset_type_id == 1 and not glob_vars.discovered_items_data.get("Dynamic Head"):
-                dprint("No Dynamic Head found for Character Bundle. Adding Default (ID 946).")
+                dprint("No Dynamic Head found for Character Bundle. Adding Default (ID 10638267973).")
                 glob_vars.discovered_items_data["Dynamic Head"].append({
-                    'id': 946, # Default Dynamic Head ID
+                    'id': 10638267973, # Default Dynamic Head ID
                     'name': "Stevie Standard (Default)"
                 })
 
@@ -165,6 +169,7 @@ class RBX_OT_import_reset(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
+        glob_vars.rbx_imp_error = None
         rbx_prefs = context.scene.rbx_prefs
         
         # Reset UI State
@@ -199,9 +204,19 @@ class RBX_OT_import_discovery_download(bpy.types.Operator):
         from . import rbx_import_download_manager
         importlib.reload(rbx_import_download_manager)
         
+        download_all_items = (self.category == "ALL_CATEGORIES")
+
         if self.category == "Body Parts" or self.category == "ALL_CATEGORIES":
             self.report({'INFO'}, "Downloading Body Parts...")
-            rbx_import_download_manager.download_body_parts(context, category_name="Body Parts")
+            rbx_import_download_manager.download_body_parts(context, category_name="Body Parts", download_all=download_all_items)
+            
+        if self.category == "Dynamic Head" or self.category == "ALL_CATEGORIES":
+            self.report({'INFO'}, "Downloading Dynamic Heads...")
+            rbx_import_download_manager.download_body_parts(context, category_name="Dynamic Head", download_all=download_all_items)
+
+        if self.category == "Accessory" or self.category == "ALL_CATEGORIES":
+             self.report({'INFO'}, "Downloading Accessories...")
+             rbx_import_download_manager.download_body_parts(context, category_name="Accessory", download_all=download_all_items)
 
         return {'FINISHED'}
 
@@ -247,12 +262,50 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
             
             box.prop(rbx_prefs, 'rbx_bndl_char_choice_clean_tmp_meshes')
 
+        if category == "Dynamic Head":
+            box.prop(rbx_prefs, 'rbx_dyn_heads_choice_at_origin') 
+            box.prop(rbx_prefs, 'rbx_dyn_heads_choice_add_meshes')
+            
+            row = box.row()
+            row.enabled = rbx_prefs.rbx_dyn_heads_choice_add_meshes
+            row.prop(rbx_prefs, 'rbx_dyn_heads_choice_add_textures')
+            
+            box.prop(rbx_prefs, 'rbx_dyn_heads_choice_add_cages')
+            box.prop(rbx_prefs, 'rbx_dyn_heads_choice_add_attachment')
+            box.prop(rbx_prefs, 'rbx_dyn_heads_choice_add_motor6d_attachment')
+            
+            row = box.row()
+            row.enabled = rbx_prefs.rbx_dyn_heads_choice_add_meshes or rbx_prefs.rbx_dyn_heads_choice_add_cages
+            row.prop(rbx_prefs, 'rbx_dyn_heads_choice_add_ver_col')
+            
+            box.prop(rbx_prefs, 'rbx_dyn_heads_choice_clean_tmp_meshes')
+
+        if category == "Accessory":
+            box.prop(rbx_prefs, 'rbx_accessory_choice_at_origin') 
+            box.prop(rbx_prefs, 'rbx_accessory_choice_add_meshes')
+            
+            row = box.row()
+            row.enabled = rbx_prefs.rbx_accessory_choice_add_meshes
+            row.prop(rbx_prefs, 'rbx_accessory_choice_add_textures')
+            
+            box.prop(rbx_prefs, 'rbx_accessory_choice_add_attachment')
+            # No Motor6D or Cages for now as per user request ("except cages, motor6d")
+            
+            row = box.row()
+            row.enabled = rbx_prefs.rbx_accessory_choice_add_meshes
+            row.prop(rbx_prefs, 'rbx_accessory_choice_add_ver_col')
+            
+            box.prop(rbx_prefs, 'rbx_accessory_choice_clean_tmp_meshes')
+
         # Generic Checkbox Loop
         if category in category_checkboxes:
             for prop_name in category_checkboxes[category]:
-                # Skip properties already manually handled for Body Parts
+                # Skip properties already manually handled for certain categories
                 if category == "Body Parts": 
                     continue 
+                if category == "Dynamic Head" and prop_name == "rbx_enum_dynamic_head":
+                     # rbx_enum_dynamic_head is the dropdown, usually shown in main panel, but we iterate here
+                     continue
                 if hasattr(rbx_prefs, prop_name):
                     box.prop(rbx_prefs, prop_name)
 

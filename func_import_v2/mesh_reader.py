@@ -39,6 +39,12 @@ class ByteReader:
     def subarray(self, start, end):
         return self.buffer.getbuffer()[start:end]
 
+    def get_remaining(self):
+        return self.get_length() - self.get_index()
+
+    def read(self, n):
+        return self.buffer.read(n)
+
 def buffer_to_string(buf):
     if isinstance(buf, memoryview):
         buf = buf.tobytes()  # convert memoryview → bytes
@@ -51,10 +57,13 @@ class RBXMeshParser:
         assert_condition(reader.string(8) == "version ", "Invalid mesh file")
 
         version = reader.string(4)
+        print(f"MeshReader: Mesh version - {version}")
         if version in ("1.00", "1.01"):
             return RBXMeshParser.parse_text(buffer_to_string(buffer))
         elif version in ("2.00", "3.00", "3.01", "4.00", "4.01", "5.00"):
             return RBXMeshParser.parse_bin(buffer, version)
+        elif version in ("6.00", "7.00"):
+            return RBXMeshParser.parse_chunked(buffer, version)
         else:
             raise ValueError(f"Unsupported mesh version '{version}'")
 
@@ -86,7 +95,7 @@ class RBXMeshParser:
                              vertex[2] * scale_multiplier])
 
             normals.extend(normal)
-            uvs.extend(uv)
+            uvs.extend(uv[:2])
             faces.append(i)
 
         return {"version": version.split(" ")[1], "vertices": vertices, "normals": normals, "uvs": uvs, "faces": faces, "lods": [0, face_count]}
@@ -304,9 +313,276 @@ class RBXMeshParser:
 
         return mesh
 
+    @staticmethod
+    def parse_chunked(buffer: bytes, version: str):
+        reader = ByteReader(buffer)
+        assert_condition(reader.string(12) == f"version {version}", "Bad header")
 
+        newline = reader.byte()
+        if newline == 0x0D:
+            assert_condition(reader.byte() == 0x0A, "Bad newline")
+        else:
+            assert_condition(newline == 0x0A, "Bad newline")
 
+        mesh = {}
+        
+        while reader.get_remaining() >= 16:
+            chunk_type = reader.string(8)
+            chunk_version = reader.uint32le()
+            chunk_size = reader.uint32le()
+            chunk_data = reader.read(chunk_size)
+            
+            # Create a reader for the chunk data
+            chunk = ByteReader(chunk_data)
 
+            if chunk_type.startswith("COREMESH"):
+                if chunk_version == 1:
+                    num_verts = chunk.uint32le()
+                    
+                    vertices = [0.0] * (num_verts * 3)
+                    normals = [0.0] * (num_verts * 3)
+                    uvs = [0.0] * (num_verts * 2)
+                    tangents = [0.0] * (num_verts * 4)
+                    vertex_colors = [0] * (num_verts * 4)
+                    
+                    for i in range(num_verts):
+                        vertices[i*3+0] = chunk.floatle()
+                        vertices[i*3+1] = chunk.floatle()
+                        vertices[i*3+2] = chunk.floatle()
+
+                        normals[i*3+0] = chunk.floatle()
+                        normals[i*3+1] = chunk.floatle()
+                        normals[i*3+2] = chunk.floatle()
+
+                        uvs[i*2+0] = chunk.floatle()
+                        uvs[i*2+1] = 1.0 - chunk.floatle() # Flip V
+
+                        # Tangents
+                        tangents[i*4+0] = chunk.byte() / 127.0 - 1.0
+                        tangents[i*4+1] = chunk.byte() / 127.0 - 1.0
+                        tangents[i*4+2] = chunk.byte() / 127.0 - 1.0
+                        tangents[i*4+3] = chunk.byte() / 127.0 - 1.0
+
+                        # Vertex Colors
+                        vertex_colors[i*4+0] = chunk.byte()
+                        vertex_colors[i*4+1] = chunk.byte()
+                        vertex_colors[i*4+2] = chunk.byte()
+                        vertex_colors[i*4+3] = chunk.byte()
+
+                    num_faces = chunk.uint32le()
+                    faces = [0] * (num_faces * 3)
+                    
+                    for i in range(num_faces):
+                        faces[i*3+0] = chunk.uint32le()
+                        faces[i*3+1] = chunk.uint32le()
+                        faces[i*3+2] = chunk.uint32le()
+
+                    mesh["vertices"] = vertices
+                    mesh["normals"] = normals
+                    mesh["uvs"] = uvs
+                    mesh["tangents"] = tangents
+                    mesh["vertexColors"] = vertex_colors
+                    mesh["faces"] = faces
+                    
+                    if "lods" not in mesh:
+                         mesh["lods"] = [0, num_faces]
+
+                elif chunk_version == 2:
+                     try:
+                         # Lazy import/init
+                         from .draco_decoder import DracoBitstream
+                         
+                         bitstream_size = chunk.uint32le()
+                         # Read the rest as draco bitstream
+                         draco_data = chunk.read(bitstream_size)
+                         
+                         decoded = DracoBitstream.parse(draco_data)
+                         print(f"[RBXMeshParser] Draco Decoded Keys: {list(decoded.keys())}")
+                         
+                         if "vertices" in decoded:
+                             mesh["vertices"] = decoded["vertices"]
+                             
+                         num_verts = len(mesh.get("vertices", [])) // 3
+                         
+                         if "normals" in decoded:
+                             mesh["normals"] = decoded["normals"]
+                         if "uvs" in decoded:
+                             # Roblox UVs usually need flipping: 1-v.
+                             raw_uvs = decoded["uvs"]
+                             width = 2
+                             count = len(raw_uvs) // width
+                             flipped = [0.0]*len(raw_uvs)
+                             for k in range(count):
+                                 flipped[k*2+0] = raw_uvs[k*2+0]
+                                 flipped[k*2+1] = 1.0 - raw_uvs[k*2+1]
+                             mesh["uvs"] = flipped
+                             
+                         if "faces" in decoded:
+                             mesh["faces"] = decoded["faces"]
+                             
+                         if "vertexColors" in decoded:
+                             mesh["vertexColors"] = decoded["vertexColors"]
+                         else:
+                             # Default to white (255, 255, 255, 255) if missing, to avoid KeyError downstream
+                             # Size: num_verts * 4
+                             mesh["vertexColors"] = [255] * (num_verts * 4)
+                             
+                         if "lods" not in mesh and "faces" in decoded:
+                             mesh["lods"] = [0, len(decoded["faces"]) // 3]
+
+                             
+                     except Exception as e:
+                         import traceback
+                         traceback.print_exc()
+                         print(f"[RBXMeshParser] Failed to decode Draco COREMESH: {e}")
+                         pass
+                else:
+                    print(f"[RBXMeshParser] Unknown COREMESH version {chunk_version}")
+
+            elif chunk_type.startswith("LODS"):
+                 if chunk_version == 1:
+                    lod_type = chunk.uint16le()
+                    num_high_quality_lods = chunk.byte()
+                    num_lods = chunk.uint32le()
+
+                    if num_lods <= 2:
+                        chunk.jump(num_lods * 4)
+                    else:
+                        lods = []
+                        for i in range(num_lods):
+                            lods.append(chunk.uint32le())
+                        mesh["lods"] = lods
+                 else:
+                     print(f"[RBXMeshParser] Unknown LODS version {chunk_version}")
+
+            elif chunk_type.startswith("SKINNING"):
+                if chunk_version == 1:
+                    num_verts = chunk.uint32le()
+                    
+                    skin_indices = [0] * (num_verts * 4)
+                    skin_weights = [0.0] * (num_verts * 4)
+                    
+                    for i in range(num_verts):
+                        skin_indices[i*4+0] = chunk.byte()
+                        skin_indices[i*4+1] = chunk.byte()
+                        skin_indices[i*4+2] = chunk.byte()
+                        skin_indices[i*4+3] = chunk.byte()
+                        
+                        skin_weights[i*4+0] = chunk.byte() / 255.0
+                        skin_weights[i*4+1] = chunk.byte() / 255.0
+                        skin_weights[i*4+2] = chunk.byte() / 255.0
+                        skin_weights[i*4+3] = chunk.byte() / 255.0
+                    
+                    mesh["skinIndices"] = skin_indices
+                    mesh["skinWeights"] = skin_weights
+
+                    num_bones = chunk.uint32le()
+                    mesh["bones"] = [None] * num_bones
+                    
+                    # Name table offset calculation
+                    # In JS: chunk.GetIndex() + numBones * 60 + 4
+                    # Here chunk.get_index() is currently pointing to start of bones
+                    name_table_offset = chunk.get_index() + num_bones * 60 + 4
+                    
+                    # Store bones temporarily to resolve parents later if needed, 
+                    # but index referencing handles it.
+                    bones_list = []
+
+                    for i in range(num_bones):
+                        bone = {}
+                        name_start = name_table_offset + chunk.uint32le()
+                        
+                        # Read name from buffer
+                        # We need to peek into the full chunk buffer to find the null terminator
+                        chunk_buffer = chunk.buffer.getbuffer()
+                        
+                        # Find null terminator
+                        name_end = -1
+                        for k in range(name_start, len(chunk_buffer)):
+                            if chunk_buffer[k] == 0:
+                                name_end = k
+                                break
+                        
+                        if name_end != -1:
+                           bone["name"] = buffer_to_string(chunk_buffer[name_start:name_end])
+                        else:
+                           bone["name"] = "Unknown"
+
+                        parent_idx = chunk.uint16le()
+                        lod_parent_idx = chunk.uint16le()
+                        
+                        # Resolving parent references immediately if we have the list might be tricky 
+                        # if they reference forward. But usually parents are defined before children?
+                        # JS code: bone.parent = mesh.bones[reader.UInt16LE()] 
+                        #Implies references are indices into the array we are building.
+                        #BUT if it's forward reference, it will be undefined.
+                        #However, in standard python we store indices or Resolve later.
+                        #Let's just store indices for now or try to resolve if possible.
+                        #Actually JS arrays are sparse/dynamic, so `mesh.bones[idx]` works even if empty? No.
+                        # For now, let's store indices directly or objects. The JS code seems to assign the object.
+                        # "bone.parent = mesh.bones[...]" -> returns undefined if not exists yet.
+                        # We will store the INDEX temporarily or None
+                        
+                        bone["parent_idx"] = parent_idx
+                        bone["lod_parent_idx"] = lod_parent_idx
+                        
+                        bone["culling"] = chunk.floatle()
+                        bone["cframe"] = [0.0] * 12
+                        for j in range(9):
+                            bone["cframe"][j+3] = chunk.floatle()
+                        for j in range(3):
+                            bone["cframe"][j] = chunk.floatle()
+                            
+                        bones_list.append(bone)
+                        mesh["bones"][i] = bone
+
+                    # Resolve parents
+                    for i, bone in enumerate(bones_list):
+                        p_idx = bone["parent_idx"]
+                        lp_idx = bone["lod_parent_idx"]
+                        # In JS if index is out of bounds or undefined it returns undefined.
+                        # We need to emulate that. 
+                        # Usually parent index is < i?
+                        if p_idx < len(bones_list) and p_idx != i: # Simple safety
+                             bone["parent"] = bones_list[p_idx]
+                        else:
+                             bone["parent"] = None
+                             
+                        if lp_idx < len(bones_list) and lp_idx != i:
+                             bone["lodParent"] = bones_list[lp_idx]
+                        else:
+                             bone["lodParent"] = None
+
+                    name_table_size = chunk.uint32le()
+                    chunk.jump(name_table_size)
+                    
+                    num_subsets = chunk.uint32le()
+                    # subset processing...
+                    bone_indices_map = [0] * 26
+                    
+                    for _ in range(num_subsets):
+                        chunk.uint32le() # facesBegin
+                        chunk.uint32le() # facesLength
+                        verts_begin = chunk.uint32le()
+                        verts_length = chunk.uint32le()
+                        chunk.uint32le() # numBoneIndices
+                        
+                        for k in range(26):
+                            bone_indices_map[k] = chunk.uint16le()
+                            
+                        verts_end = verts_begin + verts_length
+                        for v_idx in range(verts_begin, verts_end):
+                             for j in range(4):
+                                 old_idx = mesh["skinIndices"][v_idx*4+j]
+                                 if old_idx < 26:
+                                     mesh["skinIndices"][v_idx*4+j] = bone_indices_map[old_idx]
+
+                else:
+                    print(f"[RBXMeshParser] Unknown SKINNING version {chunk_version}")
+        
+        # Post-process: Add 'version' to mesh dict
+        mesh["version"] = version
+        return mesh
 
 
 def write_obj_from_mesh_json(mesh, out_path, lod_index=0, object_name="mesh"):
@@ -396,4 +672,5 @@ with open(mesh_file, "rb") as f:
 
 
 #write_obj_from_mesh_json(mesh, otput_obj, lod_index=0, object_name="mesh")
+
 

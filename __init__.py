@@ -57,7 +57,6 @@ all_modules_names = [
     "functions.funct_others",
     "functions.menu_pie",
     "functions.menu_ui",
-    "func_import_v2.rbx_import_bundle_char",
     "func_import_v2.rbx_import_discovery",
 ]
 
@@ -100,7 +99,6 @@ from .functions.menu_pie import RBX_MT_MENU2_3
 from .functions.menu_pie import RBX_MT_MENU3
 from .functions.menu_pie import RBX_MT_MENU4
 from .functions.menu_ui import TOOLBOX_MENU
-from .func_import_v2.rbx_import_bundle_char import RBX_IMPORT_V2
 from .func_import_v2.rbx_import_discovery import RBX_OT_import_discovery, RBX_OT_import_reset, RBX_OT_import_discovery_download, RBX_OT_import_discovery_options, RBX_OT_import_discovery_open_folder
 from . import oauth
 import bpy
@@ -119,7 +117,6 @@ classes = (
     BUTTON_BNDS,
     RBX_BUTTON_HDRI,
     OBJECT_OT_add_object,
-    RBX_IMPORT_V2,
     RBX_OT_import_discovery,
     RBX_OT_import_reset,
     RBX_OT_import_discovery_download,
@@ -162,7 +159,6 @@ def register():
     Scene.subpanel_bounds = BoolProperty(default=False)
     Scene.subpanel_hdri = BoolProperty(default=False)
     Scene.subpanel_imp_char = BoolProperty(default=False)
-    Scene.subpanel_imp_char_v2 = BoolProperty(default=False)
     Scene.subpanel_imp_beta = BoolProperty(default=False)
     Scene.subpanel_supported = BoolProperty(default=False)
     Scene.subpanel_dummy = BoolProperty(default=False)
@@ -201,7 +197,6 @@ def unregister():
     del Scene.subpanel_bounds
     del Scene.subpanel_hdri
     del Scene.subpanel_imp_char
-    del Scene.subpanel_imp_char_v2
     del Scene.subpanel_imp_beta
     del Scene.subpanel_supported
     del Scene.subpanel_dummy

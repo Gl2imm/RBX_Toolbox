@@ -41,6 +41,7 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
     rbx_SurfaceAppearance = mesh_part.FindFirstChild[SurfaceAppearance]("SurfaceAppearance")
     
     # Aligning logic with bundle_char
+    rbx_textures = {}
     try:
         special_mesh = None
         if mesh_part.ClassName == "Part":

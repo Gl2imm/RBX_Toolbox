@@ -15,7 +15,8 @@ dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dict[str, Any], 
                        bundles_folder: str, rbx_tmp_rbxm_filepath: str, 
-                       mesh_reader: Any, funct: Any, func_rbx_cloud_api: Any, func_rbx_other: Any, func_blndr_api: Any):
+                       mesh_reader: Any, funct: Any, func_rbx_cloud_api: Any, func_rbx_other: Any, func_blndr_api: Any,
+                       parent_name: str = None, skip_download: bool = False):
     
     # Initialize Context & Dependencies
     import clr
@@ -30,8 +31,9 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
     importlib.reload(func_blndr_api)
     importlib.reload(rbx_import_textures)
 
+
     if not TYPE_CHECKING:
-        from RobloxFiles import RobloxFile, Folder, MeshPart # type: ignore
+        from RobloxFiles import RobloxFile, Folder, MeshPart, Part, Accessory # type: ignore
 
     rbx_meshes_to_clean_up_lst = []
 
@@ -49,19 +51,21 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
     # 1. Download RBXM
     rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
     
-    # Always download to ensure freshness or handle missing files
-    asset_data, rbx_imp_error = func_rbx_cloud_api.get_asset_data(asset_id, headers)
-    
-    if rbx_imp_error or not asset_data:
-        dprint(f"Error downloading asset {asset_id}: {rbx_imp_error}")
-        return
+    if not skip_download:
+        # Always download to ensure freshness or handle missing files
+        asset_data, rbx_imp_error = func_rbx_cloud_api.get_asset_data(asset_id, headers)
+        
+        if rbx_imp_error or not asset_data:
+            dprint(f"Error downloading asset {asset_id}: {rbx_imp_error}")
+            return
 
-    try:
-        with open(rbx_tmp_rbxm_file, "wb") as f:
-            f.write(asset_data)
-    except Exception as e:
-        dprint(f"Error saving RBXM {asset_id}: {e}")
-        return
+        try:
+            with open(rbx_tmp_rbxm_file, "wb") as f:
+                f.write(asset_data)
+        except Exception as e:
+            dprint(f"Error saving RBXM {asset_id}: {e}")
+            return
+        
         
     # 2. Open RBXM
     try:
@@ -70,40 +74,83 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
         dprint(f"Error opening RBXM {asset_id}: {e}")
         return
 
-    # Look for R15Fixed folder
-    R15Fixed = rbxm_file.FindFirstChild[Folder]("R15Fixed")
-    if not R15Fixed:
-        dprint(f"No R15Fixed folder found in {asset_name}")
-        return
-        
-    # 3. Create Collection and Folder
-    main_collection_name = glob_vars.rbx_asset_name if glob_vars.rbx_asset_name else "Imported Body Parts"
-    main_collection_name = func_rbx_other.replace_restricted_char(main_collection_name)
+    # Check/Create per-asset folder
+    asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)
     
-    rbx_collection = func_blndr_api.blender_api_create_collection("Meshes", main_collection_name)
-    
-    bundle_own_folder = os.path.join(bundles_folder, main_collection_name)
+    # Use parent name for folder grouping if available? 
+    # Current behavior puts each part in its own folder. Keeping that for now to avoid complexity unless requested.
+    bundle_own_folder = os.path.join(bundles_folder, asset_clean_name)
     if not os.path.exists(bundle_own_folder):
         os.makedirs(bundle_own_folder)
-        
-    asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)
 
-    # 4. Process MeshParts
-    rbx_avatar_bundle_parts = [
-            "LeftUpperArm", "LeftLowerArm", "LeftHand",
-            "RightUpperArm", "RightLowerArm", "RightHand",
-            "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
-            "RightUpperLeg", "RightLowerLeg", "RightFoot",
-            "UpperTorso", "LowerTorso", "Head"
-        ]
+    # Look for R15Fixed folder
+    # Look for R15Fixed folder
+    R15Fixed = rbxm_file.FindFirstChild[Folder]("R15Fixed")
+    acc_obj = rbxm_file.FindFirstChildOfClass[Accessory]()
 
     mesh_parts_to_process = []
-    for mesh_name in rbx_avatar_bundle_parts:
-        mesh_part = R15Fixed.FindFirstChild[MeshPart](mesh_name)
-        if mesh_part:
-            mesh_parts_to_process.append((mesh_part, mesh_name))
     
     # Process extracted parts
+    if acc_obj:
+        dprint(f"Accessory found: {acc_obj.Name}")
+        acc_mesh_part = acc_obj.FindFirstChildOfClass[MeshPart]()
+
+        if acc_mesh_part:
+             # User Request: "the item added to blender should have same name as it shown in discovery, not handle."
+             mesh_parts_to_process.append((acc_mesh_part, asset_name))
+        else:
+            dprint("Accessory found but no MeshPart inside.")
+            
+    elif not R15Fixed:
+        dprint(f"No R15Fixed folder found in {asset_name}. Checking for Dynamic Head...")
+        
+        # Try Dynamic Head Import
+        head_mesh_part, new_rbxm_file = process_dynamic_head(
+            headers, rbx_tmp_rbxm_filepath, rbxm_file, func_rbx_cloud_api, str(asset_id)
+        )
+        
+        if head_mesh_part:
+            dprint("Dynamic Head Found and Processed.")
+            mesh_parts_to_process.append((head_mesh_part, "Head"))
+            # Update rbxm_file ref if needed, though we operate on the mesh_part mainly
+        else:
+            dprint("Dynamic Head check failed or not a head.")
+            return
+
+
+    else:
+        # 4. Standard R15Fixed Processing
+        rbx_avatar_bundle_parts = [
+                "LeftUpperArm", "LeftLowerArm", "LeftHand",
+                "RightUpperArm", "RightLowerArm", "RightHand",
+                "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+                "RightUpperLeg", "RightLowerLeg", "RightFoot",
+                "UpperTorso", "LowerTorso", "Head"
+            ]
+
+        for mesh_name in rbx_avatar_bundle_parts:
+            mesh_part = R15Fixed.FindFirstChild[MeshPart](mesh_name)
+            if mesh_part:
+                mesh_parts_to_process.append((mesh_part, mesh_name))
+    
+    # Process extracted parts
+    # Check/Create Main Asset Collection
+    
+    # Determine Collection Name: Use Parent Name if available (e.g. Bundle Name), else Asset Name
+    if parent_name:
+        collection_name = func_rbx_other.replace_restricted_char(parent_name)
+    else:
+        collection_name = asset_clean_name
+
+    if add_meshes:
+        # User Request: "Accessories should be added to their own collection 'Accessories' inside main item collection."
+        sub_collection_name = "Accessories" if acc_obj else "Body Parts"
+        
+        # Use helper to create or retrieve collection AND set it as active
+        rbx_meshes_col = func_blndr_api.blender_api_create_collection(sub_collection_name, collection_name)
+
+    created_objects = []
+
     for mesh_part, mesh_name in mesh_parts_to_process:
         dprint(f"  - Processing MeshPart: {mesh_name}")
         
@@ -122,7 +169,14 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
                 dprint(f"    Error downloading/reading mesh {mesh_name}: {rbx_imp_error}")
                 continue
                 
-            mesh_data = mesh_reader.RBXMeshParser.parse(asset_data)
+            try:
+                mesh_data = mesh_reader.RBXMeshParser.parse(asset_data)
+            except Exception as e:
+                error_msg = f"Error processing mesh {mesh_name}: {e}"
+                dprint(error_msg)
+                glob_vars.rbx_imp_error = error_msg
+                bpy.context.workspace.status_text_set(error_msg)
+                continue
             
             if not mesh_data:
                 dprint(f"    No mesh data parsed for {mesh_name}")
@@ -139,32 +193,23 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
             except:
                 from RobloxFiles.DataTypes import CFrame as RbxCFrame
                 part_cframe_pivot = RbxCFrame()
-
-            # Check if pivot is identity
-            pivot_comps = part_cframe_pivot.GetComponents()
-            identity_comps = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-            is_identity = True
-            if len(pivot_comps) == 12:
-                for a, b in zip(pivot_comps, identity_comps):
-                    if abs(a - b) > 0.0001: 
-                        is_identity = False
-                        break
             
-            # If pivot is identity, force at_origin to False
-            actual_at_origin = at_origin
-            if is_identity:
-                actual_at_origin = False
-
+            # Note: at_origin logic is now handled post-import as a group operation.
+            # We pass 'at_origin' but it is ignored by the blender_api function for individual placement.
+            # Effectively we are placing everything at World Coordinates first.
+            
             rbx_obj = None
             if add_meshes:
                 rbx_obj = func_blndr_api.blender_api_add_meshes_as_obj(
                     bundle_own_folder, mesh_part, mesh_data, cframe, part_cframe_pivot, 
-                    actual_at_origin, mesh_reader, funct, mesh_name=mesh_name
+                    at_origin, mesh_reader, funct, mesh_name=mesh_name,
+                    is_accessory=(acc_obj is not None)
                 )
             
             # Add Vertex Colors
             if add_meshes and add_ver_col and rbx_obj:
                     func_blndr_api.blender_api_add_ver_col(rbx_obj, mesh_data)
+
 
             # Add Textures
             if add_meshes and add_textures and rbx_obj:
@@ -172,12 +217,19 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
                         mesh_part, mesh_name, bundle_own_folder, headers, rbx_obj, asset_clean_name
                     )
 
-            # Move to Collection
-            if rbx_collection and rbx_obj:
-                    if rbx_obj.name not in rbx_collection.objects:
-                        rbx_collection.objects.link(rbx_obj)
-
-
+            # Move to Collection (Meshes Sub-Collection)
+            if rbx_meshes_col and rbx_obj:
+                # Link to proper collection
+                if rbx_obj.name not in rbx_meshes_col.objects:
+                    rbx_meshes_col.objects.link(rbx_obj)
+                
+                # Unlink from other collections (e.g. Scene Collection where it was spawned)
+                for col in rbx_obj.users_collection:
+                    if col != rbx_meshes_col:
+                        col.objects.unlink(rbx_obj)
+            
+            if rbx_obj:
+                created_objects.append(rbx_obj)
 
             # Append to cleanup list for .mesh files
             rbx_meshes_to_clean_up_lst.append(mesh_name)
@@ -189,3 +241,61 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
     # Cleanup (per asset)
     if prefs.get('clean_tmp_meshes', False):
          func_rbx_other.cleanup_tmp_files(rbx_meshes_to_clean_up_lst, ".mesh")
+
+    return created_objects
+
+def process_dynamic_head(headers: dict, rbx_tmp_rbxm_filepath: str, rbxm_file, 
+                         func_rbx_cloud_api, rbxm_id: str):
+    """
+    Checks for and processes a Dynamic Head from the RBXM file.
+    Returns the MeshPart object if found and successfully processed/reloaded, else None.
+    """
+    if not TYPE_CHECKING:
+        from RobloxFiles import RobloxFile, MeshPart, SpecialMesh, Folder # type: ignore
+
+    # Check if we already have the Dynamic Head (e.g. upgraded by download manager)
+    head_part_existing = rbxm_file.FindFirstChild[MeshPart]("Head")
+    if head_part_existing:
+        dprint("Found existing Dynamic Head MeshPart 'Head'. Skipping re-download.")
+        return head_part_existing, rbxm_file
+
+    special_mesh = rbxm_file.FindFirstChild[SpecialMesh]("Mesh")
+    if special_mesh:
+        dprint("Special Mesh 'Mesh' found, checking if it is a dynamic head candidate...")
+        
+        is_dynamic_head = True # Tentative
+        dprint("Special Mesh exist, mesh is a dynamic head candidate")
+        
+        # Download as avatar_meshpart_head
+        dprint(f"Re-downloading {rbxm_id} as avatar_meshpart_head...")
+        asset_data, rbx_imp_error = func_rbx_cloud_api.get_asset_data(rbxm_id, headers, RobloxAssetFormat="avatar_meshpart_head")
+        
+        if not rbx_imp_error and asset_data:
+            rbxm_file_path = os.path.join(rbx_tmp_rbxm_filepath, str(rbxm_id) + ".rbxm")
+            
+            with open(rbxm_file_path, "wb") as f:
+                f.write(asset_data)
+            
+            # Re-open the file
+            try:
+                if not TYPE_CHECKING:
+                    from RobloxFiles import RobloxFile, MeshPart # type: ignore
+
+                rbxm_file_reloaded = RobloxFile.Open(rbxm_file_path)
+                # Now expect a MeshPart named "Head" (usually)
+                head_part = rbxm_file_reloaded.FindFirstChild[MeshPart]("Head")
+                
+                if head_part:
+                     dprint("Successfully upgraded to Dynamic Head MeshPart!")
+                     return head_part, rbxm_file_reloaded 
+                else:
+                    dprint("Downloaded data but 'Head' MeshPart not found.")
+                    return None, None
+            except Exception as e:
+                dprint(f"Error re-opening dynamic head RBXM: {e}")
+                return None, None
+        else:
+            dprint(f"Failed to download dynamic head data: {rbx_imp_error}")
+            return None, None
+
+    return None, None

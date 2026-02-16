@@ -165,6 +165,119 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     default = False
     ) # type: ignore
 
+    ### Dynamic Heads Properties ###
+    def update_dyn_head_dependencies(self, context):
+        """
+        Update callback to enforce checkbox dependencies for Dynamic Heads.
+        """
+        # If Meshes are unchecked, uncheck Textures
+        if not self.rbx_dyn_heads_choice_add_meshes:
+            self.rbx_dyn_heads_choice_add_textures = False
+            
+        # If both Meshes and Cages are unchecked, uncheck Vertex Colors
+        if not self.rbx_dyn_heads_choice_add_meshes and not self.rbx_dyn_heads_choice_add_cages:
+            self.rbx_dyn_heads_choice_add_ver_col = False
+
+    rbx_dyn_heads_choice_at_origin : bpy.props.BoolProperty(
+    name="Spawn at Origin",
+    description="Spawn at Origin property",
+    default = True
+    ) # type: ignore
+
+    rbx_dyn_heads_choice_add_meshes : bpy.props.BoolProperty(
+    name="Meshes",
+    description="Meshes property",
+    default = True,
+    update = update_dyn_head_dependencies
+    ) # type: ignore
+
+    rbx_dyn_heads_choice_add_textures : bpy.props.BoolProperty(
+    name="Textures",
+    description="Textures property",
+    default = True
+    ) # type: ignore
+
+    rbx_dyn_heads_choice_add_cages : bpy.props.BoolProperty(
+    name="Cages",
+    description="Cages property",
+    default = False,
+    update = update_dyn_head_dependencies
+    ) # type: ignore
+
+    rbx_dyn_heads_choice_add_attachment : bpy.props.BoolProperty(
+    name="Accessory Attachments",
+    description="Accessory Attachments property",
+    default = True
+    ) # type: ignore
+
+    rbx_dyn_heads_choice_add_motor6d_attachment : bpy.props.BoolProperty(
+    name="Motor6D Attachments",
+    description="Motor6D Attachments property",
+    default = True
+    ) # type: ignore
+
+    rbx_dyn_heads_choice_add_ver_col : bpy.props.BoolProperty(
+    name="Vertex Colors",
+    description="Vertex Colors property",
+    default = False
+    ) # type: ignore
+
+    rbx_dyn_heads_choice_clean_tmp_meshes : bpy.props.BoolProperty(
+    name="Cleanup tmp files (rbxm)",
+    description="Cleanup tmp files property",
+    default = False
+    ) # type: ignore
+
+    ### Accessory Properties ###
+    def update_accessory_dependencies(self, context):
+        """
+        Update callback to enforce checkbox dependencies for Accessories.
+        """
+        # If Meshes are unchecked, uncheck Textures
+        if not self.rbx_accessory_choice_add_meshes:
+            self.rbx_accessory_choice_add_textures = False
+            
+        # If Meshes are unchecked, uncheck Vertex Colors (Accessories don't have cages usually)
+        if not self.rbx_accessory_choice_add_meshes:
+            self.rbx_accessory_choice_add_ver_col = False
+
+    rbx_accessory_choice_at_origin : bpy.props.BoolProperty(
+    name="Spawn at Origin",
+    description="Spawn at Origin property",
+    default = True
+    ) # type: ignore
+
+    rbx_accessory_choice_add_meshes : bpy.props.BoolProperty(
+    name="Meshes",
+    description="Meshes property",
+    default = True,
+    update = update_accessory_dependencies
+    ) # type: ignore
+
+    rbx_accessory_choice_add_textures : bpy.props.BoolProperty(
+    name="Textures",
+    description="Textures property",
+    default = True
+    ) # type: ignore
+
+    rbx_accessory_choice_add_attachment : bpy.props.BoolProperty(
+    name="Accessory Attachments",
+    description="Accessory Attachments property",
+    default = True
+    ) # type: ignore
+
+    rbx_accessory_choice_add_ver_col : bpy.props.BoolProperty(
+    name="Vertex Colors",
+    description="Vertex Colors property",
+    default = False
+    ) # type: ignore
+
+    rbx_accessory_choice_clean_tmp_meshes : bpy.props.BoolProperty(
+    name="Cleanup tmp files (rbxm)",
+    description="Cleanup tmp files property",
+    default = False
+    ) # type: ignore
+
 
 
 

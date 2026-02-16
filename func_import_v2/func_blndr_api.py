@@ -17,7 +17,7 @@ def blender_api_import_obj(obj_filepath):
 
 
 
-def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cframe, cframe_pivot, rbx_choice_at_origin, mesh_reader, funct, mesh_name=None):
+def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cframe, cframe_pivot, rbx_choice_at_origin, mesh_reader, funct, mesh_name=None, is_accessory=False):
 	if mesh_name:
 		true_name = mesh_name
 	else:
@@ -35,21 +35,17 @@ def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cfram
 	bpy.context.view_layer.objects.active = bpy.data.objects[rbx_obj.name]
 
 	blender_matrix = funct.cframe_to_blender_matrix(cframe)
+	print(f"DEBUG: Converting matrix for object: {rbx_obj.name}")
 	oriented_blender_matrix = funct.blender_matrix_axis_conversion(blender_matrix)
 
 	# Apply the matrix to object (world transform)
 	rbx_obj.matrix_world = oriented_blender_matrix
-	### Spawn at origin
-	if rbx_choice_at_origin:
-		blender_matrix = funct.cframe_to_blender_matrix(cframe_pivot)
-		oriented_blender_vector = funct.blender_matrix_axis_conversion(blender_matrix,loc_vector_only=True)
-		rbx_obj.matrix_world.translation = -oriented_blender_vector
 
 	return rbx_obj
 
 
 
-def blender_api_add_attachments(mesh_part_attachment, mesh_part_attachment_cframe, part_cframe, part_cframe_pivot, rbx_bndl_char_choice_at_origin, funct):
+def blender_api_add_attachments(mesh_part_attachment, mesh_part_attachment_cframe, part_cframe, part_cframe_pivot, rbx_bndl_char_choice_at_origin, funct, is_accessory=False):
 	bpy.ops.mesh.primitive_uv_sphere_add(segments=8, ring_count=8, radius=1, enter_editmode=False, align='WORLD', location=(0, 0, 0), scale=(0.15, 0.15, 0.15))
 	bpy.ops.object.shade_smooth()
 	mesh_part_attachment_obj = bpy.context.selected_objects[0]
@@ -61,28 +57,29 @@ def blender_api_add_attachments(mesh_part_attachment, mesh_part_attachment_cfram
 
 	# Get main mesh location
 	blender_matrix_parent = funct.cframe_to_blender_matrix(part_cframe)
+	print(f"DEBUG: Converting parent matrix for attachment: {mesh_part_attachment_obj.name}")
 	oriented_blender_matrix_parent = funct.blender_matrix_axis_conversion(blender_matrix_parent)
 	
-	# Apply mesh matrix to attachment (world transform)
-	mesh_part_attachment_obj.matrix_world = oriented_blender_matrix_parent
+	# Store Parent Matrix
+	parent_matrix = oriented_blender_matrix_parent.copy()
 
-	# Apply mesh matrix to attachment if spawn at origin
-	if rbx_bndl_char_choice_at_origin:
-		blender_matrix_parent = funct.cframe_to_blender_matrix(part_cframe_pivot)
-		oriented_blender_matrix_parent = funct.blender_matrix_axis_conversion(blender_matrix_parent,loc_vector_only=True)
-		mesh_part_attachment_obj.matrix_world.translation = -oriented_blender_matrix_parent 
+	# Apply the (potentially modified) parent matrix to the attachment object
+	mesh_part_attachment_obj.matrix_world = parent_matrix
 
 	# Add in attachment own offset
 	blender_matrix_attachment = funct.cframe_to_blender_matrix(mesh_part_attachment_cframe)
+	print(f"DEBUG: Converting attachment matrix: {mesh_part_attachment_obj.name}")
 	oriented_blender_matrix_attachment = funct.blender_matrix_axis_conversion(blender_matrix_attachment)
 
 	# Apply the matrix to object (world transform)
 	mesh_part_attachment_obj.matrix_world.translation = mesh_part_attachment_obj.matrix_world.translation + oriented_blender_matrix_attachment.translation
 										
+	return mesh_part_attachment_obj
 
 
 
 def blender_api_add_ver_col(rbx_obj, mesh_data):
+	#print(mesh_data)
 	## Adding Vertex Colors
 	obj_mesh = rbx_obj.data
 	# Ensure a vertex color layer

@@ -160,8 +160,6 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
             'clean_tmp_meshes': rbx_prefs.rbx_bndl_char_choice_clean_tmp_meshes
         }
 
-    all_imported_objects = []
-
     # Process Loop
     for item in items_to_process:
         asset_id = item['id']
@@ -184,21 +182,20 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         # 1. Process Meshes
         if prefs['add_meshes']:
             parent_name = glob_vars.rbx_asset_name
-            objs = rbx_import_meshes.process_mesh_asset(
+            # if category_name == "Accessory":
+            #     parent_name = "Accessories"
+            rbx_import_meshes.process_mesh_asset(
                 asset_id, asset_name, headers, prefs, 
                 bundles_folder, rbx_tmp_rbxm_filepath, 
                 mesh_reader, funct, func_rbx_cloud_api, func_rbx_other, func_blndr_api,
                 parent_name=parent_name,
                 skip_download=True
             )
-            if objs:
-                all_imported_objects.extend(objs)
-                
             
         if prefs['add_cages']:
              # Clean name needed for arguments
              asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)
-             objs = rbx_import_cages.download_and_apply_cages(
+             rbx_import_cages.download_and_apply_cages(
                 asset_id, asset_name, bundles_folder, headers, 
                 asset_clean_name, rbx_tmp_rbxm_filepath, 
                 prefs['at_origin'], prefs['add_ver_col'],
@@ -206,13 +203,11 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
                 func_rbx_cloud_api, func_rbx_other, func_blndr_api,
                 skip_download=True
             )
-             if objs:
-                all_imported_objects.extend(objs)
         
         if prefs['add_attachment'] or prefs['add_motor6d_attachment']:
              # Clean name needed for arguments
              asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)
-             objs = rbx_import_attachments.download_and_apply_attachments(
+             rbx_import_attachments.download_and_apply_attachments(
                 asset_id, asset_name, bundles_folder, headers, 
                 asset_clean_name, rbx_tmp_rbxm_filepath, 
                 prefs['at_origin'], prefs['add_attachment'], prefs['add_motor6d_attachment'],
@@ -220,86 +215,16 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
                 func_rbx_cloud_api, func_rbx_other, func_blndr_api,
                 skip_download=True
             )
-             if objs:
-                all_imported_objects.extend(objs)
 
-    # --- Group Move to Origin Logic ---
-    if prefs['at_origin'] and all_imported_objects:
-        dprint("Applying Group Move to Origin...")
-        
-        # Deselect all first
-        bpy.ops.object.select_all(action='DESELECT')
-        
-        # 1. Find Pivot Object (LowerTorso > Head > First Object)
-        pivot_obj = None
-        
-        # Look for LowerTorso
-        for obj in all_imported_objects:
-            if "LowerTorso" in obj.name: # Name might be prefixed/suffixed
-                pivot_obj = obj
-                break
-        
-        # Look for Head if no LowerTorso
-        if not pivot_obj:
-            for obj in all_imported_objects:
-                if "Head" in obj.name:
-                    pivot_obj = obj
-                    break
-        
-        # Fallback to first object
-        if not pivot_obj:
-            pivot_obj = all_imported_objects[0]
-            
-        dprint(f"Pivot Object: {pivot_obj.name}")
-        
-        # 2. Select All Imported Objects
-        for obj in all_imported_objects:
+    # Cleanup RBXM file if requested
+    if prefs.get('clean_tmp_meshes', False):
+        rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
+        if os.path.exists(rbx_tmp_rbxm_file):
             try:
-                obj.select_set(True)
-            except:
-                pass # Object might be deleted or invalid?
-                
-        # 3. Calculate Translation Vector
-        # We want to move everything so that pivot_obj is at (0,0,0)
-        # Translation = (0,0,0) - pivot_obj.location
-        # Use matrix_world translation
-        translation_vec = -pivot_obj.matrix_world.translation
-        
-        # 4. Apply Translation using Blender Operator (handles hierarchy etc better?)
-        # Or manually update matrix_world for all top-level parents?
-        # If objects are parented, moving parent moves children.
-        # Check if objects satisfy parent-child relationships.
-        # rbx_import usually does not set parenting between parts (except attachments are parented to parts?)
-        # Meshes are usually independent.
-        # So we can just translate everything.
-        
-        # Set Active Object to Pivot for context
-        bpy.context.view_layer.objects.active = pivot_obj
-        
-        bpy.ops.transform.translate(value=translation_vec, orient_type='GLOBAL')
-        
-        dprint(f"Moved {len(all_imported_objects)} objects to origin.")
-    else:
-        # Just highlight them if not moving?
-        # The user said "highlight all the imported objects and bring to blender origin".
-        # If at_origin is False, maybe just Select All is nice?
-        bpy.ops.object.select_all(action='DESELECT')
-        for obj in all_imported_objects:
-             try:
-                obj.select_set(True)
-             except:
-                pass
-
-            
-        # Cleanup RBXM file if requested
-        if prefs.get('clean_tmp_meshes', False):
-            rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
-            if os.path.exists(rbx_tmp_rbxm_file):
-                try:
-                    os.remove(rbx_tmp_rbxm_file)
-                    dprint(f"Cleaned up RBXM: {rbx_tmp_rbxm_file}")
-                except Exception as e:
-                    dprint(f"Error cleaning up RBXM {asset_id}: {e}")
+                os.remove(rbx_tmp_rbxm_file)
+                dprint(f"Cleaned up RBXM: {rbx_tmp_rbxm_file}")
+            except Exception as e:
+                dprint(f"Error cleaning up RBXM {asset_id}: {e}")
 
     dprint(f"Download Finished for {category_name}.")
 

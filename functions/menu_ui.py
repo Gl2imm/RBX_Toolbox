@@ -498,6 +498,12 @@ class TOOLBOX_MENU(bpy.types.Panel):
                             
                             box.prop(rbx_prefs, enum_prop, text="")
                             
+                            if category_name == "Dynamic Head" and getattr(glob_vars, 'rbx_default_head_used', False):
+                                # Manual text wrapping for info message
+                                col_info = box.column(align=True)
+                                col_info.label(text="Dynamic head not found in bundle,", icon='INFO')
+                                col_info.label(text="Default is used.")
+                            
                             # Checkboxes and options are now handling in the pop-up operator
                             
                             box.separator()

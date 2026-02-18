@@ -1,6 +1,7 @@
 import bpy
 import os
 from RBX_Toolbox import glob_vars
+from mathutils import Matrix, Vector
 
 
 #################################
@@ -17,7 +18,7 @@ def blender_api_import_obj(obj_filepath):
 
 
 
-def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cframe, cframe_pivot, rbx_choice_at_origin, mesh_reader, funct, mesh_name=None, is_accessory=False):
+def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cframe, cframe_pivot, rbx_choice_at_origin, mesh_reader, funct, mesh_name=None):
 	if mesh_name:
 		true_name = mesh_name
 	else:
@@ -35,17 +36,42 @@ def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cfram
 	bpy.context.view_layer.objects.active = bpy.data.objects[rbx_obj.name]
 
 	blender_matrix = funct.cframe_to_blender_matrix(cframe)
-	print(f"DEBUG: Converting matrix for object: {rbx_obj.name}")
 	oriented_blender_matrix = funct.blender_matrix_axis_conversion(blender_matrix)
+
+	print(f"DEBUG_ORIGIN: Name={true_name}")
+	print(f"  CFrame (Roblox): {cframe}")
+	print(f"  PivotOffset (Roblox): {cframe_pivot}")
+
+	# Calculate Pivot Offset Vector (Raw Local Space)
+	blender_matrix_pivot = funct.cframe_to_blender_matrix(cframe_pivot)
+	raw_local_pivot = blender_matrix_pivot.translation
+
+	# Shift Mesh Data so that Origin is at Pivot Point
+	# We move vertices by -PivotOffset (in Local Space)
+	rbx_obj.data.transform(Matrix.Translation(-raw_local_pivot))
+	
+	# Rotate the Pivot Vector by Object Rotation to get World Space Offset
+	rot_mat = oriented_blender_matrix.to_3x3()
+	rotated_pivot_vector = rot_mat @ raw_local_pivot
+	
+	# Adjust Object Matrix to be at World Pivot Location
+	# New Pos = Old Pos + Rotated Pivot Offset
+	oriented_blender_matrix.translation += rotated_pivot_vector
 
 	# Apply the matrix to object (world transform)
 	rbx_obj.matrix_world = oriented_blender_matrix
+	
+	### Spawn at origin
+	if rbx_choice_at_origin:
+		# Simply reset translation to 0,0,0
+		# Since Origin IS the Pivot, this places Pivot at World Origin.
+		rbx_obj.matrix_world.translation = (0.0, 0.0, 0.0)
 
 	return rbx_obj
 
 
 
-def blender_api_add_attachments(mesh_part_attachment, mesh_part_attachment_cframe, part_cframe, part_cframe_pivot, rbx_bndl_char_choice_at_origin, funct, is_accessory=False):
+def blender_api_add_attachments(mesh_part_attachment, mesh_part_attachment_cframe, part_cframe, part_cframe_pivot, rbx_bndl_char_choice_at_origin, funct):
 	bpy.ops.mesh.primitive_uv_sphere_add(segments=8, ring_count=8, radius=1, enter_editmode=False, align='WORLD', location=(0, 0, 0), scale=(0.15, 0.15, 0.15))
 	bpy.ops.object.shade_smooth()
 	mesh_part_attachment_obj = bpy.context.selected_objects[0]
@@ -57,29 +83,51 @@ def blender_api_add_attachments(mesh_part_attachment, mesh_part_attachment_cfram
 
 	# Get main mesh location
 	blender_matrix_parent = funct.cframe_to_blender_matrix(part_cframe)
-	print(f"DEBUG: Converting parent matrix for attachment: {mesh_part_attachment_obj.name}")
 	oriented_blender_matrix_parent = funct.blender_matrix_axis_conversion(blender_matrix_parent)
 	
-	# Store Parent Matrix
-	parent_matrix = oriented_blender_matrix_parent.copy()
+	# Apply mesh matrix to attachment (world transform)
+	# NOTE: Mesh Origin is now at Pivot Point! 
+	# So 'oriented_blender_matrix_parent' (derived from Part CFrame Center) is NOT where the Mesh Object Origin is.
+	# We need to construct the matrix of the Mesh Object (at Pivot).
+	
+	blender_matrix_pivot = funct.cframe_to_blender_matrix(part_cframe_pivot)
+	raw_local_pivot = blender_matrix_pivot.translation
+	
+	rot_mat = oriented_blender_matrix_parent.to_3x3()
+	rotated_pivot_vector = rot_mat @ raw_local_pivot
+	
+	# Shift Parent Matrix to Pivot Location
+	oriented_blender_matrix_parent.translation += rotated_pivot_vector
+	
+	# Apply final parent matrix to attachment object temporarily (as base)
+	mesh_part_attachment_obj.matrix_world = oriented_blender_matrix_parent
 
-	# Apply the (potentially modified) parent matrix to the attachment object
-	mesh_part_attachment_obj.matrix_world = parent_matrix
+	# Apply mesh matrix to attachment if spawn at origin
+	if rbx_bndl_char_choice_at_origin:
+		# Reset Parent Translation to (0,0,0)
+		oriented_blender_matrix_parent.translation = (0.0, 0.0, 0.0)
+		mesh_part_attachment_obj.matrix_world.translation = (0.0, 0.0, 0.0)
 
-	# Add in attachment own offset
-	blender_matrix_attachment = funct.cframe_to_blender_matrix(mesh_part_attachment_cframe)
-	print(f"DEBUG: Converting attachment matrix: {mesh_part_attachment_obj.name}")
-	oriented_blender_matrix_attachment = funct.blender_matrix_axis_conversion(blender_matrix_attachment)
+	# Calculate Attachment Offset relative to Pivot
+	# Attachment World Matrix = Parent(at Pivot) @ Translation(-PivotOffset) @ AttachmentLocal
+	# PivotOffset here must be RAW LOCAL because it's applied in Local Space of the Parent.
+	
+	offset_matrix = Matrix.Translation(-raw_local_pivot)
+	
+	# Get Attachment Local Matrix
+	blender_matrix_att = funct.cframe_to_blender_matrix(mesh_part_attachment_cframe)
+	oriented_blender_matrix_att = funct.blender_matrix_axis_conversion(blender_matrix_att)
+	
+	# Combine Matrices: Parent(at Pivot) @ Offset(to Center) @ Attachment(from Center)
+	final_matrix = oriented_blender_matrix_parent @ offset_matrix @ oriented_blender_matrix_att
 
 	# Apply the matrix to object (world transform)
-	mesh_part_attachment_obj.matrix_world.translation = mesh_part_attachment_obj.matrix_world.translation + oriented_blender_matrix_attachment.translation
+	mesh_part_attachment_obj.matrix_world = final_matrix
 										
-	return mesh_part_attachment_obj
 
 
 
 def blender_api_add_ver_col(rbx_obj, mesh_data):
-	#print(mesh_data)
 	## Adding Vertex Colors
 	obj_mesh = rbx_obj.data
 	# Ensure a vertex color layer

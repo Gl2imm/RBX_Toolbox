@@ -135,6 +135,7 @@ class RBX_OT_import_discovery(bpy.types.Operator):
 
             # Reset and populate discovered items
             glob_vars.discovered_items_data = {cat: [] for cat in glob_vars.supported_assets}
+            glob_vars.rbx_default_head_used = False
             
             if rbx_bundledItems:
                 for item in rbx_bundledItems:
@@ -149,13 +150,15 @@ class RBX_OT_import_discovery(bpy.types.Operator):
                                 })
                                 break # Stop after finding the category
             
-            # Logic: If Character Bundle (Type 1) AND No Dynamic Head -> Use Default (ID 10638267973)
+            # Logic: If Character Bundle (Type 1) AND No Dynamic Head -> Use Default (ID 10687288296)
+            # Since Type 17 is now in "Dynamic Head" category, if it's found, get("Dynamic Head") will be truthy.
             if rbx_asset_type_id == 1 and not glob_vars.discovered_items_data.get("Dynamic Head"):
-                dprint("No Dynamic Head found for Character Bundle. Adding Default (ID 10638267973).")
+                dprint("No Dynamic Head found for Character Bundle. Adding Default (ID 10687288296).")
                 glob_vars.discovered_items_data["Dynamic Head"].append({
-                    'id': 10638267973, # Default Dynamic Head ID
-                    'name': "Stevie Standard (Default)"
+                    'id': 10687288296, # Default Dynamic Head ID
+                    'name': "Dylan Standard (Default)"
                 })
+                glob_vars.rbx_default_head_used = True
 
             dprint("Grouped Items:", glob_vars.discovered_items_data)
 
@@ -183,6 +186,7 @@ class RBX_OT_import_reset(bpy.types.Operator):
         
         # Clear discovered items
         glob_vars.discovered_items_data = {}
+        glob_vars.rbx_default_head_used = False
 
         self.report({'INFO'}, "Import (Beta) Reset")
         return {'FINISHED'}

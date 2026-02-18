@@ -136,20 +136,24 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
     # Process extracted parts
     # Check/Create Main Asset Collection
     
-    # Determine Collection Name: Use Parent Name if available (e.g. Bundle Name), else Asset Name
+    # Determine Collection Name
+    # Determine Collection Name
     if parent_name:
         collection_name = func_rbx_other.replace_restricted_char(parent_name)
     else:
         collection_name = asset_clean_name
 
     if add_meshes:
-        # User Request: "Accessories should be added to their own collection 'Accessories' inside main item collection."
-        sub_collection_name = "Accessories" if acc_obj else "Body Parts"
-        
-        # Use helper to create or retrieve collection AND set it as active
-        rbx_meshes_col = func_blndr_api.blender_api_create_collection(sub_collection_name, collection_name)
+        if acc_obj:
+            # Hierarchy: Main -> Accessories -> AssetName -> Object
+            acc_main_col = func_blndr_api.blender_api_create_collection("Accessories", collection_name)
+            # Create specific collection for this accessory inside Accessories
+            rbx_meshes_col = func_blndr_api.blender_api_create_collection(asset_clean_name, acc_main_col.name)
+        else:
+            # Hierarchy: Main -> Body Parts -> Object
+            rbx_meshes_col = func_blndr_api.blender_api_create_collection("Body Parts", collection_name)
 
-    created_objects = []
+
 
     for mesh_part, mesh_name in mesh_parts_to_process:
         dprint(f"  - Processing MeshPart: {mesh_name}")
@@ -198,12 +202,35 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
             # We pass 'at_origin' but it is ignored by the blender_api function for individual placement.
             # Effectively we are placing everything at World Coordinates first.
             
+            # Check if Pivot is Identity
+            # If so, disable "Spawn at Origin" for this mesh
+            actual_at_origin = at_origin
+            if part_cframe_pivot:
+                pivot_comps = part_cframe_pivot.GetComponents()
+                identity_comps = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+                is_identity = True
+                if len(pivot_comps) == 12:
+                    for a, b in zip(pivot_comps, identity_comps):
+                        if abs(a - b) > 0.0001: 
+                            is_identity = False
+                            break
+                            
+                # Special Case: Accessories
+                # Accessories often have Identity Pivot on Handle but should still respect "Spawn at Origin"
+                # because the user wants them centered, not at World Position.
+                is_accessory = False
+                if mesh_part.Parent and mesh_part.Parent.ClassName == "Accessory":
+                    is_accessory = True
+
+                if is_identity and not is_accessory:
+                    actual_at_origin = False
+
+            
             rbx_obj = None
             if add_meshes:
                 rbx_obj = func_blndr_api.blender_api_add_meshes_as_obj(
                     bundle_own_folder, mesh_part, mesh_data, cframe, part_cframe_pivot, 
-                    at_origin, mesh_reader, funct, mesh_name=mesh_name,
-                    is_accessory=(acc_obj is not None)
+                    actual_at_origin, mesh_reader, funct, mesh_name=mesh_name
                 )
             
             # Add Vertex Colors
@@ -228,9 +255,6 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
                     if col != rbx_meshes_col:
                         col.objects.unlink(rbx_obj)
             
-            if rbx_obj:
-                created_objects.append(rbx_obj)
-
             # Append to cleanup list for .mesh files
             rbx_meshes_to_clean_up_lst.append(mesh_name)
 
@@ -241,8 +265,8 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
     # Cleanup (per asset)
     if prefs.get('clean_tmp_meshes', False):
          func_rbx_other.cleanup_tmp_files(rbx_meshes_to_clean_up_lst, ".mesh")
-
-    return created_objects
+    
+    return
 
 def process_dynamic_head(headers: dict, rbx_tmp_rbxm_filepath: str, rbxm_file, 
                          func_rbx_cloud_api, rbxm_id: str):

@@ -136,8 +136,8 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     ) # type: ignore
 
     rbx_bndl_char_choice_add_attachment : bpy.props.BoolProperty(
-    name="Accessory Attachments",
-    description="Accessory Attachments property",
+    name="Body Attachments",
+    description="Body Attachments property",
     default = False
     ) # type: ignore
 

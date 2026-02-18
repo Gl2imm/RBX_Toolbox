@@ -149,6 +149,7 @@ rbx_is_bundle = False
 rbx_is_bundled_item = False
 
 rbx_imp_error = None
+rbx_default_head_used = False
 discovered_items_data = {}
 
 
@@ -264,9 +265,9 @@ rbx_bundle_types = {
 ### Only when you getting direct assets or LC, not bundles
 supported_assets = {
     "Gear"          : [19],
-    "Accessory"     : [8,41,42,43,44,45,46,47],
+    "Accessory"     : [8,41,42,43,44,45,46,47,76,77],
     "Layered Cloth" : [64,65,66,67,68,69,70,71,72],
-    "Dynamic Head"  : [79],
+    "Dynamic Head"  : [79, 17],
     "Body Parts"    : [27,28,29,30,31]
     }
 

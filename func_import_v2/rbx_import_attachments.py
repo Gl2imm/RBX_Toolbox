@@ -42,7 +42,7 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
         pass
 
     if not TYPE_CHECKING:
-        from RobloxFiles import RobloxFile, Folder, MeshPart, Attachment, SpecialMesh, Accessory, Part # type: ignore
+        from RobloxFiles import RobloxFile, Folder, MeshPart, Attachment, Accessory # type: ignore
 
     # === CASE 1: Target is Asset ID (Polymorphic Entry) ===
     if isinstance(target, int) or (isinstance(target, str) and str(target).isdigit()):
@@ -72,63 +72,22 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
             return
 
         R15Fixed = rbxm_file.FindFirstChild[Folder]("R15Fixed")
-        acc_obj = rbxm_file.FindFirstChildOfClass[Accessory]()
         
         parts_to_process = []
+        is_accessory = False # Default to False, updated if Accessory found
 
-        if acc_obj:
-            dprint(f"Accessory found: {acc_obj.Name}")
-            acc_mesh_part = acc_obj.FindFirstChildOfClass[MeshPart]()
-
-            if acc_mesh_part:
-                 parts_to_process.append((acc_mesh_part, acc_mesh_part.Name))
-            else:
-                dprint("Accessory found but no MeshPart inside.")
-        
-        elif not R15Fixed:
-            dprint(f"No R15Fixed folder found using standard check. Checking for Dynamic Head SpecialMesh...")
-            
-            # Check for SpecialMesh "Mesh" (Raw Dynamic Head)
-            special_mesh = rbxm_file.FindFirstChild[SpecialMesh]("Mesh")
-            if special_mesh:
-                dprint("Special Mesh 'Mesh' found, attempting to upgrade to Dynamic Head MeshPart...")
-                
-                # Re-download as avatar_meshpart_head
-                asset_data, rbx_imp_error = func_rbx_cloud_api.get_asset_data(asset_id, headers, RobloxAssetFormat="avatar_meshpart_head")
-                
-                if not rbx_imp_error and asset_data:
-                    # Overwrite temp file with new data
-                    try:
-                        with open(rbx_tmp_rbxm_file, "wb") as f:
-                            f.write(asset_data)
-                        
-                        # Re-open the file
-                        rbxm_file = RobloxFile.Open(rbx_tmp_rbxm_file)
-                        head_part = rbxm_file.FindFirstChild[MeshPart]("Head")
-                        
-                        if head_part:
-                             dprint("Successfully upgraded to Dynamic Head MeshPart 'Head'. Processing...")
-                             parts_to_process.append((head_part, "Head"))
-                        else:
-                            dprint("Downloaded data but 'Head' MeshPart not found.")
-                            return
-                    except Exception as e:
-                        dprint(f"Error re-processing dynamic head RBXM: {e}")
-                        return
-                else:
-                    dprint(f"Failed to download avatar_meshpart_head: {rbx_imp_error}")
-                    return
-
-            else:
-                 # Check if we already have a Head MeshPart (maybe it was already processed/cached?)
-                head_part = rbxm_file.FindFirstChild[MeshPart]("Head")
-                if head_part:
-                    dprint("Found Dynamic Head MeshPart 'Head' directly. Processing...")
-                    parts_to_process.append((head_part, "Head"))
-                else:
-                    return
-        else:    
+        if R15Fixed:
             dprint(f"Found R15Fixed folder. Checking children...")
+            # Create folder structure for the bundle
+            main_collection_name = glob_vars.rbx_asset_name if glob_vars.rbx_asset_name else "Imported Body Parts"
+            main_collection_name = func_rbx_other.replace_restricted_char(main_collection_name)
+            
+            target_bundle_folder = os.path.join(bundle_own_folder, main_collection_name) if 'Imported Body Parts' in bundle_own_folder else bundle_own_folder
+            
+            if not os.path.exists(target_bundle_folder):
+                    if not os.path.exists(bundle_own_folder): # Safe check
+                        os.makedirs(bundle_own_folder)
+
             # Loop children
             rbx_avatar_bundle_parts = [
                     "LeftUpperArm", "LeftLowerArm", "LeftHand",
@@ -137,46 +96,76 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
                     "RightUpperLeg", "RightLowerLeg", "RightFoot",
                     "UpperTorso", "LowerTorso", "Head"
                 ]
-            
+
             for part_name in rbx_avatar_bundle_parts:
                 mesh_part = R15Fixed.FindFirstChild[MeshPart](part_name)
                 if mesh_part:
                     parts_to_process.append((mesh_part, part_name))
+        else:
+
+            children = rbxm_file.GetChildren()
+            child_names = [c.Name for c in children]
+            child_types = [type(c).__name__ for c in children]
+            dprint(f"RBXM Children: {child_names} Types: {child_types}")
             
-        dprint(f"Found R15Fixed folder. Checking children...")
+            head_part = rbxm_file.FindFirstChild[MeshPart]("Head")
+            if head_part:
+                dprint("Found Head MeshPart. Processing as Dynamic Head.")
+                # For dynamic head, the bundle folder is the target
+                target_bundle_folder = bundle_own_folder 
+                parts_to_process.append((head_part, "Head"))
+            else:
 
-        # Create folder structure for the bundle
-        main_collection_name = glob_vars.rbx_asset_name if glob_vars.rbx_asset_name else "Imported Body Parts"
-        main_collection_name = func_rbx_other.replace_restricted_char(main_collection_name)
-        
-        target_bundle_folder = os.path.join(bundle_own_folder, main_collection_name) if 'Imported Body Parts' in bundle_own_folder else bundle_own_folder
-        
-        if not os.path.exists(target_bundle_folder):
-                if not os.path.exists(bundle_own_folder): # Safe check
-                    os.makedirs(bundle_own_folder)
+                 # Fallback: check all children for MeshParts (e.g. Accessories with "Handle")
+                 dprint("No Head MeshPart found. Checking all children for MeshParts...")
+                 target_bundle_folder = bundle_own_folder
+                 
+                 found_any = False
+                 # User requested loop with break
+                 is_accessory = False
+                 for child in children:
+                     # 1. Check if child is an Accessory (container)
+                     if child.ClassName == "Accessory":
+                         is_accessory = True
+                         for acc_child in child.GetChildren():
+                             if acc_child.ClassName == "MeshPart":
+                                 dprint(f"Found Accessory MeshPart: {acc_child.Name}")
+                                 parts_to_process.append((acc_child, acc_child.Name))
+                                 found_any = True
+                                 break # Stop searching inside this Accessory
+                         
+                         if found_any:
+                             break # Stop searching other children if found an Accessory Handle
+                             
+                         # If found accessory but not handle, reset is_accessory? 
+                         # Actually if we fallback to generic MeshPart next, it might not be accessory.
+                         if not found_any: is_accessory = False
+                     
+                     # 2. Check if child is directly a MeshPart
+                     elif child.ClassName == "MeshPart":
+                         dprint(f"Found generic MeshPart: {child.Name}")
+                         parts_to_process.append((child, child.Name))
+                         found_any = True
+                         break # Stop searching
 
-        dprint(f"Starting Attachments loop.")
-        created_objects = []
+                 if not parts_to_process:
+                     dprint(f"No MeshParts found in {asset_clean_name if asset_clean_name else str(asset_id)}")
+                     return
+
         for mesh_part, part_name in parts_to_process:
-            dprint(f"Attachments Loop - Processing {part_name}")
-            objs = _process_single_attachment(
+            dprint(f"  -> Found Body Part: {part_name}, checking for attachments...")
+            # Process single attachment
+            _process_single_attachment(
                 mesh_part, part_name, target_bundle_folder, headers, 
                 asset_clean_name, at_origin, add_attachment, add_motor6d_attachment, funct, func_blndr_api, func_rbx_other,
-                is_accessory=(acc_obj is not None)
+                is_accessory=is_accessory
             )
-            created_objects.extend(objs)
         
-        return created_objects
+        return
     
     # === CASE 2: Target is MeshPart (Called from Bundle Importer) ===
     else:
         # Assuming target is a MeshPart object (or duck-typed enough)
-        # Bundle importer (rbx_import_meshes) might call this? No, it calls download_and_apply_attachments?
-        # Actually this function `download_and_apply_attachments` is called from download manager.
-        # So CASE 2 is when target is object. Download manager passes ID (CASE 1).
-        # CASE 2 seems unused or legacy? Loop above says "Called from Bundle Importer". 
-        # But `rbx_import_meshes` doesn't seem to call this.
-        # If it is used, `Accessory` variable is not available here. `is_accessory` default False.
         if hasattr(target, "FindFirstChild"):
              _process_single_attachment(
                 target, mesh_name, bundle_own_folder, headers, 
@@ -189,8 +178,8 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
 
 
 def _process_single_attachment(mesh_part, mesh_name, bundle_own_folder, headers, 
-                         asset_clean_name, at_origin, add_attachment, add_motor6d_attachment, funct, func_blndr_api, func_rbx_other,
-                         is_accessory=False):
+                          asset_clean_name, at_origin, add_attachment, add_motor6d_attachment, funct, func_blndr_api, func_rbx_other,
+                          is_accessory=False):
 
     # Unpack Preferences
     # at_origin is passed directly
@@ -210,25 +199,48 @@ def _process_single_attachment(mesh_part, mesh_name, bundle_own_folder, headers,
         from RobloxFiles.DataTypes import CFrame as RbxCFrame
         part_cframe_pivot = RbxCFrame()
 
+    # Check if pivot is identity
+    pivot_comps = part_cframe_pivot.GetComponents()
+    identity_comps = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    is_identity = True
+    if len(pivot_comps) == 12:
+        for a, b in zip(pivot_comps, identity_comps):
+            if abs(a - b) > 0.0001: 
+                is_identity = False
+                break
+    
+    # If pivot is identity, force at_origin to False
+    # UNLESS it is an Accessory, which we want to center even if identity
+    actual_at_origin = at_origin
+    if is_identity and not is_accessory:
+        actual_at_origin = False
+
+        
     # Calculate main collection name if not available or passed
     main_collection_name = glob_vars.rbx_asset_name if glob_vars.rbx_asset_name else "Imported Body Parts"
     main_collection_name = func_rbx_other.replace_restricted_char(main_collection_name)
-
-    created_objects = []
 
     # Logic from backup: Split into "Accessory Attachments" and "Motor6D Attachments"
     
     # 1. Accessory Attachments
     if add_attachment:
-        if is_accessory:
-            # User Request: "Attachments for accessories should be added in 'Attachment' Collection but inside 'Accessories' collection"
-            # Ensure Accessories collection exists inside Main
-            acc_col = func_blndr_api.blender_api_create_collection("Accessories", main_collection_name)
-            # Create Attachments inside Accessories
-            attachments_collection = func_blndr_api.blender_api_create_collection("Attachments", "Accessories")
-        else:
-             attachments_collection = func_blndr_api.blender_api_create_collection("Accessory Attachments", main_collection_name)
-             
+        att_col_name = f"{asset_clean_name}_Attachments" if is_accessory else "Body Attachments"
+        # If accessory, create collection inside the accessory's own folder/collection?
+        # The user said: "current case when i downloading accessories attachments this folder should be inside this accessories collection"
+        # bundle_own_folder is passed in. If it's an accessory, bundle_own_folder usually points to its folder.
+        
+        # We use main_collection_name as parent? 
+        # rbx_import_download_manager passes 'asset_clean_name' as bundle_own_folder or similar?
+        # Re-check download manager call: it passes bundles_folder which is root? 
+        # modifying main_collection_name to be passed bundle_own_folder if feasible?
+        # Actually blender_api_create_collection takes (name, parent_col_name). 
+        # If we want it nested in the accessory folder, we need the accessory folder name.
+        
+        # If is_accessory, we trust bundle_own_folder is correct or we use asset_clean_name?
+        # Using asset_clean_name as parent collection seems safer for accessories if they have their own collection.
+        parent_col_name = asset_clean_name if is_accessory else main_collection_name
+        
+        attachments_collection = func_blndr_api.blender_api_create_collection(att_col_name, parent_col_name)
         existing_attachment_names = set(obj.name for obj in attachments_collection.objects)
 
         for child in mesh_part.GetChildren():
@@ -241,11 +253,10 @@ def _process_single_attachment(mesh_part, mesh_name, bundle_own_folder, headers,
                         continue
 
                     dprint(f"    -> Found Attachment: {child.Name} in {mesh_name}")
-                    obj = func_blndr_api.blender_api_add_attachments(
+                    func_blndr_api.blender_api_add_attachments(
                         child, child.CFrame, cframe, part_cframe_pivot, 
-                        at_origin, funct
+                        actual_at_origin, funct
                     )
-                    created_objects.append(obj)
 
     # 2. Motor6D Attachments
     if add_motor6d_attachment:
@@ -262,10 +273,7 @@ def _process_single_attachment(mesh_part, mesh_name, bundle_own_folder, headers,
                         continue
 
                     dprint(f"    -> Found Motor6D Attachment: {child.Name} in {mesh_name}")
-                    obj = func_blndr_api.blender_api_add_attachments(
+                    func_blndr_api.blender_api_add_attachments(
                         child, child.CFrame, cframe, part_cframe_pivot, 
-                        at_origin, funct
+                        actual_at_origin, funct
                     )
-                    created_objects.append(obj)
-    
-    return created_objects

@@ -593,8 +593,7 @@ def write_obj_from_mesh_json(mesh, out_path, lod_index=0, object_name="mesh"):
     UV = mesh.get("uvs")                  # flat [u,v,...]       (optional)
     F  = mesh["faces"]                    # flat [i0,i1,i2, i3,i4,i5, ...] (0-based)
     LOD = mesh.get("lods") or [0, len(F)//3]  # fallback: single range if no LODs present
-    if float(ver) == 1.00:
-        flip_v=True
+    # choose one LOD's face range
 
 
     # choose one LOD's face range

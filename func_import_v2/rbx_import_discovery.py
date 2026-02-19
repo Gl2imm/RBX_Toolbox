@@ -58,6 +58,14 @@ class RBX_OT_import_discovery(bpy.types.Operator):
         importlib.reload(func_rbx_cloud_api)
         from . import func_rbx_api
         importlib.reload(func_rbx_api)
+        from . import rbx_import_download_manager
+        importlib.reload(rbx_import_download_manager)
+        from . import rbx_import_meshes
+        importlib.reload(rbx_import_meshes)
+        from . import rbx_import_cages
+        importlib.reload(rbx_import_cages)
+        from . import rbx_import_attachments
+        importlib.reload(rbx_import_attachments)
 
 
         # Enable Beta Mode (Gray out input)
@@ -162,6 +170,58 @@ class RBX_OT_import_discovery(bpy.types.Operator):
 
             dprint("Grouped Items:", glob_vars.discovered_items_data)
 
+            # --- Thumbnail Preview Implementation ---
+            # 1. Clean Name
+            rbx_asset_name_clean = func_rbx_other.replace_restricted_char(rbx_asset_name)
+            glob_vars.rbx_asset_name_clean = rbx_asset_name_clean
+            
+            # 2. Determine if bundle
+            is_bundle = (rbx_asset_type_id in glob_vars.rbx_bundle_types.keys())
+            # Also check if it was treated as a single asset with fake bundle list
+            if len(rbx_bundledItems) == 1 and rbx_bundledItems[0]['id'] == int(rbx_asset_id):
+                 # It was a single asset, but let's double check type. 
+                 # If type in bundle types, it is bundle. If in asset types, it is asset.
+                 # However, get_asset_and_bundle_img_url expects boolean. 
+                 # rbx_asset_type_id comes from get_catalog_bundle_data or get_catalog_asset_data.
+                 pass
+
+            # 3. Get URL
+            img_url, img_error = func_rbx_api.get_asset_and_bundle_img_url(rbx_asset_id, is_bundle)
+            
+            if not img_error and img_url:
+                # 4. Get Image Data
+                img_data, img_error = func_rbx_api.get_asset_and_bundle_img(img_url)
+                
+                if not img_error and img_data:
+                    # 5. Save to Tmp
+                    try:
+                        # Clear old image if exists
+                        old_img = bpy.data.images.get(rbx_asset_name_clean + ".png")
+                        if old_img:
+                            bpy.data.images.remove(old_img)
+                            
+                        # Ensure tmp folder
+                        tmp_dir = os.path.join(glob_vars.addon_path, glob_vars.rbx_import_main_folder, 'tmp')
+                        if not os.path.exists(tmp_dir):
+                            os.makedirs(tmp_dir)
+                            
+                        img_path = os.path.join(tmp_dir, rbx_asset_name_clean + ".png")
+                        
+                        with open(img_path, "wb") as f:
+                            f.write(img_data)
+                            
+                        # 6. Load into Blender
+                        bpy.data.images.load(img_path)
+                        dprint(f"Thumbnail loaded: {img_path}")
+                        
+                    except Exception as e:
+                        dprint(f"Error saving/loading thumbnail: {e}")
+                else:
+                    dprint(f"Error getting image data: {img_error}")
+            else:
+                 dprint(f"Error getting image URL: {img_error}")
+
+
         return {'FINISHED'}
 
 
@@ -221,6 +281,14 @@ class RBX_OT_import_discovery_download(bpy.types.Operator):
         if self.category == "Accessory" or self.category == "ALL_CATEGORIES":
              self.report({'INFO'}, "Downloading Accessories...")
              rbx_import_download_manager.download_body_parts(context, category_name="Accessory", download_all=download_all_items)
+
+        if self.category == "Layered Cloth" or self.category == "ALL_CATEGORIES":
+             self.report({'INFO'}, "Downloading Layered Cloth...")
+             rbx_import_download_manager.download_body_parts(context, category_name="Layered Cloth", download_all=download_all_items)
+
+        if self.category == "Gear" or self.category == "ALL_CATEGORIES":
+             self.report({'INFO'}, "Downloading Gears...")
+             rbx_import_download_manager.download_body_parts(context, category_name="Gear", download_all=download_all_items)
 
         return {'FINISHED'}
 
@@ -293,6 +361,11 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
             row.prop(rbx_prefs, 'rbx_accessory_choice_add_textures')
             
             box.prop(rbx_prefs, 'rbx_accessory_choice_add_attachment')
+            
+            row = box.row()
+            # Gray out if Accessory Attachments not selected
+            row.enabled = rbx_prefs.rbx_accessory_choice_add_attachment
+
             # No Motor6D or Cages for now as per user request ("except cages, motor6d")
             
             row = box.row()
@@ -301,14 +374,51 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
             
             box.prop(rbx_prefs, 'rbx_accessory_choice_clean_tmp_meshes')
 
+        if category == "Layered Cloth":
+            box.prop(rbx_prefs, 'rbx_lc_choice_at_origin') 
+            box.prop(rbx_prefs, 'rbx_lc_choice_add_meshes')
+            
+            row = box.row()
+            row.enabled = rbx_prefs.rbx_lc_choice_add_meshes
+            row.prop(rbx_prefs, 'rbx_lc_choice_add_textures')
+            
+            box.prop(rbx_prefs, 'rbx_lc_choice_add_cages')
+            
+            box.prop(rbx_prefs, 'rbx_lc_choice_add_attachment')
+            
+            row = box.row()
+            # Gray out if Attachments not selected
+            row.enabled = rbx_prefs.rbx_lc_choice_add_attachment
+
+            
+            row = box.row()
+            row.enabled = rbx_prefs.rbx_lc_choice_add_meshes or rbx_prefs.rbx_lc_choice_add_cages
+            row.prop(rbx_prefs, 'rbx_lc_choice_add_ver_col')
+            
+            box.prop(rbx_prefs, 'rbx_lc_choice_clean_tmp_meshes')
+
+        if category == "Gear":
+            box.prop(rbx_prefs, 'rbx_gears_choice_at_origin') 
+            box.prop(rbx_prefs, 'rbx_gears_choice_add_meshes')
+            
+            row = box.row()
+            row.enabled = rbx_prefs.rbx_gears_choice_add_meshes
+            row.prop(rbx_prefs, 'rbx_gears_choice_add_textures')
+            
+            box.prop(rbx_prefs, 'rbx_gears_choice_clean_tmp_meshes')
+
         # Generic Checkbox Loop
         if category in category_checkboxes:
             for prop_name in category_checkboxes[category]:
                 # Skip properties already manually handled for certain categories
                 if category == "Body Parts": 
                     continue 
+                if category == "Layered Cloth":
+                    continue
                 if category == "Dynamic Head" and prop_name == "rbx_enum_dynamic_head":
                      # rbx_enum_dynamic_head is the dropdown, usually shown in main panel, but we iterate here
+                     continue
+                if category == "Gear" and prop_name == "rbx_enum_gear":
                      continue
                 if hasattr(rbx_prefs, prop_name):
                     box.prop(rbx_prefs, prop_name)

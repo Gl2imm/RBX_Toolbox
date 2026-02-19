@@ -483,6 +483,16 @@ class TOOLBOX_MENU(bpy.types.Panel):
                             box.label(text=f"Type: {glob_vars.rbx_asset_type}")
                         if glob_vars.rbx_asset_creator:
                             box.label(text=f"Creator: {glob_vars.rbx_asset_creator}")
+
+                        # Thumbnail Preview
+                        try:
+                            if glob_vars.rbx_asset_name_clean:
+                                rbx_asset_img_prev = bpy.data.images.get(glob_vars.rbx_asset_name_clean + ".png")
+                                if rbx_asset_img_prev:
+                                    rbx_asset_img_prev.preview_ensure()
+                                    box.template_icon(rbx_asset_img_prev.preview.icon_id, scale=10.0)
+                        except:
+                            pass
                         
                         # Import the configuration
                         from RBX_Toolbox.func_import_v2 import rbx_import_discovery as discovery_config
@@ -493,8 +503,11 @@ class TOOLBOX_MENU(bpy.types.Panel):
                             
                             # Header Row: Label + Options Button
                             row_header = box.row()
+                            row_header.alert = True
                             row_header.label(text=category_name, icon=icon)
                             row_header.operator("object.rbx_import_discovery_options", text="", icon='PREFERENCES').category = category_name
+                            
+                            box.separator()
                             
                             box.prop(rbx_prefs, enum_prop, text="")
                             

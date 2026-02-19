@@ -85,6 +85,10 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         selected_item_id = rbx_prefs.rbx_enum_dynamic_head
     elif category_name == "Accessory":
         selected_item_id = rbx_prefs.rbx_enum_accessory
+    elif category_name == "Layered Cloth":
+        selected_item_id = rbx_prefs.rbx_enum_layered_cloth
+    elif category_name == "Gear":
+        selected_item_id = rbx_prefs.rbx_enum_gear
     else:
         selected_item_id = rbx_prefs.rbx_enum_body_parts
     
@@ -145,8 +149,33 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
             'add_cages': False, # Explicitly False per user request
             'add_attachment': rbx_prefs.rbx_accessory_choice_add_attachment,
             'add_motor6d_attachment': False, # Explicitly False per user request
-            'add_ver_col': False, # Explicitly False per user request
-            'clean_tmp_meshes': rbx_prefs.rbx_accessory_choice_clean_tmp_meshes
+            'add_ver_col': rbx_prefs.rbx_accessory_choice_add_ver_col,
+            'clean_tmp_meshes': rbx_prefs.rbx_accessory_choice_clean_tmp_meshes,
+
+        }
+    elif category_name == "Layered Cloth":
+        prefs = {
+            'at_origin': rbx_prefs.rbx_lc_choice_at_origin,
+            'add_meshes': rbx_prefs.rbx_lc_choice_add_meshes,
+            'add_textures': rbx_prefs.rbx_lc_choice_add_textures,
+            'add_cages': rbx_prefs.rbx_lc_choice_add_cages,
+            'add_attachment': rbx_prefs.rbx_lc_choice_add_attachment,
+            'add_motor6d_attachment': False, 
+            'add_ver_col': rbx_prefs.rbx_lc_choice_add_ver_col,
+            'clean_tmp_meshes': rbx_prefs.rbx_lc_choice_clean_tmp_meshes,
+
+        }
+    elif category_name == "Gear":
+        prefs = {
+            'at_origin': rbx_prefs.rbx_gears_choice_at_origin,
+            'add_meshes': rbx_prefs.rbx_gears_choice_add_meshes,
+            'add_textures': rbx_prefs.rbx_gears_choice_add_textures,
+            'add_cages': False,
+            'add_attachment': False,
+            'add_motor6d_attachment': False, 
+            'add_ver_col': False,
+            'clean_tmp_meshes': rbx_prefs.rbx_gears_choice_clean_tmp_meshes,
+
         }
     else: # Default to Body Parts / Bundles
         prefs = {
@@ -173,6 +202,8 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
             asset_format = "avatar_meshpart_head"
         elif category_name == "Accessory":
             asset_format = "avatar_meshpart_accessory"
+        elif category_name == "Layered Cloth":
+            asset_format = "avatar_meshpart_accessory" # Layered Cloth are accessories
             
         success = ensure_local_asset(asset_id, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=asset_format)
         if not success:
@@ -180,6 +211,8 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
             continue
 
         # 1. Process Meshes
+        is_layered_clothing = (category_name == "Layered Cloth")
+        
         if prefs['add_meshes']:
             parent_name = glob_vars.rbx_asset_name
             # if category_name == "Accessory":
@@ -189,7 +222,7 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
                 bundles_folder, rbx_tmp_rbxm_filepath, 
                 mesh_reader, funct, func_rbx_cloud_api, func_rbx_other, func_blndr_api,
                 parent_name=parent_name,
-                skip_download=True
+                skip_download=True, is_layered_clothing=is_layered_clothing
             )
             
         if prefs['add_cages']:
@@ -201,7 +234,7 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
                 prefs['at_origin'], prefs['add_ver_col'],
                 mesh_reader, funct, [],
                 func_rbx_cloud_api, func_rbx_other, func_blndr_api,
-                skip_download=True
+                skip_download=True, is_layered_clothing=is_layered_clothing
             )
         
         if prefs['add_attachment'] or prefs['add_motor6d_attachment']:
@@ -210,10 +243,10 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
              rbx_import_attachments.download_and_apply_attachments(
                 asset_id, asset_name, bundles_folder, headers, 
                 asset_clean_name, rbx_tmp_rbxm_filepath, 
-                prefs['at_origin'], prefs['add_attachment'], prefs['add_motor6d_attachment'],
+                prefs['at_origin'], prefs['add_attachment'], prefs.get('add_motor6d_attachment', False),
                 mesh_reader, funct,
                 func_rbx_cloud_api, func_rbx_other, func_blndr_api,
-                skip_download=True
+                skip_download=True, is_layered_clothing=is_layered_clothing
             )
 
     # Cleanup RBXM file if requested

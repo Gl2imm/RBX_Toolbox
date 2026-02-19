@@ -91,7 +91,7 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     rbx_item_field_entry: bpy.props.StringProperty(
         name="Item Field Entry",
         description="Username, URL or Item ID entered in the field",
-        default="1244794402",
+        default="ID or URL",
         maxlen=100,
     ) # type: ignore
 
@@ -279,6 +279,64 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     ) # type: ignore
 
 
+    ### Layered Cloth Properties ###
+    def update_lc_dependencies(self, context):
+        """
+        Update callback to enforce checkbox dependencies for Layered Cloth.
+        """
+        # If Meshes are unchecked, uncheck Textures
+        if not self.rbx_lc_choice_add_meshes:
+            self.rbx_lc_choice_add_textures = False
+            
+        # If Meshes AND Cages are unchecked, uncheck Vertex Colors
+    # If Meshes AND Cages are unchecked, uncheck Vertex Colors
+        if not self.rbx_lc_choice_add_meshes and not self.rbx_lc_choice_add_cages:
+            self.rbx_lc_choice_add_ver_col = False
+
+    rbx_lc_choice_at_origin : bpy.props.BoolProperty(
+    name="Spawn at Origin",
+    description="Spawn at Origin property",
+    default = True
+    ) # type: ignore
+
+    rbx_lc_choice_add_meshes : bpy.props.BoolProperty(
+    name="Meshes",
+    description="Meshes property",
+    default = True,
+    update = update_lc_dependencies
+    ) # type: ignore
+
+    rbx_lc_choice_add_textures : bpy.props.BoolProperty(
+    name="Textures",
+    description="Textures property",
+    default = True
+    ) # type: ignore
+
+    rbx_lc_choice_add_cages : bpy.props.BoolProperty(
+    name="Cages",
+    description="Cages property",
+    default = True,
+    update = update_lc_dependencies
+    ) # type: ignore
+
+    rbx_lc_choice_add_attachment : bpy.props.BoolProperty(
+    name="Attachments",
+    description="Attachments property",
+    default = True
+    ) # type: ignore
+
+
+    rbx_lc_choice_add_ver_col : bpy.props.BoolProperty(
+    name="Vertex Colors",
+    description="Vertex Colors property",
+    default = False
+    ) # type: ignore
+
+    rbx_lc_choice_clean_tmp_meshes : bpy.props.BoolProperty(
+    name="Cleanup tmp files (rbxm)",
+    description="Cleanup tmp files property",
+    default = False
+    ) # type: ignore
 
 
 
@@ -288,6 +346,44 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
 
 
 
+
+
+
+
+
+    ### Gears Properties ###
+    def update_gears_dependencies(self, context):
+        """
+        Update callback to enforce checkbox dependencies for Gears.
+        """
+        # If Meshes are unchecked, uncheck Textures
+        if not self.rbx_gears_choice_add_meshes:
+            self.rbx_gears_choice_add_textures = False
+
+    rbx_gears_choice_at_origin : bpy.props.BoolProperty(
+    name="Spawn at Origin",
+    description="Spawn at Origin property",
+    default = True
+    ) # type: ignore
+
+    rbx_gears_choice_add_meshes : bpy.props.BoolProperty(
+    name="Meshes",
+    description="Meshes property",
+    default = True,
+    update = update_gears_dependencies
+    ) # type: ignore
+
+    rbx_gears_choice_add_textures : bpy.props.BoolProperty(
+    name="Textures",
+    description="Textures property",
+    default = True
+    ) # type: ignore
+
+    rbx_gears_choice_clean_tmp_meshes : bpy.props.BoolProperty(
+    name="Cleanup tmp files (rbxm)",
+    description="Cleanup tmp files property",
+    default = False
+    ) # type: ignore
 
 
     ### Import Character ###

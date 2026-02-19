@@ -43,20 +43,23 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
     # Aligning logic with bundle_char
     rbx_textures = {}
     try:
-        special_mesh = None
-        if mesh_part.ClassName == "Part":
+        if mesh_part.ClassName == "SpecialMesh":
+             # If the passed object is already the SpecialMesh
+             special_mesh = mesh_part
+        elif mesh_part.ClassName == "Part":
             special_mesh = mesh_part.FindFirstChildOfClass[SpecialMesh]()
-            # Note: We are not extracting MeshId here as the function is focused on textures, 
-            # but we need special_mesh for TextureId logic later.
+        else:
+            special_mesh = None
+
     except Exception as e:
         dprint(f"Error checking SpecialMesh for {mesh_name}: {e}")
-        pass
+        special_mesh = None
 
     if rbx_SurfaceAppearance:
         dprint(f"Found SurfaceAppearance for {mesh_name}")
         for tex_name in glob_vars.rbx_pbr_materials:
             try:
-                # Direct property access (No Reflection fixes per user request)
+                # Direct property access
                 val = rbx_SurfaceAppearance.Properties[tex_name].Value
                 part_TextureID = func_rbx_other.strip_rbxassetid(val)
                 
@@ -83,9 +86,23 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
             rbx_tex_id_value = None
             
             if special_mesh:
-                rbx_tex_id_value = special_mesh.Properties["TextureId"].Value
+                # SpecialMesh uses "TextureId"
+                try:
+                    rbx_tex_id_value = special_mesh.Properties["TextureId"].Value
+                except:
+                    # Fallback or check if it uses TextureID? API usually says TextureId
+                     dprint(f"Failed to get TextureId from SpecialMesh. trying TextureID")
+                     try:
+                        rbx_tex_id_value = special_mesh.Properties["TextureID"].Value
+                     except:
+                        pass
             else:
-                rbx_tex_id_value = mesh_part.Properties["TextureID"].Value
+                 # MeshPart uses "TextureID"
+                 try:
+                    rbx_tex_id_value = mesh_part.Properties["TextureID"].Value
+                 except:
+                    pass
+            
             dprint(f"rbx_tex_id_value for {mesh_name}: {rbx_tex_id_value}")
             
             if not rbx_tex_id_value or str(rbx_tex_id_value) == "":

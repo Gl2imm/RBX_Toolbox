@@ -1,5 +1,7 @@
 import requests
 from RBX_Toolbox import glob_vars
+import time
+
 
 
 
@@ -71,3 +73,83 @@ def get_catalog_asset_data(rbx_asset_id, headers):
 			rbx_imp_error = f"Error {response.status_code} fetching asset details"
 			
 	return None, None, None, rbx_imp_error
+
+
+
+
+
+### check Thumbnail API state (often not ready yet)
+def check_thumbnail_api_state(url, itm_type:str, max_retries=3, delay=1.0):
+	"""Retries until the avatar state is 'Completed' or 'Blocked'. itm_type - Avatar or Accessory. Returns (data, rbx_char_error, rbx_asset_error)."""
+	is_asset = True if itm_type == "Accessory" else False
+	is_avatar = True if itm_type == "Avatar" else False
+	data = None
+	error = None
+	
+	# In V2 we mainly use rbx_imp_error or return error string, but for compatibility let's keep local error var
+	
+	for attempt in range(max_retries):
+		try:
+			response = requests.get(url)
+		except Exception as e:
+			error = f"Thumbnail api check exception: {e}"
+			return data, error
+
+		if response.status_code != 200:
+			error = f"{response.status_code}: Error contacting thumbnail API"
+			return data, error
+
+		data = response.json()
+		state = data.get("state") or data.get("data", [{}])[0].get("state")
+
+		if state == "Completed":
+			return data, None
+		
+		elif state == "Blocked":
+			if is_asset:
+				error = "Thumbnail API: Banned Item - unable to get image"
+			else:
+				error = "Thumbnail API: Banned User - unable to get image"
+			return data, error
+
+		#print(f"Thumbnail API returning state: {state}. Retrying... Attempt {attempt+1} of {max_retries}")
+		time.sleep(delay)
+
+	error = f"Thumbnail API did not return 'Completed' state after {max_retries} retries"
+	return data, error
+
+
+### Get Accessory Preview Image URL
+def get_asset_and_bundle_img_url(rbx_asset_id, rbx_is_bundle):
+	rbx_size = '150x150'
+	rbx_format = 'Png'
+	rbx_isCircular = 'false'
+	if rbx_is_bundle:
+		url = f"https://thumbnails.roblox.com/v1/bundles/thumbnails?bundleIds={rbx_asset_id}&size={rbx_size}&format={rbx_format}&isCircular={rbx_isCircular}"
+	else:
+		url = f"https://thumbnails.roblox.com/v1/assets?assetIds={rbx_asset_id}&returnPolicy=PlaceHolder&size={rbx_size}&format={rbx_format}&isCircular={rbx_isCircular}" 
+	
+	data, rbx_asset_error = check_thumbnail_api_state(url, "Accessory")
+	rbx_asset_img_url = None
+	
+	if rbx_asset_error == None:
+		rbx_asset_img_url = data.get("imageUrl") or data.get("data", [{}])[0].get("imageUrl")
+		
+	return rbx_asset_img_url, rbx_asset_error
+
+
+### Get Accessory Preview Image
+def get_asset_and_bundle_img(rbx_asset_img_url):
+	rbx_asset_error = None
+	image_data = None
+	
+	try:
+		response = requests.get(rbx_asset_img_url)
+		if response.status_code == 200:
+			image_data = response.content
+		else:
+			rbx_asset_error = f"{response.status_code}: Error getting Thumbnail IMG"
+	except Exception as e:
+		rbx_asset_error = f"Error downloading thumbnail: {str(e)}"
+		
+	return image_data, rbx_asset_error

@@ -16,7 +16,7 @@ dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dict[str, Any], 
                        bundles_folder: str, rbx_tmp_rbxm_filepath: str, 
                        mesh_reader: Any, funct: Any, func_rbx_cloud_api: Any, func_rbx_other: Any, func_blndr_api: Any,
-                       parent_name: str = None, skip_download: bool = False):
+                       parent_name: str = None, skip_download: bool = False, is_layered_clothing: bool = False):
     
     # Initialize Context & Dependencies
     import clr
@@ -33,7 +33,7 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
 
 
     if not TYPE_CHECKING:
-        from RobloxFiles import RobloxFile, Folder, MeshPart, Part, Accessory # type: ignore
+        from RobloxFiles import RobloxFile, Folder, MeshPart, Part, Accessory, Tool, SpecialMesh # type: ignore
 
     rbx_meshes_to_clean_up_lst = []
 
@@ -102,20 +102,48 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
             dprint("Accessory found but no MeshPart inside.")
             
     elif not R15Fixed:
-        dprint(f"No R15Fixed folder found in {asset_name}. Checking for Dynamic Head...")
-        
-        # Try Dynamic Head Import
-        head_mesh_part, new_rbxm_file = process_dynamic_head(
-            headers, rbx_tmp_rbxm_filepath, rbxm_file, func_rbx_cloud_api, str(asset_id)
-        )
-        
-        if head_mesh_part:
-            dprint("Dynamic Head Found and Processed.")
-            mesh_parts_to_process.append((head_mesh_part, "Head"))
-            # Update rbxm_file ref if needed, though we operate on the mesh_part mainly
+        # Check for Tool / Gear
+        # User requested iteration to find Tool
+        tool_obj = rbxm_file.FindFirstChildOfClass[Tool]()
+            
+        if tool_obj:
+            dprint(f"Tool (Gear) found: {tool_obj.Name}")
+            # Find Part inside Tool
+            # Gears usually have a "Handle" part, but could be any Part
+            part_obj = tool_obj.FindFirstChild[Part]("Handle")
+            if not part_obj:
+                 part_obj = tool_obj.FindFirstChildOfClass[Part]()
+            
+            if part_obj:
+                 dprint(f"  Part found: {part_obj.Name}")
+                 special_mesh = part_obj.FindFirstChildOfClass[SpecialMesh]()
+                 if special_mesh:
+                      dprint(f"    SpecialMesh found in {part_obj.Name}")
+                      # We treat this SpecialMesh as the MeshPart to process
+                      # Note: SpecialMesh is not a MeshPart, but our loop below expects objects with MeshId property.
+                      # SpecialMesh has MeshId, so it might work if typed correctly or if we extract here.
+                      # However, downstream logic uses mesh_part.MeshId. SpecialMesh has this.
+                      mesh_parts_to_process.append((special_mesh, asset_name))
+                 else:
+                      dprint("    No SpecialMesh found in Part.")
+            else:
+                 dprint("  No Part found in Tool.")
+
         else:
-            dprint("Dynamic Head check failed or not a head.")
-            return
+            dprint(f"No R15Fixed folder found in {asset_name}. Checking for Dynamic Head...")
+            
+            # Try Dynamic Head Import
+            head_mesh_part, new_rbxm_file = process_dynamic_head(
+                headers, rbx_tmp_rbxm_filepath, rbxm_file, func_rbx_cloud_api, str(asset_id)
+            )
+            
+            if head_mesh_part:
+                dprint("Dynamic Head Found and Processed.")
+                mesh_parts_to_process.append((head_mesh_part, "Head"))
+                # Update rbxm_file ref if needed, though we operate on the mesh_part mainly
+            else:
+                dprint("Dynamic Head check failed or not a head.")
+                return
 
 
     else:
@@ -144,11 +172,44 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
         collection_name = asset_clean_name
 
     if add_meshes:
-        if acc_obj:
-            # Hierarchy: Main -> Accessories -> AssetName -> Object
-            acc_main_col = func_blndr_api.blender_api_create_collection("Accessories", collection_name)
-            # Create specific collection for this accessory inside Accessories
+        if acc_obj or is_layered_clothing:
+            dprint(f"DEBUG: process_mesh_asset acc_obj found or is_lc. is_layered_clothing={is_layered_clothing}")
+            # Hierarchy: Main -> Accessories/LC -> AssetName -> Object
+            folder_name = "Layered Clothing" if is_layered_clothing else "Accessories"
+            
+            # Determine parent for the Main "Layered Clothing"/"Accessories" folder
+            # If collection_name (parent_name/rbx_asset_name) is same as asset_name, we are likely in single import
+            # So "Layered Clothing" should be at Root, not inside the Asset Folder.
+            lc_parent_col_name = collection_name
+            if collection_name == asset_clean_name:
+                 lc_parent_col_name = None # Root
+            
+            dprint(f"DEBUG: creating collection folder_name={folder_name} under parent={lc_parent_col_name}")
+            acc_main_col = func_blndr_api.blender_api_create_collection(folder_name, lc_parent_col_name)
+            
+            # Create specific collection for this accessory inside Accessories/LC
+            # This is the "Item Name" collection
             rbx_meshes_col = func_blndr_api.blender_api_create_collection(asset_clean_name, acc_main_col.name)
+            
+            # Fix for double-linking: If in LC, ensure not in Accessories
+            if is_layered_clothing:
+                acc_col_obj = bpy.data.collections.get("Accessories")
+                if acc_col_obj and rbx_meshes_col.name in acc_col_obj.children:
+                    dprint(f"Unlinking {rbx_meshes_col.name} from Accessories...")
+                    acc_col_obj.children.unlink(rbx_meshes_col)
+                    
+        elif mesh_parts_to_process and mesh_parts_to_process[0][0].ClassName == "SpecialMesh":
+            # Hierarchy: Main -> Gears -> AssetName -> Object
+            # User request: "Gears - Item_name - item_obj"
+            
+            # Check if we are in single import mode or bundle
+            gear_parent_col_name = collection_name
+            if collection_name == asset_clean_name:
+                 gear_parent_col_name = None # Root
+
+            gears_main_col = func_blndr_api.blender_api_create_collection("Gears", gear_parent_col_name)
+            rbx_meshes_col = func_blndr_api.blender_api_create_collection(asset_clean_name, gears_main_col.name)
+
         else:
             # Hierarchy: Main -> Body Parts -> Object
             rbx_meshes_col = func_blndr_api.blender_api_create_collection("Body Parts", collection_name)
@@ -189,11 +250,35 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
             # --- START SPAWN LOGIC INLINED ---
             
             # Pivot Logic
-            cframe = mesh_part.CFrame
+            cframe = None
+            part_scale = None
+            
+            # Special Handling for SpecialMesh (Gears)
+            if mesh_part.ClassName == "SpecialMesh":
+                # CFrame is on the Parent (Part)
+                if mesh_part.Parent:
+                    cframe = mesh_part.Parent.CFrame
+                    # For SpecialMesh, the visual scale is Property Scale (Vector3) * Part.Size? 
+                    # Actually SpecialMesh.Scale is usually relative to the file. 
+                    # But often used to fit the Part.Size.
+                    # Let's try to just use SpecialMesh.Scale first if available.
+                    try:
+                        part_scale = mesh_part.Scale
+                    except:
+                        pass
+                else:
+                    dprint(f"    SpecialMesh {mesh_name} has no Parent!")
+                    continue
+            else:
+                # MeshPart
+                cframe = mesh_part.CFrame
             
             # Try to get PivotOffset from MeshPart
+            part_cframe_pivot = None
             try:
-                part_cframe_pivot = mesh_part.Properties["PivotOffset"].Value
+                # If SpecialMesh, Pivot is on Parent
+                obj_for_pivot = mesh_part.Parent if mesh_part.ClassName == "SpecialMesh" else mesh_part
+                part_cframe_pivot = obj_for_pivot.Properties["PivotOffset"].Value
             except:
                 from RobloxFiles.DataTypes import CFrame as RbxCFrame
                 part_cframe_pivot = RbxCFrame()
@@ -219,7 +304,13 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
                 # Accessories often have Identity Pivot on Handle but should still respect "Spawn at Origin"
                 # because the user wants them centered, not at World Position.
                 is_accessory = False
-                if mesh_part.Parent and mesh_part.Parent.ClassName == "Accessory":
+                # For SpecialMesh (Gear), Parent is Part, Part Parent is Tool. Tool might be "Accessory"-like behavior?
+                # Keeping simple check for now.
+                check_obj = mesh_part
+                if mesh_part.ClassName == "SpecialMesh":
+                     check_obj = mesh_part.Parent
+                
+                if check_obj and check_obj.Parent and check_obj.Parent.ClassName == "Accessory":
                     is_accessory = True
 
                 if is_identity and not is_accessory:
@@ -230,7 +321,8 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
             if add_meshes:
                 rbx_obj = func_blndr_api.blender_api_add_meshes_as_obj(
                     bundle_own_folder, mesh_part, mesh_data, cframe, part_cframe_pivot, 
-                    actual_at_origin, mesh_reader, funct, mesh_name=mesh_name
+                    actual_at_origin, mesh_reader, funct, mesh_name=mesh_name, 
+                    special_mesh_scale=part_scale
                 )
             
             # Add Vertex Colors

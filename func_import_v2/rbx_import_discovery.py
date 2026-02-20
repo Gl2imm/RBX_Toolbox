@@ -28,7 +28,10 @@ category_checkboxes = {
     "Accessory": [],
     "Dynamic Head": ["rbx_enum_dynamic_head"],
     "Layered Cloth": ["rbx_enum_layered_cloth", "rbx_bnds_lc_enum", "rbx_lc_dum_enum", "rbx_lc_spl_enum", "rbx_lc_dum_anim_enum", "rbx_lc_anim_enum"],
+    "Face Parts": ["rbx_enum_face_parts", "rbx_bnds_lc_enum", "rbx_lc_dum_enum", "rbx_lc_spl_enum", "rbx_lc_dum_anim_enum", "rbx_lc_anim_enum"],
+    "Classics": ["rbx_enum_classics"],
     "Gear": ["rbx_enum_gear"],
+    "Armature": [],
     "Store Model": []
 }
 
@@ -134,6 +137,7 @@ class RBX_OT_import_discovery(bpy.types.Operator):
             # Store details in glob_vars for UI
             glob_vars.rbx_asset_name = rbx_asset_name
             glob_vars.rbx_asset_creator = rbx_asset_creator
+            glob_vars.rbx_asset_id = int(rbx_asset_id) # Store Bundle/Asset ID for props reference
             
             # Map type ID to name
             type_name = glob_vars.rbx_bundle_types.get(rbx_asset_type_id)
@@ -247,6 +251,7 @@ class RBX_OT_import_reset(bpy.types.Operator):
         # Clear discovered items
         glob_vars.discovered_items_data = {}
         glob_vars.rbx_default_head_used = False
+        glob_vars.rbx_armature_warning_active = False
 
         self.report({'INFO'}, "Import (Beta) Reset")
         return {'FINISHED'}
@@ -264,9 +269,10 @@ class RBX_OT_import_discovery_download(bpy.types.Operator):
         self.report({'INFO'}, f"Download triggered for category: {self.category}")
         
         # Reload modules to ensure latest code is used
-        # Reload modules to ensure latest code is used
         from . import rbx_import_download_manager
         importlib.reload(rbx_import_download_manager)
+        
+        glob_vars.rbx_armature_warning_active = False
         
         download_all_items = (self.category == "ALL_CATEGORIES")
 
@@ -286,9 +292,21 @@ class RBX_OT_import_discovery_download(bpy.types.Operator):
              self.report({'INFO'}, "Downloading Layered Cloth...")
              rbx_import_download_manager.download_body_parts(context, category_name="Layered Cloth", download_all=download_all_items)
 
+        if self.category == "Face Parts" or self.category == "ALL_CATEGORIES":
+             self.report({'INFO'}, "Downloading Face Parts...")
+             rbx_import_download_manager.download_body_parts(context, category_name="Face Parts", download_all=download_all_items)
+
+        if self.category == "Classics" or self.category == "ALL_CATEGORIES":
+             self.report({'INFO'}, "Downloading Classics...")
+             rbx_import_download_manager.download_body_parts(context, category_name="Classics", download_all=download_all_items)
+
         if self.category == "Gear" or self.category == "ALL_CATEGORIES":
              self.report({'INFO'}, "Downloading Gears...")
              rbx_import_download_manager.download_body_parts(context, category_name="Gear", download_all=download_all_items)
+
+        if self.category == "Armature" or self.category == "ALL_CATEGORIES":
+             self.report({'INFO'}, "Downloading Armature...")
+             rbx_import_download_manager.download_body_parts(context, category_name="Armature", download_all=download_all_items)
 
         return {'FINISHED'}
 
@@ -324,9 +342,10 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
             box.prop(rbx_prefs, 'rbx_bndl_char_choice_add_attachment')
             box.prop(rbx_prefs, 'rbx_bndl_char_choice_add_motor6d_attachment')
             
-            row = box.row()
-            row.enabled = False 
-            row.prop(rbx_prefs, 'rbx_bndl_char_choice_add_bones', text="Armature (in development)")
+            # row = box.row()
+            # # row.enabled = False 
+            # # row.enabled = rbx_prefs.rbx_bndl_char_choice_add_meshes
+            # row.prop(rbx_prefs, 'rbx_bndl_char_choice_add_bones')
             
             row = box.row()
             row.enabled = rbx_prefs.rbx_bndl_char_choice_add_meshes or rbx_prefs.rbx_bndl_char_choice_add_cages
@@ -397,6 +416,29 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
             
             box.prop(rbx_prefs, 'rbx_lc_choice_clean_tmp_meshes')
 
+        if category == "Face Parts":
+            box.prop(rbx_prefs, 'rbx_fp_choice_at_origin') 
+            box.prop(rbx_prefs, 'rbx_fp_choice_add_meshes')
+            
+            row = box.row()
+            row.enabled = rbx_prefs.rbx_fp_choice_add_meshes
+            row.prop(rbx_prefs, 'rbx_fp_choice_add_textures')
+            
+            box.prop(rbx_prefs, 'rbx_fp_choice_add_cages')
+            
+            box.prop(rbx_prefs, 'rbx_fp_choice_add_attachment')
+            
+            row = box.row()
+            # Gray out if Attachments not selected
+            row.enabled = rbx_prefs.rbx_fp_choice_add_attachment
+
+            
+            row = box.row()
+            row.enabled = rbx_prefs.rbx_fp_choice_add_meshes or rbx_prefs.rbx_fp_choice_add_cages
+            row.prop(rbx_prefs, 'rbx_fp_choice_add_ver_col')
+            
+            box.prop(rbx_prefs, 'rbx_fp_choice_clean_tmp_meshes')
+
         if category == "Gear":
             box.prop(rbx_prefs, 'rbx_gears_choice_at_origin') 
             box.prop(rbx_prefs, 'rbx_gears_choice_add_meshes')
@@ -407,13 +449,17 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
             
             box.prop(rbx_prefs, 'rbx_gears_choice_clean_tmp_meshes')
 
+        if category == "Armature":
+            box.prop(rbx_prefs, 'rbx_bndl_char_choice_armature_at_origin') # Reusing bundle origin pref
+            # No other options needed for now as we just parse bones
+
         # Generic Checkbox Loop
         if category in category_checkboxes:
             for prop_name in category_checkboxes[category]:
                 # Skip properties already manually handled for certain categories
                 if category == "Body Parts": 
                     continue 
-                if category == "Layered Cloth":
+                if category in ["Layered Cloth", "Face Parts"]:
                     continue
                 if category == "Dynamic Head" and prop_name == "rbx_enum_dynamic_head":
                      # rbx_enum_dynamic_head is the dropdown, usually shown in main panel, but we iterate here
@@ -441,12 +487,20 @@ class RBX_OT_import_discovery_open_folder(bpy.types.Operator):
         # Determine folder based on category 
         target_subfolder = glob_vars.rbx_import_v2_bundles # Default to Bundles
         
-        if category == "Body Parts":
-            target_subfolder = glob_vars.rbx_import_v2_bundles
+        if category == "Accessory":
+            target_subfolder = "Accessories"
+        elif category == "Gear":
+            target_subfolder = "Gears"
+        elif category == "Layered Cloth":
+            target_subfolder = "Layered Clothing"
         elif category == "Dynamic Head":
-            target_subfolder = glob_vars.rbx_import_v2_bundles
-        elif category in ["Accessory", "Layered Cloth", "Gear"]:
-            target_subfolder = glob_vars.rbx_imported_acc_fldr
+            target_subfolder = "Dynamic Heads"
+        elif category == "Face Parts":
+            target_subfolder = "Face Parts"
+        elif category == "Classics":
+            target_subfolder = "Classics"
+        elif category == "Armature":
+            target_subfolder = glob_vars.rbx_import_v2_bundles # Armatures come from bundles mostly
         
         # Construct full path
         folder_path = os.path.join(addon_path, glob_vars.rbx_import_main_folder, target_subfolder)

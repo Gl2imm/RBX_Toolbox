@@ -16,7 +16,7 @@ dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dict[str, Any], 
                        bundles_folder: str, rbx_tmp_rbxm_filepath: str, 
                        mesh_reader: Any, funct: Any, func_rbx_cloud_api: Any, func_rbx_other: Any, func_blndr_api: Any,
-                       parent_name: str = None, skip_download: bool = False, is_layered_clothing: bool = False):
+                       parent_name: str = None, skip_download: bool = False, is_layered_clothing: bool = False, is_face_parts: bool = False, parse_bones: bool = False):
     
     # Initialize Context & Dependencies
     import clr
@@ -38,6 +38,11 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
     rbx_meshes_to_clean_up_lst = []
 
     # Unpack Preferences
+    add_meshes = prefs.get('add_meshes')
+    
+    # If not adding meshes and not parsing bones, we can just return empty
+    if not add_meshes and not parse_bones:
+        return []
     at_origin = prefs.get('at_origin', False)
     add_meshes = prefs.get('add_meshes', True)
     add_textures = prefs.get('add_textures', True)
@@ -77,9 +82,8 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
     # Check/Create per-asset folder
     asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)
     
-    # Use parent name for folder grouping if available? 
-    # Current behavior puts each part in its own folder. Keeping that for now to avoid complexity unless requested.
-    bundle_own_folder = os.path.join(bundles_folder, asset_clean_name)
+    # Download manager now routes the exact bundle folder via bundles_folder
+    bundle_own_folder = bundles_folder
     if not os.path.exists(bundle_own_folder):
         os.makedirs(bundle_own_folder)
 
@@ -89,6 +93,8 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
     acc_obj = rbxm_file.FindFirstChildOfClass[Accessory]()
 
     mesh_parts_to_process = []
+    imported_meshes_data = []
+    is_gear = False
     
     # Process extracted parts
     if acc_obj:
@@ -99,7 +105,18 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
              # User Request: "the item added to blender should have same name as it shown in discovery, not handle."
              mesh_parts_to_process.append((acc_mesh_part, asset_name))
         else:
-            dprint("Accessory found but no MeshPart inside.")
+             part_obj = acc_obj.FindFirstChild[Part]("Handle")
+             if not part_obj:
+                  part_obj = acc_obj.FindFirstChildOfClass[Part]()
+             
+             if part_obj:
+                  special_mesh = part_obj.FindFirstChildOfClass[SpecialMesh]()
+                  if special_mesh:
+                       mesh_parts_to_process.append((special_mesh, asset_name))
+                  else:
+                       dprint("Accessory found but no SpecialMesh inside Part.")
+             else:
+                  dprint("Accessory found but no MeshPart or Part inside.")
             
     elif not R15Fixed:
         # Check for Tool / Gear
@@ -107,27 +124,25 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
         tool_obj = rbxm_file.FindFirstChildOfClass[Tool]()
             
         if tool_obj:
+            is_gear = True
             dprint(f"Tool (Gear) found: {tool_obj.Name}")
-            # Find Part inside Tool
-            # Gears usually have a "Handle" part, but could be any Part
-            part_obj = tool_obj.FindFirstChild[Part]("Handle")
-            if not part_obj:
-                 part_obj = tool_obj.FindFirstChildOfClass[Part]()
+            # Find all Parts / MeshParts inside Tool
+            for child in tool_obj.GetChildren():
+                if child.ClassName == "Part":
+                     dprint(f"  Part found: {child.Name}")
+                     special_mesh = child.FindFirstChildOfClass[SpecialMesh]()
+                     if special_mesh:
+                          dprint(f"    SpecialMesh found in {child.Name}")
+                          # We treat this SpecialMesh as the MeshPart to process
+                          mesh_parts_to_process.append((special_mesh, child.Name))
+                     else:
+                          dprint(f"    No SpecialMesh found in {child.Name}.")
+                elif child.ClassName == "MeshPart":
+                     dprint(f"  MeshPart found: {child.Name}")
+                     mesh_parts_to_process.append((child, child.Name))
             
-            if part_obj:
-                 dprint(f"  Part found: {part_obj.Name}")
-                 special_mesh = part_obj.FindFirstChildOfClass[SpecialMesh]()
-                 if special_mesh:
-                      dprint(f"    SpecialMesh found in {part_obj.Name}")
-                      # We treat this SpecialMesh as the MeshPart to process
-                      # Note: SpecialMesh is not a MeshPart, but our loop below expects objects with MeshId property.
-                      # SpecialMesh has MeshId, so it might work if typed correctly or if we extract here.
-                      # However, downstream logic uses mesh_part.MeshId. SpecialMesh has this.
-                      mesh_parts_to_process.append((special_mesh, asset_name))
-                 else:
-                      dprint("    No SpecialMesh found in Part.")
-            else:
-                 dprint("  No Part found in Tool.")
+            if not mesh_parts_to_process:
+                 dprint("  No Part with SpecialMesh or MeshPart found in Tool.")
 
         else:
             dprint(f"No R15Fixed folder found in {asset_name}. Checking for Dynamic Head...")
@@ -172,10 +187,15 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
         collection_name = asset_clean_name
 
     if add_meshes:
-        if acc_obj or is_layered_clothing:
-            dprint(f"DEBUG: process_mesh_asset acc_obj found or is_lc. is_layered_clothing={is_layered_clothing}")
-            # Hierarchy: Main -> Accessories/LC -> AssetName -> Object
-            folder_name = "Layered Clothing" if is_layered_clothing else "Accessories"
+        if acc_obj or is_layered_clothing or is_face_parts:
+            dprint(f"DEBUG: process_mesh_asset acc_obj found or is_lc/is_fp. is_layered_clothing={is_layered_clothing}, is_face_parts={is_face_parts}")
+            # Hierarchy: Main -> Accessories/LC/FP -> AssetName -> Object
+            if is_face_parts:
+                folder_name = "Face Parts"
+            elif is_layered_clothing:
+                folder_name = "Layered Clothing"
+            else:
+                folder_name = "Accessories"
             
             # Determine parent for the Main "Layered Clothing"/"Accessories" folder
             # If collection_name (parent_name/rbx_asset_name) is same as asset_name, we are likely in single import
@@ -198,7 +218,7 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
                     dprint(f"Unlinking {rbx_meshes_col.name} from Accessories...")
                     acc_col_obj.children.unlink(rbx_meshes_col)
                     
-        elif mesh_parts_to_process and mesh_parts_to_process[0][0].ClassName == "SpecialMesh":
+        elif is_gear:
             # Hierarchy: Main -> Gears -> AssetName -> Object
             # User request: "Gears - Item_name - item_obj"
             
@@ -283,6 +303,8 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
                 from RobloxFiles.DataTypes import CFrame as RbxCFrame
                 part_cframe_pivot = RbxCFrame()
             
+            dprint(f"part_cframe_pivot: {part_cframe_pivot}")
+            
             # Note: at_origin logic is now handled post-import as a group operation.
             # We pass 'at_origin' but it is ignored by the blender_api function for individual placement.
             # Effectively we are placing everything at World Coordinates first.
@@ -325,30 +347,42 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
                     special_mesh_scale=part_scale
                 )
             
-            # Add Vertex Colors
-            if add_meshes and add_ver_col and rbx_obj:
-                    func_blndr_api.blender_api_add_ver_col(rbx_obj, mesh_data)
+                # Add Vertex Colors
+                if add_ver_col and rbx_obj:
+                        func_blndr_api.blender_api_add_ver_col(rbx_obj, mesh_data)
 
 
-            # Add Textures
-            if add_meshes and add_textures and rbx_obj:
-                    rbx_import_textures.download_and_apply_textures(
-                        mesh_part, mesh_name, bundle_own_folder, headers, rbx_obj, asset_clean_name
-                    )
+                # Add Textures
+                if add_textures and rbx_obj:
+                        rbx_import_textures.download_and_apply_textures(
+                            mesh_part, mesh_name, bundle_own_folder, headers, rbx_obj, asset_clean_name
+                        )
 
-            # Move to Collection (Meshes Sub-Collection)
-            if rbx_meshes_col and rbx_obj:
-                # Link to proper collection
-                if rbx_obj.name not in rbx_meshes_col.objects:
-                    rbx_meshes_col.objects.link(rbx_obj)
-                
-                # Unlink from other collections (e.g. Scene Collection where it was spawned)
-                for col in rbx_obj.users_collection:
-                    if col != rbx_meshes_col:
-                        col.objects.unlink(rbx_obj)
+                # Move to Collection (Meshes Sub-Collection)
+                if rbx_meshes_col and rbx_obj:
+                    # Link to proper collection
+                    if rbx_obj.name not in rbx_meshes_col.objects:
+                        rbx_meshes_col.objects.link(rbx_obj)
+                    
+                    # Unlink from other collections (e.g. Scene Collection where it was spawned)
+                    for col in rbx_obj.users_collection:
+                        if col != rbx_meshes_col:
+                            col.objects.unlink(rbx_obj)
             
             # Append to cleanup list for .mesh files
             rbx_meshes_to_clean_up_lst.append(mesh_name)
+
+            # Collect data for bones if object was created or parsing bones
+            if (rbx_obj or parse_bones) and mesh_data:
+                imported_meshes_data.append({
+                    "object": rbx_obj,
+                    "mesh_data": mesh_data, # Contains bones, skinIndices, skinWeights, version
+                    "mesh_version": mesh_data.get("version", "4.00"),
+                    "mesh_name": mesh_name,
+                    "cframe": cframe,
+                    "actual_at_origin": actual_at_origin,
+                    "part_cframe_pivot": part_cframe_pivot
+                })
 
         except Exception as e:
             dprint(f"    Error processing mesh data for {mesh_name}: {e}")
@@ -358,7 +392,7 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
     if prefs.get('clean_tmp_meshes', False):
          func_rbx_other.cleanup_tmp_files(rbx_meshes_to_clean_up_lst, ".mesh")
     
-    return
+    return imported_meshes_data
 
 def process_dynamic_head(headers: dict, rbx_tmp_rbxm_filepath: str, rbxm_file, 
                          func_rbx_cloud_api, rbxm_id: str):

@@ -18,7 +18,7 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
                              at_origin: bool, add_attachment: bool, add_motor6d_attachment: bool,
                              mesh_reader: Any, funct: Any,
                              func_rbx_cloud_api: Any = None, func_rbx_other: Any = None, func_blndr_api: Any = None,
-                             skip_download: bool = False, is_layered_clothing: bool = False):
+                             skip_download: bool = False, is_layered_clothing: bool = False, is_face_parts: bool = False):
     """
     Downloads the RBXM asset and iterates through its Body Parts to apply attachments.
     """
@@ -82,11 +82,10 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
             main_collection_name = glob_vars.rbx_asset_name if glob_vars.rbx_asset_name else "Imported Body Parts"
             main_collection_name = func_rbx_other.replace_restricted_char(main_collection_name)
             
-            target_bundle_folder = os.path.join(bundle_own_folder, main_collection_name) if 'Imported Body Parts' in bundle_own_folder else bundle_own_folder
+            target_bundle_folder = bundle_own_folder
             
             if not os.path.exists(target_bundle_folder):
-                    if not os.path.exists(bundle_own_folder): # Safe check
-                        os.makedirs(bundle_own_folder)
+                os.makedirs(target_bundle_folder)
 
             # Loop children
             rbx_avatar_bundle_parts = [
@@ -133,6 +132,11 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
                                  parts_to_process.append((acc_child, acc_child.Name))
                                  found_any = True
                                  break # Stop searching inside this Accessory
+                             elif acc_child.ClassName == "Part":
+                                 dprint(f"Found Accessory Part: {acc_child.Name}")
+                                 parts_to_process.append((acc_child, acc_child.Name))
+                                 found_any = True
+                                 break # Stop searching inside this Accessory
                          
                          if found_any:
                              break # Stop searching other children if found an Accessory Handle
@@ -152,21 +156,23 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
                      dprint(f"No MeshParts found in {asset_clean_name if asset_clean_name else str(asset_id)}")
                      return
 
-        if is_layered_clothing:
-             # Calculate unique attachment collection name: "LC Attachments XX"
+        if is_layered_clothing or is_face_parts:
+             # Calculate unique attachment collection name: "LC Attachments XX" or "FP Attachments XX"
              # 1. Determine Parent Collection Name (Asset Name)
              # Same logic as meshes/cages: if single asset, parent is Root. But here we put attachments INSIDE the Asset Collection.
              # The asset collection name IS asset_clean_name.
              
              lc_att_cols_parent_name = asset_clean_name
-             target_att_name = "LC Attachments 00" # Default
+             
+             prefix = "FP" if is_face_parts else "LC"
+             target_att_name = f"{prefix} Attachments 00" # Default
              
              # User Request: "running number like first folder is 00, then 01"
              # Implementation: Global Running Number across the Scene
              # Scan all collections to find max suffix
              import re
              max_suffix = -1
-             pattern = re.compile(r"LC Attachments (\d+)")
+             pattern = re.compile(rf"{prefix} Attachments (\d+)")
              
              for col in bpy.data.collections:
                  match = pattern.match(col.name)
@@ -176,7 +182,7 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
                          max_suffix = val
              
              # Increment
-             target_att_name = f"LC Attachments {max_suffix + 1:02d}"
+             target_att_name = f"{prefix} Attachments {max_suffix + 1:02d}"
         else:
              target_att_name = None
 
@@ -186,7 +192,7 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
             _process_single_attachment(
                 mesh_part, part_name, target_bundle_folder, headers, 
                 asset_clean_name, at_origin, add_attachment, add_motor6d_attachment, funct, func_blndr_api, func_rbx_other,
-                is_accessory=is_accessory, is_layered_clothing=is_layered_clothing,
+                is_accessory=is_accessory, is_layered_clothing=is_layered_clothing, is_face_parts=is_face_parts,
                 lc_target_att_name=target_att_name
             )
         
@@ -199,7 +205,7 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
              _process_single_attachment(
                 target, mesh_name, bundle_own_folder, headers, 
                 asset_clean_name, at_origin, add_attachment, add_motor6d_attachment, funct, func_blndr_api, func_rbx_other,
-                is_accessory=False, is_layered_clothing=is_layered_clothing,
+                is_accessory=False, is_layered_clothing=is_layered_clothing, is_face_parts=is_face_parts,
                 lc_target_att_name=None # Numbering logic likely not applicable or needs expansion for this path if needed
             )
         else:
@@ -209,7 +215,7 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
 
 def _process_single_attachment(mesh_part, mesh_name, bundle_own_folder, headers, 
                           asset_clean_name, at_origin, add_attachment, add_motor6d_attachment, funct, 
-                          func_blndr_api, func_rbx_other, is_accessory=False, is_layered_clothing=False,
+                          func_blndr_api, func_rbx_other, is_accessory=False, is_layered_clothing=False, is_face_parts=False,
                           lc_target_att_name=None):
 
     # Unpack Preferences
@@ -257,8 +263,11 @@ def _process_single_attachment(mesh_part, mesh_name, bundle_own_folder, headers,
     if add_attachment:
         att_col_name = f"{asset_clean_name}_Attachments" if is_accessory else "Body Attachments"
         
-        if is_layered_clothing:
-            folder_name = "Layered Clothing"
+        if is_layered_clothing or is_face_parts:
+            if is_face_parts:
+                folder_name = "Face Parts"
+            else:
+                folder_name = "Layered Clothing"
             
             # Determine parent like in meshes script
             lc_parent_col_name = main_collection_name
@@ -274,7 +283,8 @@ def _process_single_attachment(mesh_part, mesh_name, bundle_own_folder, headers,
                 dprint(f"Unlinking {asset_col.name} from Accessories...")
                 acc_col_obj.children.unlink(asset_col)
 
-            target_name = lc_target_att_name if lc_target_att_name else "LC Attachments"
+            prefix = "FP" if is_face_parts else "LC"
+            target_name = lc_target_att_name if lc_target_att_name else f"{prefix} Attachments"
             attachments_collection = func_blndr_api.blender_api_create_collection(target_name, asset_col.name)
             
         else:

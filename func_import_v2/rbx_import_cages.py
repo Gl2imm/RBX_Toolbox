@@ -19,7 +19,7 @@ def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own
                              at_origin: bool, add_ver_col: bool,
                              mesh_reader: Any, funct: Any, rbx_meshes_to_clean_up_lst: List[str],
                              func_rbx_cloud_api: Any = None, func_rbx_other: Any = None, func_blndr_api: Any = None,
-                             skip_download: bool = False, is_layered_clothing: bool = False):
+                             skip_download: bool = False, is_layered_clothing: bool = False, is_face_parts: bool = False):
     """
     Downloads the RBXM asset and iterates through its Body Parts to apply cages.
     """
@@ -82,11 +82,10 @@ def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own
             main_collection_name = glob_vars.rbx_asset_name if glob_vars.rbx_asset_name else "Imported Body Parts"
             main_collection_name = func_rbx_other.replace_restricted_char(main_collection_name)
             
-            target_bundle_folder = os.path.join(bundle_own_folder, main_collection_name) if 'Imported Body Parts' in bundle_own_folder else bundle_own_folder
+            target_bundle_folder = bundle_own_folder
             
             if not os.path.exists(target_bundle_folder):
-                    if not os.path.exists(bundle_own_folder): # Safe check
-                        os.makedirs(bundle_own_folder)
+                os.makedirs(target_bundle_folder)
             
             # Loop children
             rbx_avatar_bundle_parts = [
@@ -143,9 +142,9 @@ def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own
                 if not parts_to_process:
                     return
 
-        # Calculate unique Cages collection name if LC
+        # Calculate unique Cages collection name if LC or FP
         lc_target_cage_name = None
-        if is_layered_clothing:
+        if is_layered_clothing or is_face_parts:
              import re
              max_suffix = -1
              pattern = re.compile(r"Cages (\d+)")
@@ -169,6 +168,7 @@ def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own
                 mesh_reader, funct, rbx_meshes_to_clean_up_lst,
                 func_rbx_cloud_api, func_rbx_other, func_blndr_api,
                 is_layered_clothing=is_layered_clothing,
+                is_face_parts=is_face_parts,
                 lc_target_cage_name=lc_target_cage_name
             )
         
@@ -189,6 +189,7 @@ def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own
                 mesh_reader, funct, rbx_meshes_to_clean_up_lst,
                 func_rbx_cloud_api, func_rbx_other, func_blndr_api,
                 is_layered_clothing=is_layered_clothing,
+                is_face_parts=is_face_parts,
                 lc_target_cage_name=None 
             )
         else:
@@ -202,6 +203,7 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
                          mesh_reader, funct, rbx_meshes_to_clean_up_lst,
                          func_rbx_cloud_api, func_rbx_other, func_blndr_api,
                          is_layered_clothing: bool = False,
+                         is_face_parts: bool = False,
                          lc_target_cage_name: str = None):
     
 
@@ -214,8 +216,8 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
     cage_part = None
     is_wrap_layer = False
     
-    if is_layered_clothing:
-        # Layered Clothing uses WrapLayer
+    if is_layered_clothing or is_face_parts:
+        # Layered Clothing and Face Parts use WrapLayer
         # Check for any child of class WrapLayer
         for child in mesh_part.GetChildren():
              if child.ClassName == "WrapLayer":
@@ -238,8 +240,11 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
         main_collection_name = glob_vars.rbx_asset_name if glob_vars.rbx_asset_name else "Imported Body Parts"
         main_collection_name = func_rbx_other.replace_restricted_char(main_collection_name)
         
-        if is_layered_clothing:
-            folder_name = "Layered Clothing"
+        if is_layered_clothing or is_face_parts:
+            if is_face_parts:
+                folder_name = "Face Parts"
+            else:
+                folder_name = "Layered Clothing"
             
             # Parent logic same as meshes
             lc_parent_col_name = main_collection_name
@@ -302,19 +307,6 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
                 if cage_cframe is None: 
                     continue
 
-                # Check if CAGE pivot is identity
-                if cage_cframe_pivot:
-                    pivot_comps = cage_cframe_pivot.GetComponents()
-                    identity_comps = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-                    cage_is_identity = True
-                    if len(pivot_comps) == 12:
-                        for a, b in zip(pivot_comps, identity_comps):
-                            if abs(a - b) > 0.0001: 
-                                cage_is_identity = False
-                                break
-                else:
-                    cage_is_identity = True # Default to identity if no pivot
-
                 # Check if MESH pivot is identity (The Cage must follow the Mesh's placement)
                 try:
                     mesh_pivot = mesh_part.Properties["PivotOffset"].Value
@@ -323,6 +315,7 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
                     mesh_pivot = RbxCFrame()
 
                 mesh_pivot_comps = mesh_pivot.GetComponents()
+                identity_comps = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
                 mesh_is_identity = True
                 if len(mesh_pivot_comps) == 12:
                     for a, b in zip(mesh_pivot_comps, identity_comps):
@@ -330,10 +323,21 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
                             mesh_is_identity = False
                             break
 
-                # If pivot is identity (either Cage OR Mesh), force at_origin to False
+                is_accessory = False
+                check_obj = mesh_part
+                if mesh_part.ClassName == "SpecialMesh":
+                     check_obj = mesh_part.Parent
+                if check_obj and check_obj.Parent and check_obj.Parent.ClassName == "Accessory":
+                    is_accessory = True
+
+                # If pivot is identity (for the Mesh), force at_origin to False (unless accessory)
                 actual_at_origin = at_origin
-                if cage_is_identity or mesh_is_identity:
+                if mesh_is_identity and not is_accessory:
                     actual_at_origin = False
+                    
+                # The cage shares the exact same logical pivot as the mesh part it's wrapped around
+                cage_cframe_pivot = mesh_pivot
+
                 
                 # Ensure folder exists
                 if not os.path.exists(bundle_own_folder):

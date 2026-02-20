@@ -1,0 +1,33 @@
+--- BONES DATA BY MESH ---
+
+Mesh: LeftUpperArm
+
+Mesh: LeftLowerArm
+
+Mesh: LeftHand
+
+Mesh: RightUpperArm
+
+Mesh: RightLowerArm
+
+Mesh: RightHand
+
+Mesh: LeftUpperLeg
+
+Mesh: LeftLowerLeg
+
+Mesh: LeftFoot
+
+Mesh: RightUpperLeg
+
+Mesh: RightLowerLeg
+
+Mesh: RightFoot
+
+Mesh: UpperTorso
+
+Mesh: LowerTorso
+
+--- FINAL COMBINED DATA ---
+
+Total unique bones: 0

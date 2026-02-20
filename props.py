@@ -153,6 +153,12 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     default = False
     ) # type: ignore
 
+    rbx_bndl_char_choice_armature_at_origin : bpy.props.BoolProperty(
+    name="Armature at Origin",
+    description="Spawn Armature at Origin property",
+    default = True
+    ) # type: ignore
+
     rbx_bndl_char_choice_add_ver_col : bpy.props.BoolProperty(
     name="Vertex Colors",
     description="Vertex Colors property",
@@ -194,7 +200,7 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     rbx_dyn_heads_choice_add_textures : bpy.props.BoolProperty(
     name="Textures",
     description="Textures property",
-    default = True
+    default = False
     ) # type: ignore
 
     rbx_dyn_heads_choice_add_cages : bpy.props.BoolProperty(
@@ -207,13 +213,13 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     rbx_dyn_heads_choice_add_attachment : bpy.props.BoolProperty(
     name="Accessory Attachments",
     description="Accessory Attachments property",
-    default = True
+    default = False
     ) # type: ignore
 
     rbx_dyn_heads_choice_add_motor6d_attachment : bpy.props.BoolProperty(
     name="Motor6D Attachments",
     description="Motor6D Attachments property",
-    default = True
+    default = False
     ) # type: ignore
 
     rbx_dyn_heads_choice_add_ver_col : bpy.props.BoolProperty(
@@ -339,6 +345,62 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     ) # type: ignore
 
 
+    ### Face Parts Properties ###
+    def update_fp_dependencies(self, context):
+        """
+        Update callback to enforce checkbox dependencies for Face Parts.
+        """
+        # If Meshes are unchecked, uncheck Textures
+        if not self.rbx_fp_choice_add_meshes:
+            self.rbx_fp_choice_add_textures = False
+            
+        # If Meshes AND Cages are unchecked, uncheck Vertex Colors
+        if not self.rbx_fp_choice_add_meshes and not self.rbx_fp_choice_add_cages:
+            self.rbx_fp_choice_add_ver_col = False
+
+    rbx_fp_choice_at_origin : bpy.props.BoolProperty(
+    name="Spawn at Origin",
+    description="Spawn at Origin property",
+    default = True
+    ) # type: ignore
+
+    rbx_fp_choice_add_meshes : bpy.props.BoolProperty(
+    name="Meshes",
+    description="Meshes property",
+    default = True,
+    update = update_fp_dependencies
+    ) # type: ignore
+
+    rbx_fp_choice_add_textures : bpy.props.BoolProperty(
+    name="Textures",
+    description="Textures property",
+    default = True
+    ) # type: ignore
+
+    rbx_fp_choice_add_cages : bpy.props.BoolProperty(
+    name="Cages",
+    description="Cages property",
+    default = True,
+    update = update_fp_dependencies
+    ) # type: ignore
+
+    rbx_fp_choice_add_attachment : bpy.props.BoolProperty(
+    name="Attachments",
+    description="Attachments property",
+    default = True
+    ) # type: ignore
+
+    rbx_fp_choice_add_ver_col : bpy.props.BoolProperty(
+    name="Vertex Colors",
+    description="Vertex Colors property",
+    default = False
+    ) # type: ignore
+
+    rbx_fp_choice_clean_tmp_meshes : bpy.props.BoolProperty(
+    name="Cleanup tmp files (rbxm)",
+    description="Cleanup tmp files property",
+    default = False
+    ) # type: ignore
 
 
 
@@ -637,7 +699,49 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
 
     def get_items_callback(self, context, category):
         items = []
-        if category in glob_vars.discovered_items_data:
+        
+        if category == "Armature":
+            # List specific items: "Body Parts" (Bundle) and "Dynamic Head"
+            # Format: "ID_CATEGORY": "Name - Armature"
+            
+            # 1. Body Parts
+            # 1. Body Parts
+            if "Body Parts" in glob_vars.discovered_items_data and glob_vars.discovered_items_data["Body Parts"]:
+                # Use the Bundle ID (glob_vars.rbx_asset_id) if available, or fall back to first item?
+                # Ideally, rbx_asset_id is the bundle ID.
+                # However, if user searched for single asset, rbx_asset_id is that asset.
+                # If "Body Parts" list is populated, we treat it as a single entity (the Cluster/Bundle).
+                
+                bund_id = getattr(glob_vars, 'rbx_asset_id', None)
+                bund_name = getattr(glob_vars, 'rbx_asset_name', "Unknown Bundle")
+                
+                if not bund_id:
+                     # Fallback to first item's ID if global var not set (should be set now)
+                     bund_id = glob_vars.discovered_items_data["Body Parts"][0]['id']
+                
+                identifier = f"BODYPART_{bund_id}"
+                name = f"{bund_name} - Armature"
+                desc = f"Generate Armature from Body Parts bundle: {bund_name}"
+                items.append((identifier, name, desc))
+
+            # 2. Dynamic Heads
+            if "Dynamic Head" in glob_vars.discovered_items_data:
+                seen_ids = set() # Reset for new category
+                for item in glob_vars.discovered_items_data["Dynamic Head"]:
+                    if item['id'] in seen_ids:
+                        continue
+                    seen_ids.add(item['id'])
+                    
+                    # ID format: "DYNHEAD_AssetID"
+                    identifier = f"DYNHEAD_{item['id']}"
+                    name = f"{item['name']} - Armature"
+                    desc = f"Generate Armature from Dynamic Head: {item['name']}"
+                    items.append((identifier, name, desc))
+            
+            # No aggregation of Layered Cloth/Accessories as standalone armature sources usually
+            # unless requested. Focusing on Body Parts and Heads as requested.
+        
+        elif category in glob_vars.discovered_items_data:
             for item in glob_vars.discovered_items_data[category]:
                 # Identifier (Asset ID), Name (Asset Name), Description
                 items.append((str(item['id']), item['name'], f"Asset ID: {item['id']}"))
@@ -674,10 +778,28 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
         items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Layered Cloth")
     ) # type: ignore
     
+    rbx_enum_face_parts : bpy.props.EnumProperty(
+        name = "Face Parts",
+        description = "Discovered Face Parts",
+        items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Face Parts")
+    ) # type: ignore
+    
+    rbx_enum_classics : bpy.props.EnumProperty(
+        name = "Classics",
+        description = "Discovered Classics",
+        items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Classics")
+    ) # type: ignore
+    
     rbx_enum_gear : bpy.props.EnumProperty(
         name = "Gear",
         description = "Discovered Gear",
         items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Gear")
+    ) # type: ignore
+
+    rbx_arma_enum : bpy.props.EnumProperty(
+        name = "Armature",
+        description = "Discovered Armature Items",
+        items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Armature")
     ) # type: ignore
 
     ##### OTHER FUNCTIONS ##### 

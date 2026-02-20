@@ -505,7 +505,9 @@ class TOOLBOX_MENU(bpy.types.Panel):
                             row_header = box.row()
                             row_header.alert = True
                             row_header.label(text=category_name, icon=icon)
-                            row_header.operator("object.rbx_import_discovery_options", text="", icon='PREFERENCES').category = category_name
+                            
+                            if category_name != "Classics":
+                                row_header.operator("object.rbx_import_discovery_options", text="", icon='PREFERENCES').category = category_name
                             
                             box.separator()
                             
@@ -520,8 +522,18 @@ class TOOLBOX_MENU(bpy.types.Panel):
                             # Checkboxes and options are now handling in the pop-up operator
                             
                             box.separator()
+                            box.separator()
                             box.operator('object.rbx_import_discovery_download', text=download_operator_text).category = category_name
-                            box.operator('object.rbx_import_discovery_open_folder', text="Open Folder").category = category_name
+                            
+                            # User Request: Remove open folder button for Armature box
+                            if category_name != "Armature":
+                                box.operator('object.rbx_import_discovery_open_folder', text="Open Folder").category = category_name
+                            else:
+                                if getattr(glob_vars, 'rbx_armature_warning_active', False):
+                                    col_info = box.column(align=True)
+                                    col_info.label(text="Item meshes version is below 4.00", icon='ERROR')
+                                    col_info.label(text="and does not have Armature.")
+                                    col_info.label(text="Older mesh armatures are not yet implemented.")
 
                         # Define categories to display
                         categories_to_draw = []
@@ -533,8 +545,22 @@ class TOOLBOX_MENU(bpy.types.Panel):
                             categories_to_draw.append(("Dynamic Head", 'MONKEY', "rbx_enum_dynamic_head", "Download Dynamic Heads"))
                         if glob_vars.discovered_items_data.get("Layered Cloth"):
                             categories_to_draw.append(("Layered Cloth", 'MOD_CLOTH', "rbx_enum_layered_cloth", "Download Layered Cloth"))
+                        if glob_vars.discovered_items_data.get("Face Parts"):
+                            categories_to_draw.append(("Face Parts", 'FACESEL', "rbx_enum_face_parts", "Download Face Parts"))
+                        if glob_vars.discovered_items_data.get("Classics"):
+                            categories_to_draw.append(("Classics", 'MOD_CLOTH', "rbx_enum_classics", "Download Classics"))
                         if glob_vars.discovered_items_data.get("Gear"):
                             categories_to_draw.append(("Gear", 'MODIFIER', "rbx_enum_gear", "Download Gear"))
+                        
+                        # Check if Armature category should be shown (if any mesh-containing category exists)
+                        armature_relevant_cats = ["Body Parts", "Dynamic Head", "Layered Cloth", "Face Parts"]
+                        if any(glob_vars.discovered_items_data.get(cat) for cat in armature_relevant_cats):
+                             # Use a dummy enum or None for now, or maybe create one if needed for specific options
+                             # For now reusing body parts enum as placeholder or None if logic allows
+                             # But wait, draw_discovery_category expects an enum_prop name for `box.prop(rbx_prefs, enum_prop, ...)`
+                             # We can pass None if we handle it in drawing function, but `draw_discovery_category` uses it directly.
+                             # Let's use `rbx_arma_enum` which exists in props.py (Armatures)
+                             categories_to_draw.append(("Armature", 'OUTLINER_OB_ARMATURE', "rbx_arma_enum", "Download Armature"))
 
                         # Stack Layout (Vertical)
                         for cat_name, icon, enum, dl_text in categories_to_draw:

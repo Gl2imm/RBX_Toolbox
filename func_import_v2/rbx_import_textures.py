@@ -20,6 +20,71 @@ importlib.reload(func_blndr_api)
 DEBUG = True
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
+def find_texture_from_decals(node):
+    """
+    Recursively searches for a Decal object and returns its Texture property.
+    """
+    if not TYPE_CHECKING:
+        from RobloxFiles import Decal # type: ignore
+    
+    # Check children
+    for child in node.GetChildren():
+        if child.ClassName == "Decal":
+            try:
+                tex = child.Properties["Texture"].Value
+                if tex and str(tex) != "":
+                    dprint(f"Found texture in Decal: {tex}")
+                    return tex
+            except:
+                pass
+        
+        # Recurse
+        found = find_texture_from_decals(child)
+        if found:
+            return found
+    return None
+
+
+def resolve_rbxasset(rbx_path):
+    """
+    Resolves rbxasset:// paths to the local Roblox installation.
+    Example: rbxasset://textures/face.png -> %LOCALAPPDATA%/Roblox/Versions/<latest>/content/textures/face.png
+    """
+    if not rbx_path.startswith("rbxasset://"):
+        return None
+    
+    sub_path = rbx_path.replace("rbxasset://", "")
+    sub_path = sub_path.replace("/", os.sep) # Normalize separators
+    
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        dprint("LOCALAPPDATA environment variable not found.")
+        return None
+        
+    versions_dir = os.path.join(local_app_data, "Roblox", "Versions")
+    if not os.path.exists(versions_dir):
+        dprint(f"Roblox Versions directory not found: {versions_dir}")
+        return None
+        
+    # Find latest version folder
+    versions = [os.path.join(versions_dir, d) for d in os.listdir(versions_dir) if os.path.isdir(os.path.join(versions_dir, d)) and d.startswith("version-")]
+    if not versions:
+        dprint("No Roblox version folders found.")
+        return None
+        
+    # Sort by modification time to get latest
+    latest_version = max(versions, key=os.path.getmtime)
+    dprint(f"Latest Roblox version: {latest_version}")
+    
+    full_path = os.path.join(latest_version, "content", sub_path)
+    
+    if os.path.exists(full_path):
+        return full_path
+    
+    dprint(f"Resolved path does not exist: {full_path}")
+    return None
+
+
 def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers, rbx_obj, asset_clean_name):
     """
     Downloads texture(s) for the mesh_part (Classic or SurfaceAppearance) and applies to rbx_obj.
@@ -105,12 +170,26 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
             
             dprint(f"rbx_tex_id_value for {mesh_name}: {rbx_tex_id_value}")
             
+            # FALLBACK: Decals
+            if not rbx_tex_id_value or str(rbx_tex_id_value) == "":
+                dprint(f"TextureId not found for {mesh_name}, searching Decals...")
+                rbx_tex_id_value = find_texture_from_decals(mesh_part)
+                if rbx_tex_id_value:
+                    dprint(f"Found texture via Decals: {rbx_tex_id_value}")
+
             if not rbx_tex_id_value or str(rbx_tex_id_value) == "":
                  rbx_textures = None
             else:
-                 part_TextureID = func_rbx_other.strip_rbxassetid(rbx_tex_id_value)
-                 rbx_textures = {} 
-                 rbx_textures["Color"] = part_TextureID
+                 # Check for local rbxasset://
+                 resolved_local_path = resolve_rbxasset(str(rbx_tex_id_value))
+                 if resolved_local_path:
+                     dprint(f"Resolved local asset: {resolved_local_path}")
+                     rbx_textures = {}
+                     rbx_textures["Color"] = resolved_local_path
+                 else:
+                     part_TextureID = func_rbx_other.strip_rbxassetid(rbx_tex_id_value)
+                     rbx_textures = {} 
+                     rbx_textures["Color"] = part_TextureID
         except Exception as e:
             dprint(f"Error getting classic texture: {e}")
             rbx_textures = None
@@ -126,6 +205,26 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
     new_rbx_textures = rbx_textures.copy()
     
     for tex_name, tex_id in rbx_textures.items():
+        # Check if tex_id is a local absolute path (from resolve_rbxasset)
+        if os.path.isabs(str(tex_id)) and os.path.exists(str(tex_id)):
+             # Copy local file to bundle folder
+             import shutil
+             tex_file_name = f"{mesh_name}_{tex_name}.png"
+             tex_path = os.path.join(bundle_own_folder, tex_file_name)
+             
+             try:
+                 if not os.path.exists(tex_path):
+                     shutil.copy2(str(tex_id), tex_path)
+                     dprint(f"Copied local asset to: {tex_path}")
+             except Exception as e:
+                 dprint(f"Error copying local asset: {e}")
+                 # Fallback to original path if copy fails?
+                 # new_rbx_textures[tex_name] = tex_id 
+                 # continue
+             
+             new_rbx_textures[tex_name] = tex_path
+             continue
+
         tex_file_name = f"{mesh_name}_{tex_name}.png"
         tex_path = os.path.join(bundle_own_folder, tex_file_name)
         
@@ -156,4 +255,66 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
             rbx_obj, mesh_part, rbx_textures, asset_clean_name, bool(rbx_SurfaceAppearance)
         )
 
+def classic_shirt_import(asset_id, asset_name, bundles_folder, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other):
+    rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
+    if not os.path.exists(rbx_tmp_rbxm_file): return
 
+    import clr
+    try:
+        clr.AddReference(robloxfile_dll) # type: ignore
+    except: pass
+    if not TYPE_CHECKING:
+        from RobloxFiles import RobloxFile, Shirt # type: ignore
+        
+    try:
+        file = RobloxFile.Open(rbx_tmp_rbxm_file)
+        shirt_node = file.FindFirstChildOfClass[Shirt]()
+        if shirt_node:
+            template_id_val = shirt_node.Properties["ShirtTemplate"].Value
+            if template_id_val:
+                tex_id = func_rbx_other.strip_rbxassetid(template_id_val)
+                asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)
+                tex_file_name = f"{asset_clean_name}.png"
+                tex_path = os.path.join(bundles_folder, tex_file_name)
+                
+                tex_data, tex_error = func_rbx_cloud_api.get_asset_data(tex_id, headers)
+                if not tex_error and tex_data:
+                    with open(tex_path, "wb") as f:
+                        f.write(tex_data)
+                    dprint(f"Classic shirt saved to {tex_path}")
+                else:
+                    dprint(f"Error downloading classic shirt texture {tex_id}: {tex_error}")
+    except Exception as e:
+        dprint(f"Error processing classic shirt: {e}")
+
+def classic_pants_import(asset_id, asset_name, bundles_folder, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other):
+    rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
+    if not os.path.exists(rbx_tmp_rbxm_file): return
+
+    import clr
+    try:
+        clr.AddReference(robloxfile_dll) # type: ignore
+    except: pass
+    if not TYPE_CHECKING:
+        from RobloxFiles import RobloxFile, Pants # type: ignore
+        
+    try:
+        file = RobloxFile.Open(rbx_tmp_rbxm_file)
+        pants_node = file.FindFirstChildOfClass[Pants]()
+        if pants_node:
+            template_id_val = pants_node.Properties["PantsTemplate"].Value
+            if template_id_val:
+                tex_id = func_rbx_other.strip_rbxassetid(template_id_val)
+                asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)
+                tex_file_name = f"{asset_clean_name}.png"
+                tex_path = os.path.join(bundles_folder, tex_file_name)
+                
+                tex_data, tex_error = func_rbx_cloud_api.get_asset_data(tex_id, headers)
+                if not tex_error and tex_data:
+                    with open(tex_path, "wb") as f:
+                        f.write(tex_data)
+                    dprint(f"Classic pants saved to {tex_path}")
+                else:
+                    dprint(f"Error downloading classic pants texture {tex_id}: {tex_error}")
+    except Exception as e:
+        dprint(f"Error processing classic pants: {e}")

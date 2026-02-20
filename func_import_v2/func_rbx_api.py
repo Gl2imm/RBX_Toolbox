@@ -19,7 +19,7 @@ def get_catalog_bundle_data(rbx_asset_id, headers):
 	glob_vars.rbx_asset_error = None
 	url = f"https://catalog.roblox.com/v1/catalog/items/{rbx_asset_id}/details?itemType=Bundle"
 	try:
-		data = requests.get(url, headers=headers)
+		data = requests.get(url)
 	except Exception as e:     
 		rbx_imp_error = f"Error Getting Catalog Bundle Data: {str(e)}"
 		glob_vars.rbx_imp_error = rbx_imp_error
@@ -49,15 +49,14 @@ def get_catalog_asset_data(rbx_asset_id, headers):
 	rbx_asset_type_id = None
 	rbx_asset_creator = None
 	rbx_imp_error = None
-	
+		
 	try:
-		response = requests.get(url, headers=headers)
+		response = requests.get(url)
 	except Exception as e:
 		rbx_imp_error = f"Connection Error: {str(e)}"
-		return None, None, None, null, rbx_imp_error # Match return signature of get_catalog_bundle_data partialy? No, existing usage expecting 4 values.
-		# specific usage in rbx_import_discovery: asset_name, asset_type_id, asset_creator, asset_error = ...
 		return None, None, None, rbx_imp_error
 		
+	print(f"DEBUG ASSET DATA - Status: {response.status_code}, Body: {response.text}")
 	if response.status_code == 200:
 		data = response.json()
 		rbx_asset_name = data.get("name")
@@ -66,9 +65,21 @@ def get_catalog_asset_data(rbx_asset_id, headers):
 		
 		return rbx_asset_name, rbx_asset_type_id, rbx_asset_creator, None
 	else:
-		if response.status_code == 404:
-			# Not an asset or invalid ID
-			pass
+		if response.status_code in [404, 400]:
+			# Fallback for Classic Clothes (Shirts/Pants) which 400 on the Catalog API
+			eco_url = f"https://economy.roblox.com/v2/assets/{rbx_asset_id}/details"
+			try:
+				eco_response = requests.get(eco_url)
+				if eco_response.status_code == 200:
+					eco_data = eco_response.json()
+					rbx_asset_name = eco_data.get("Name")
+					rbx_asset_type_id = eco_data.get("AssetTypeId")
+					creator_data = eco_data.get("Creator", {})
+					rbx_asset_creator = creator_data.get("Name")
+					return rbx_asset_name, rbx_asset_type_id, rbx_asset_creator, None
+			except:
+				pass
+			rbx_imp_error = f"{response.status_code}: Invalid Asset ID"
 		else:
 			rbx_imp_error = f"Error {response.status_code} fetching asset details"
 			

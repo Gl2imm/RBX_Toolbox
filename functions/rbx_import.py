@@ -333,7 +333,7 @@ def get_catalog_asset_data(rbx_asset_id, headers, rbx_char):
     glob_vars.rbx_asset_error = None
     url = f"https://catalog.roblox.com/v1/catalog/items/{rbx_asset_id}/details?itemType=Asset"
     try:
-        data = requests.get(url, headers=headers)
+        data = requests.get(url)
     except:     
         rbx_asset_error = "Error Getting Catalog Asset Data"
         glob_vars.rbx_asset_error = rbx_asset_error
@@ -347,7 +347,23 @@ def get_catalog_asset_data(rbx_asset_id, headers, rbx_char):
                 glob_vars.rbx_asset_name = rbx_asset_name
                 glob_vars.rbx_asset_creator = rbx_asset_creator
         else:
-            if data.status_code == 400:
+            if data.status_code in [404, 400]:
+                # Fallback for Classic Clothes (Shirts/Pants) which 400 on the Catalog API
+                eco_url = f"https://economy.roblox.com/v2/assets/{rbx_asset_id}/details"
+                try:
+                    eco_response = requests.get(eco_url)
+                    if eco_response.status_code == 200:
+                        eco_data = eco_response.json()
+                        rbx_asset_name = eco_data.get("Name")
+                        rbx_asset_type_id = eco_data.get("AssetTypeId")
+                        creator_data = eco_data.get("Creator", {})
+                        rbx_asset_creator = creator_data.get("Name")
+                        if rbx_char == 'preview_accessory':
+                            glob_vars.rbx_asset_name = rbx_asset_name
+                            glob_vars.rbx_asset_creator = rbx_asset_creator
+                        return rbx_asset_name, rbx_asset_type_id, rbx_asset_creator, None
+                except:
+                    pass
                 rbx_asset_error = f"{data.status_code}: Invalid Asset ID"
             else:
                 rbx_asset_error = f"{data.status_code}: Error getting Catalog Asset Data"
@@ -618,7 +634,7 @@ def get_catalog_bundle_data(rbx_asset_id, headers, rbx_char):
     glob_vars.rbx_asset_error = None
     url = f"https://catalog.roblox.com/v1/catalog/items/{rbx_asset_id}/details?itemType=Bundle"
     try:
-        data = requests.get(url, headers=headers)
+        data = requests.get(url)
     except:     
         rbx_asset_error = "Error Getting Catalog Bundle Data"
         glob_vars.rbx_asset_error = rbx_asset_error

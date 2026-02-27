@@ -10,15 +10,48 @@ matrix = | m[0][0]  m[0][1]  m[0][2] |	# X axis vector
 Rows are where the vector is pointing to in world space (X Y Z)
 '''
 
+def cframe_identity():
+	"""Return an identity CFrame dict (replaces RbxCFrame() from .NET)."""
+	return {"position": (0.0, 0.0, 0.0), "rotation": ("matrix", (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))}
+
+
+def cframe_get_components(cframe):
+	"""Extract a 12-tuple (px,py,pz, r00..r22) from any CFrame format.
+	Supports dicts from rbxm_reader, lists, and legacy .NET objects.
+	"""
+	if isinstance(cframe, dict):
+		pos = cframe.get("position", (0, 0, 0))
+		rot_type, rot_data = cframe.get("rotation", ("matrix", (1,0,0, 0,1,0, 0,0,1)))
+		return (*pos, *rot_data)
+	elif isinstance(cframe, (list, tuple)):
+		return tuple(cframe)
+	elif hasattr(cframe, "GetComponents"):
+		return cframe.GetComponents()
+	else:
+		raise TypeError(f"Unsupported CFrame type: {type(cframe)}")
+
 def cframe_to_blender_matrix(cframe):
-	"""Convert Roblox CFrame to Blender 4x4 matrix. (no swapping Y/Z)"""
-	if type(cframe) == list:
+	"""Convert Roblox CFrame to Blender 4x4 matrix. (no swapping Y/Z)
+	Supports:
+	  - list of 12 floats [px, py, pz, r00..r22]
+	  - dict from rbxm_reader: {"position": (x,y,z), "rotation": ("matrix", (9 floats))}
+	  - .NET CFrame objects with .GetComponents() (legacy, if still used)
+	"""
+	if isinstance(cframe, list):
 		if len(cframe) != 12:
 			raise ValueError("CFrame must have exactly 12 components")
-		else:
-			px, py, pz, r00, r01, r02, r10, r11, r12, r20, r21, r22 = cframe
-	else:
+		px, py, pz, r00, r01, r02, r10, r11, r12, r20, r21, r22 = cframe
+	elif isinstance(cframe, dict):
+		# rbxm_reader dict format: {"position": (x,y,z), "rotation": ("matrix", (r00..r22))}
+		pos = cframe.get("position", (0, 0, 0))
+		px, py, pz = pos
+		rot_type, rot_data = cframe.get("rotation", ("matrix", (1,0,0, 0,1,0, 0,0,1)))
+		r00, r01, r02, r10, r11, r12, r20, r21, r22 = rot_data
+	elif hasattr(cframe, "GetComponents"):
+		# Legacy .NET CFrame object
 		px, py, pz, r00, r01, r02, r10, r11, r12, r20, r21, r22 = cframe.GetComponents()
+	else:
+		raise TypeError(f"Unsupported CFrame type: {type(cframe)}")
 
 	# Build a 4x4 matrix
 	matrix = mathutils.Matrix((

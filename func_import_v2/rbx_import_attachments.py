@@ -4,11 +4,6 @@ import importlib
 from RBX_Toolbox import glob_vars
 from typing import TYPE_CHECKING, List, Any, Dict, Union
 
-# Get the folder where this script (__file__) lives and add subfolders so PythonNET can find dependencies
-net_lib_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rbxm_net_lib")
-robloxfile_dll_name = "RobloxFileFormat.dll"
-robloxfile_dll = os.path.join(net_lib_dir, robloxfile_dll_name)
-
 ### Debug prints
 DEBUG = True
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
@@ -25,6 +20,7 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
     
     # Reload Dependencies & Setup Context
     from . import func_rbx_cloud_api as api_cloud, func_rbx_other as api_other, func_blndr_api as api_blend
+    from . import rbxm_reader
     
     if func_rbx_cloud_api is None: func_rbx_cloud_api = api_cloud
     if func_rbx_other is None: func_rbx_other = api_other
@@ -33,16 +29,6 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
     importlib.reload(func_rbx_cloud_api)
     importlib.reload(func_rbx_other)
     importlib.reload(func_blndr_api)
-
-    import clr
-    from System.Reflection import Assembly # type: ignore
-    try:
-        clr.AddReference(robloxfile_dll) # type: ignore
-    except:
-        pass
-
-    if not TYPE_CHECKING:
-        from RobloxFiles import RobloxFile, Folder, MeshPart, Attachment, Accessory # type: ignore
 
     # === CASE 1: Target is Asset ID (Polymorphic Entry) ===
     if isinstance(target, int) or (isinstance(target, str) and str(target).isdigit()):
@@ -66,12 +52,12 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
                 return
             
         try:
-            rbxm_file = RobloxFile.Open(rbx_tmp_rbxm_file)
+            rbxm_file = rbxm_reader.parse(rbx_tmp_rbxm_file)
         except Exception as e:
             dprint(f"Error opening RBXM {asset_id}: {e}")
             return
 
-        R15Fixed = rbxm_file.FindFirstChild[Folder]("R15Fixed")
+        R15Fixed = rbxm_file.FindFirstChild("R15Fixed")
         
         parts_to_process = []
         is_accessory = False # Default to False, updated if Accessory found
@@ -97,18 +83,18 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
                 ]
 
             for part_name in rbx_avatar_bundle_parts:
-                mesh_part = R15Fixed.FindFirstChild[MeshPart](part_name)
+                mesh_part = R15Fixed.FindFirstChild(part_name)
                 if mesh_part:
                     parts_to_process.append((mesh_part, part_name))
         else:
 
-            children = rbxm_file.GetChildren()
-            child_names = [c.Name for c in children]
-            child_types = [type(c).__name__ for c in children]
+            children = rbxm_file.roots
+            child_names = [c.name for c in children]
+            child_types = [c.class_name for c in children]
             dprint(f"RBXM Children: {child_names} Types: {child_types}")
             
-            head_part = rbxm_file.FindFirstChild[MeshPart]("Head")
-            if head_part:
+            head_part = rbxm_file.FindFirstChild("Head")
+            if head_part and head_part.class_name == "MeshPart":
                 dprint("Found Head MeshPart. Processing as Dynamic Head.")
                 # For dynamic head, the bundle folder is the target
                 target_bundle_folder = bundle_own_folder 
@@ -124,17 +110,17 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
                  is_accessory = False
                  for child in children:
                      # 1. Check if child is an Accessory (container)
-                     if child.ClassName == "Accessory":
+                     if child.class_name == "Accessory":
                          is_accessory = True
                          for acc_child in child.GetChildren():
-                             if acc_child.ClassName == "MeshPart":
-                                 dprint(f"Found Accessory MeshPart: {acc_child.Name}")
-                                 parts_to_process.append((acc_child, acc_child.Name))
+                             if acc_child.class_name == "MeshPart":
+                                 dprint(f"Found Accessory MeshPart: {acc_child.name}")
+                                 parts_to_process.append((acc_child, acc_child.name))
                                  found_any = True
                                  break # Stop searching inside this Accessory
-                             elif acc_child.ClassName == "Part":
-                                 dprint(f"Found Accessory Part: {acc_child.Name}")
-                                 parts_to_process.append((acc_child, acc_child.Name))
+                             elif acc_child.class_name == "Part":
+                                 dprint(f"Found Accessory Part: {acc_child.name}")
+                                 parts_to_process.append((acc_child, acc_child.name))
                                  found_any = True
                                  break # Stop searching inside this Accessory
                          
@@ -142,13 +128,12 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
                              break # Stop searching other children if found an Accessory Handle
                              
                          # If found accessory but not handle, reset is_accessory? 
-                         # Actually if we fallback to generic MeshPart next, it might not be accessory.
                          if not found_any: is_accessory = False
                      
                      # 2. Check if child is directly a MeshPart
-                     elif child.ClassName == "MeshPart":
-                         dprint(f"Found generic MeshPart: {child.Name}")
-                         parts_to_process.append((child, child.Name))
+                     elif child.class_name == "MeshPart":
+                         dprint(f"Found generic MeshPart: {child.name}")
+                         parts_to_process.append((child, child.name))
                          found_any = True
                          break # Stop searching
 
@@ -158,18 +143,11 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
 
         if is_layered_clothing or is_face_parts:
              # Calculate unique attachment collection name: "LC Attachments XX" or "FP Attachments XX"
-             # 1. Determine Parent Collection Name (Asset Name)
-             # Same logic as meshes/cages: if single asset, parent is Root. But here we put attachments INSIDE the Asset Collection.
-             # The asset collection name IS asset_clean_name.
-             
              lc_att_cols_parent_name = asset_clean_name
              
              prefix = "FP" if is_face_parts else "LC"
              target_att_name = f"{prefix} Attachments 00" # Default
              
-             # User Request: "running number like first folder is 00, then 01"
-             # Implementation: Global Running Number across the Scene
-             # Scan all collections to find max suffix
              import re
              max_suffix = -1
              pattern = re.compile(rf"{prefix} Attachments (\d+)")
@@ -200,13 +178,13 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
     
     # === CASE 2: Target is MeshPart (Called from Bundle Importer) ===
     else:
-        # Assuming target is a MeshPart object (or duck-typed enough)
+        # Assuming target is an rbxm_reader Instance object
         if hasattr(target, "FindFirstChild"):
              _process_single_attachment(
                 target, mesh_name, bundle_own_folder, headers, 
                 asset_clean_name, at_origin, add_attachment, add_motor6d_attachment, funct, func_blndr_api, func_rbx_other,
                 is_accessory=False, is_layered_clothing=is_layered_clothing, is_face_parts=is_face_parts,
-                lc_target_att_name=None # Numbering logic likely not applicable or needs expansion for this path if needed
+                lc_target_att_name=None
             )
         else:
              dprint(f"Invalid target type for attachments: {type(target)}")
@@ -218,26 +196,18 @@ def _process_single_attachment(mesh_part, mesh_name, bundle_own_folder, headers,
                           func_blndr_api, func_rbx_other, is_accessory=False, is_layered_clothing=False, is_face_parts=False,
                           lc_target_att_name=None):
 
-    # Unpack Preferences
-    # at_origin is passed directly
-    
-    if not TYPE_CHECKING:
-        from RobloxFiles import Attachment, MeshPart # type: ignore
-
     # Reuse logic from meshes script but standalone
     # We need the CFrame and Pivot of the parent part to act as reference
     
-    cframe = mesh_part.CFrame
+    cframe = mesh_part.get("CFrame")
     
     # Try to get PivotOffset from MeshPart
-    try:
-        part_cframe_pivot = mesh_part.Properties["PivotOffset"].Value
-    except:
-        from RobloxFiles.DataTypes import CFrame as RbxCFrame
-        part_cframe_pivot = RbxCFrame()
+    part_cframe_pivot = mesh_part.get("PivotOffset")
+    if part_cframe_pivot is None:
+        part_cframe_pivot = funct.cframe_identity()
 
     # Check if pivot is identity
-    pivot_comps = part_cframe_pivot.GetComponents()
+    pivot_comps = funct.cframe_get_components(part_cframe_pivot)
     identity_comps = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
     is_identity = True
     if len(pivot_comps) == 12:
@@ -293,17 +263,18 @@ def _process_single_attachment(mesh_part, mesh_name, bundle_own_folder, headers,
         existing_attachment_names = set(obj.name for obj in attachments_collection.objects)
 
         for child in mesh_part.GetChildren():
-            if child.ClassName == "Attachment":
-                if "RigAttachment" not in str(child.Name):
+            if child.class_name == "Attachment":
+                if "RigAttachment" not in str(child.name):
                     # Clean name check
-                    att_name = child.Name
+                    att_name = child.name
                     if att_name in existing_attachment_names:
                         dprint(f"    -> Skipping Duplicate Attachment: {att_name}")
                         continue
 
-                    dprint(f"    -> Found Attachment: {child.Name} in {mesh_name}")
+                    dprint(f"    -> Found Attachment: {child.name} in {mesh_name}")
+                    att_cframe = child.get("CFrame")
                     func_blndr_api.blender_api_add_attachments(
-                        child, child.CFrame, cframe, part_cframe_pivot, 
+                        child, att_cframe, cframe, part_cframe_pivot, 
                         actual_at_origin, funct, is_accessory=is_accessory
                     )
 
@@ -313,16 +284,17 @@ def _process_single_attachment(mesh_part, mesh_name, bundle_own_folder, headers,
         existing_motor6d_names = set(obj.name for obj in motor6d_collection.objects)
 
         for child in mesh_part.GetChildren():
-            if child.ClassName == "Attachment":
-                if "RigAttachment" in str(child.Name):
+            if child.class_name == "Attachment":
+                if "RigAttachment" in str(child.name):
                     # Clean name check
-                    att_name = child.Name
+                    att_name = child.name
                     if att_name in existing_motor6d_names:
                         dprint(f"    -> Skipping Duplicate Motor6D Attachment: {att_name}")
                         continue
 
-                    dprint(f"    -> Found Motor6D Attachment: {child.Name} in {mesh_name}")
+                    dprint(f"    -> Found Motor6D Attachment: {child.name} in {mesh_name}")
+                    att_cframe = child.get("CFrame")
                     func_blndr_api.blender_api_add_attachments(
-                        child, child.CFrame, cframe, part_cframe_pivot, 
+                        child, att_cframe, cframe, part_cframe_pivot, 
                         actual_at_origin, funct, is_accessory=is_accessory
                     )

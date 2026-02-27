@@ -4,12 +4,6 @@ from . import func_rbx_cloud_api
 from . import func_rbx_other
 from . import func_blndr_api
 from RBX_Toolbox import glob_vars
-from typing import TYPE_CHECKING
-
-# Get the folder where this script (__file__) lives and add subfolders so PythonNET can find dependencies
-net_lib_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rbxm_net_lib")
-robloxfile_dll_name = "RobloxFileFormat.dll"
-robloxfile_dll = os.path.join(net_lib_dir, robloxfile_dll_name)
 
 # Reload modules if needed, though usually handled by caller or auto-reload
 importlib.reload(func_rbx_cloud_api)
@@ -24,15 +18,13 @@ def find_texture_from_decals(node):
     """
     Recursively searches for a Decal object and returns its Texture property.
     """
-    if not TYPE_CHECKING:
-        from RobloxFiles import Decal # type: ignore
-    
     # Check children
     for child in node.GetChildren():
-        if child.ClassName == "Decal":
+        if child.class_name == "Decal":
             try:
-                tex = child.Properties["Texture"].Value
-                if tex and str(tex) != "":
+                tex_raw = child.get("Texture")
+                tex = func_rbx_other.resolve_content_uri(tex_raw)
+                if tex and tex != "":
                     dprint(f"Found texture in Decal: {tex}")
                     return tex
             except:
@@ -88,31 +80,20 @@ def resolve_rbxasset(rbx_path):
 def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers, rbx_obj, asset_clean_name):
     """
     Downloads texture(s) for the mesh_part (Classic or SurfaceAppearance) and applies to rbx_obj.
+    mesh_part is now an rbxm_reader Instance object.
     """
-    # Removed load('coreclr') logic error - context is already loaded by caller
-    import clr
-    from System.Reflection import Assembly # type: ignore
-    try:
-        clr.AddReference(robloxfile_dll) # type: ignore
-    except:
-        pass
-
-    if not TYPE_CHECKING:
-        from RobloxFiles import RobloxFile, Folder, MeshPart, Part, WrapTarget, Attachment, SpecialMesh, SurfaceAppearance # type: ignore
-    
 
     # Check for SurfaceAppearance (PBR)
-    # Using typed FindFirstChild to ensure correct overload resolution
-    rbx_SurfaceAppearance = mesh_part.FindFirstChild[SurfaceAppearance]("SurfaceAppearance")
+    rbx_SurfaceAppearance = mesh_part.FindFirstChildOfClass("SurfaceAppearance")
     
     # Aligning logic with bundle_char
     rbx_textures = {}
     try:
-        if mesh_part.ClassName == "SpecialMesh":
+        if mesh_part.class_name == "SpecialMesh":
              # If the passed object is already the SpecialMesh
              special_mesh = mesh_part
-        elif mesh_part.ClassName == "Part":
-            special_mesh = mesh_part.FindFirstChildOfClass[SpecialMesh]()
+        elif mesh_part.class_name == "Part":
+            special_mesh = mesh_part.FindFirstChildOfClass("SpecialMesh")
         else:
             special_mesh = None
 
@@ -124,8 +105,9 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
         dprint(f"Found SurfaceAppearance for {mesh_name}")
         for tex_name in glob_vars.rbx_pbr_materials:
             try:
-                # Direct property access
-                val = rbx_SurfaceAppearance.Properties[tex_name].Value
+                # Direct property access via rbxm_reader Instance
+                val_raw = rbx_SurfaceAppearance.get(tex_name)
+                val = func_rbx_other.resolve_content_uri(val_raw)
                 part_TextureID = func_rbx_other.strip_rbxassetid(val)
                 
                 if part_TextureID == "" or part_TextureID == "None":
@@ -153,31 +135,34 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
             if special_mesh:
                 # SpecialMesh uses "TextureId"
                 try:
-                    rbx_tex_id_value = special_mesh.Properties["TextureId"].Value
+                    raw = special_mesh.get("TextureId")
+                    rbx_tex_id_value = func_rbx_other.resolve_content_uri(raw)
                 except:
-                    # Fallback or check if it uses TextureID? API usually says TextureId
-                     dprint(f"Failed to get TextureId from SpecialMesh. trying TextureID")
-                     try:
-                        rbx_tex_id_value = special_mesh.Properties["TextureID"].Value
-                     except:
+                    # Fallback: try TextureID
+                    dprint(f"Failed to get TextureId from SpecialMesh. trying TextureID")
+                    try:
+                        raw = special_mesh.get("TextureID")
+                        rbx_tex_id_value = func_rbx_other.resolve_content_uri(raw)
+                    except:
                         pass
             else:
                  # MeshPart uses "TextureID"
                  try:
-                    rbx_tex_id_value = mesh_part.Properties["TextureID"].Value
+                    raw = mesh_part.get("TextureID")
+                    rbx_tex_id_value = func_rbx_other.resolve_content_uri(raw)
                  except:
                     pass
             
             dprint(f"rbx_tex_id_value for {mesh_name}: {rbx_tex_id_value}")
             
             # FALLBACK: Decals
-            if not rbx_tex_id_value or str(rbx_tex_id_value) == "":
+            if not rbx_tex_id_value or rbx_tex_id_value == "":
                 dprint(f"TextureId not found for {mesh_name}, searching Decals...")
                 rbx_tex_id_value = find_texture_from_decals(mesh_part)
                 if rbx_tex_id_value:
                     dprint(f"Found texture via Decals: {rbx_tex_id_value}")
 
-            if not rbx_tex_id_value or str(rbx_tex_id_value) == "":
+            if not rbx_tex_id_value or rbx_tex_id_value == "":
                  rbx_textures = None
             else:
                  # Check for local rbxasset://
@@ -218,9 +203,6 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
                      dprint(f"Copied local asset to: {tex_path}")
              except Exception as e:
                  dprint(f"Error copying local asset: {e}")
-                 # Fallback to original path if copy fails?
-                 # new_rbx_textures[tex_name] = tex_id 
-                 # continue
              
              new_rbx_textures[tex_name] = tex_path
              continue
@@ -236,7 +218,6 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
                         f.write(tex_data)
                 except Exception as e:
                     dprint(f"    Error saving texture {tex_file_name}: {e}")
-                    # If save fails, we might still want to try next one, or remove this from map?
                     del new_rbx_textures[tex_name]
                     continue
             else:
@@ -259,18 +240,14 @@ def classic_shirt_import(asset_id, asset_name, bundles_folder, headers, rbx_tmp_
     rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
     if not os.path.exists(rbx_tmp_rbxm_file): return
 
-    import clr
-    try:
-        clr.AddReference(robloxfile_dll) # type: ignore
-    except: pass
-    if not TYPE_CHECKING:
-        from RobloxFiles import RobloxFile, Shirt # type: ignore
+    from . import rbxm_reader
         
     try:
-        file = RobloxFile.Open(rbx_tmp_rbxm_file)
-        shirt_node = file.FindFirstChildOfClass[Shirt]()
+        file = rbxm_reader.parse(rbx_tmp_rbxm_file)
+        shirt_node = file.FindFirstChildOfClass("Shirt")
         if shirt_node:
-            template_id_val = shirt_node.Properties["ShirtTemplate"].Value
+            template_raw = shirt_node.get("ShirtTemplate")
+            template_id_val = func_rbx_other.resolve_content_uri(template_raw)
             if template_id_val:
                 tex_id = func_rbx_other.strip_rbxassetid(template_id_val)
                 asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)
@@ -291,18 +268,14 @@ def classic_pants_import(asset_id, asset_name, bundles_folder, headers, rbx_tmp_
     rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
     if not os.path.exists(rbx_tmp_rbxm_file): return
 
-    import clr
-    try:
-        clr.AddReference(robloxfile_dll) # type: ignore
-    except: pass
-    if not TYPE_CHECKING:
-        from RobloxFiles import RobloxFile, Pants # type: ignore
+    from . import rbxm_reader
         
     try:
-        file = RobloxFile.Open(rbx_tmp_rbxm_file)
-        pants_node = file.FindFirstChildOfClass[Pants]()
+        file = rbxm_reader.parse(rbx_tmp_rbxm_file)
+        pants_node = file.FindFirstChildOfClass("Pants")
         if pants_node:
-            template_id_val = pants_node.Properties["PantsTemplate"].Value
+            template_raw = pants_node.get("PantsTemplate")
+            template_id_val = func_rbx_other.resolve_content_uri(template_raw)
             if template_id_val:
                 tex_id = func_rbx_other.strip_rbxassetid(template_id_val)
                 asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)

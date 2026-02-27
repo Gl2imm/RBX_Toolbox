@@ -1,5 +1,4 @@
 import os
-import winreg
 from RBX_Toolbox import glob_vars
 
 
@@ -8,23 +7,22 @@ DEBUG = True
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 
-def is_dotnet_installed() -> bool:
-	"""Check if .NET Framework 4.7.1 or newer is installed (Windows registry check)."""
-	try:
-		key_path = r"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full"
-		with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as key:
-			release, _ = winreg.QueryValueEx(key, "Release")
-			# 461808 = 4.7.1, 528040 = 4.8
-			version_map = {
-				461808: "4.7.1",
-				528040: "4.8",
-			}
-			for rel in version_map:
-				if release >= rel:
-					return True
-		return False
-	except FileNotFoundError:
-		return False
+def resolve_content_uri(value):
+	"""Extract a URI string from an rbxm_reader Content property value.
+	Content properties in the new reader return dicts like:
+	  {"type": "Uri", "uri": "rbxassetid://123"}
+	  {"type": "None"}
+	Also handles plain strings (backwards compat) and None.
+	Returns the URI string, or empty string if not available.
+	"""
+	if value is None:
+		return ""
+	if isinstance(value, dict):
+		if value.get("type") == "Uri":
+			return value.get("uri", "")
+		return ""
+	# Plain string (backwards compat or already resolved)
+	return str(value)
 
 
 ## Remove restricted characters from string ##

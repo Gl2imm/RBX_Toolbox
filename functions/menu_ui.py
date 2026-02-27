@@ -448,41 +448,27 @@ class TOOLBOX_MENU(bpy.types.Panel):
             row.label(text='Import (Beta)', icon='IMPORT')
             # some data on the subpanel
             if context.scene.subpanel_imp_beta:
-                # .NET Framework check (required for pythonnet / RobloxFileFormat.dll)
-                from RBX_Toolbox.func_import_v2 import func_rbx_other as _rbx_other
-                _dotnet_ok = _rbx_other.is_dotnet_installed()
-                if not _dotnet_ok:
-                    box = layout.box()
-                    box.label(text="Import (Beta) requires .NET Framework (Runtime)", icon="ERROR")
-                    box.label(text="4.7.1 or newer to be installed.")
-                    box.operator(
-                        "object.url_handler",
-                        text="Download .NET Framework",
-                        icon="URL",
-                    ).rbx_link = "dotnet_download"
-                    box.label(text="Restart Blender after installation.")
-                else:
-                    box = layout.box()
-                    box.label(text = 'Enter ID or URL')
-                    
-                    row = box.row()
-                    row.enabled = not rbx_prefs.rbx_import_beta_active
-                    row.prop(rbx_prefs, 'rbx_item_field_entry', text ='')
+                box = layout.box()
+                box.label(text = 'Enter ID or URL')
+                
+                row = box.row()
+                row.enabled = not rbx_prefs.rbx_import_beta_active
+                row.prop(rbx_prefs, 'rbx_item_field_entry', text ='')
 
-                    row = box.row()
-                    row.enabled = not rbx_prefs.rbx_import_beta_active
-                    row.operator('object.rbx_import_discovery', text = "Asset Discovery")
-                    
-                    box_reset = box.box()
-                    if rbx_prefs.rbx_import_beta_active:
-                         box_reset.alert = True
-                    box_reset.operator('object.rbx_import_reset', text = "Reset")
-                    
-                    if glob_vars.rbx_imp_error:
-                        box_reset.label(text=glob_vars.rbx_imp_error, icon='ERROR')
+                row = box.row()
+                row.enabled = not rbx_prefs.rbx_import_beta_active
+                row.operator('object.rbx_import_discovery', text = "Asset Discovery")
+                
+                box_reset = box.box()
+                if rbx_prefs.rbx_import_beta_active:
+                     box_reset.alert = True
+                box_reset.operator('object.rbx_import_reset', text = "Reset")
+                
+                if glob_vars.rbx_imp_error:
+                    box_reset.label(text=glob_vars.rbx_imp_error, icon='ERROR')
 
-                    # Discovered Items UI
-                    if hasattr(glob_vars, 'discovered_items_data') and glob_vars.discovered_items_data:
+                # Discovered Items UI
+                if hasattr(glob_vars, 'discovered_items_data') and glob_vars.discovered_items_data:
                         # Check if any category has items
                         has_items = any(glob_vars.discovered_items_data.values())
                         

@@ -8,11 +8,6 @@ from RBX_Toolbox import glob_vars
 from glob_vars import addon_path
 
 
-# Get the folder where this script (__file__) lives and add subfolders so PythonNET can find dependencies
-net_lib_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rbxm_net_lib")
-robloxfile_dll_name = "RobloxFileFormat.dll"
-robloxfile_dll = os.path.join(net_lib_dir, robloxfile_dll_name)
-
 # code here runs only in editor
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -45,14 +40,6 @@ class RBX_OT_import_discovery(bpy.types.Operator):
         # Clear previous errors
         glob_vars.rbx_imp_error = None
 
-        from pythonnet import load
-        load('coreclr')
-        import clr
-        from System.Reflection import Assembly # type: ignore
-        clr.AddReference(robloxfile_dll) # type: ignore
-        # this is import from dll in runtime
-        if not TYPE_CHECKING:
-            from RobloxFiles import RobloxFile, Folder, MeshPart, Part, WrapTarget, Attachment, SpecialMesh, SurfaceAppearance, Shirt, Pants, Accessory   # type: ignore
         from . import mesh_reader
         importlib.reload(mesh_reader)
         from . import func_rbx_other
@@ -242,12 +229,6 @@ class RBX_OT_import_reset(bpy.types.Operator):
         # Reset UI State
         rbx_prefs.rbx_import_beta_active = False
         
-        # Reset Input Field to default (or empty, or placeholder)
-        # Using the default property value or a standard placeholder
-        # rbx_prefs.property_unset("rbx_item_field_entry") # This resets to default
-        # Or manually:
-        # rbx_prefs.rbx_item_field_entry = "Input ID or URL"  
-        
         # Clear discovered items
         glob_vars.discovered_items_data = {}
         glob_vars.rbx_default_head_used = False
@@ -341,11 +322,6 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
             box.prop(rbx_prefs, 'rbx_bndl_char_choice_add_cages')
             box.prop(rbx_prefs, 'rbx_bndl_char_choice_add_attachment')
             box.prop(rbx_prefs, 'rbx_bndl_char_choice_add_motor6d_attachment')
-            
-            # row = box.row()
-            # # row.enabled = False 
-            # # row.enabled = rbx_prefs.rbx_bndl_char_choice_add_meshes
-            # row.prop(rbx_prefs, 'rbx_bndl_char_choice_add_bones')
             
             row = box.row()
             row.enabled = rbx_prefs.rbx_bndl_char_choice_add_meshes or rbx_prefs.rbx_bndl_char_choice_add_cages

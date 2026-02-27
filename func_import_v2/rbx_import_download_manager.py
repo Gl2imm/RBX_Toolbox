@@ -6,10 +6,7 @@ from RBX_Toolbox import glob_vars
 from glob_vars import addon_path
 from typing import TYPE_CHECKING
 
-# Get the folder where this script (__file__) lives and add subfolders so PythonNET can find dependencies
-net_lib_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rbxm_net_lib")
-robloxfile_dll_name = "RobloxFileFormat.dll"
-robloxfile_dll = os.path.join(net_lib_dir, robloxfile_dll_name)
+
 
 ### Debug prints
 DEBUG = True
@@ -53,13 +50,7 @@ def ensure_local_asset(asset_id, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_
 
 
 def download_body_parts(context, category_name="Body Parts", download_all=False):
-    # Initialize Context
-    import clr
-    from System.Reflection import Assembly # type: ignore
-    try:
-        clr.AddReference(robloxfile_dll) # type: ignore
-    except:
-        pass
+    # Initialize Context — .NET no longer needed, sub-modules use rbxm_reader
     
     # Reload Dependencies
     from . import mesh_reader, conversion_funct as funct, func_rbx_other, func_rbx_api, func_blndr_api, func_rbx_cloud_api

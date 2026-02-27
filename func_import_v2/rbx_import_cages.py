@@ -5,11 +5,6 @@ import re
 from RBX_Toolbox import glob_vars
 from typing import TYPE_CHECKING, List, Any, Dict, Union
 
-# Get the folder where this script (__file__) lives and add subfolders so PythonNET can find dependencies
-net_lib_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rbxm_net_lib")
-robloxfile_dll_name = "RobloxFileFormat.dll"
-robloxfile_dll = os.path.join(net_lib_dir, robloxfile_dll_name)
-
 ### Debug prints
 DEBUG = True
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
@@ -26,6 +21,7 @@ def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own
     
     # Reload Dependencies & Setup Context
     from . import func_rbx_cloud_api as api_cloud, func_rbx_other as api_other, func_blndr_api as api_blend
+    from . import rbxm_reader
     
     if func_rbx_cloud_api is None: func_rbx_cloud_api = api_cloud
     if func_rbx_other is None: func_rbx_other = api_other
@@ -34,16 +30,6 @@ def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own
     importlib.reload(func_rbx_cloud_api)
     importlib.reload(func_rbx_other)
     importlib.reload(func_blndr_api)
-
-    import clr
-    from System.Reflection import Assembly # type: ignore
-    try:
-        clr.AddReference(robloxfile_dll) # type: ignore
-    except:
-        pass
-
-    if not TYPE_CHECKING:
-        from RobloxFiles import RobloxFile, Folder, MeshPart, WrapTarget # type: ignore
 
     # === CASE 1: Target is Asset ID (Polymorphic Entry) ===
     if isinstance(target, int) or (isinstance(target, str) and str(target).isdigit()):
@@ -67,12 +53,12 @@ def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own
                 return
             
         try:
-            rbxm_file = RobloxFile.Open(rbx_tmp_rbxm_file)
+            rbxm_file = rbxm_reader.parse(rbx_tmp_rbxm_file)
         except Exception as e:
             dprint(f"Error opening RBXM {asset_id}: {e}")
             return
 
-        R15Fixed = rbxm_file.FindFirstChild[Folder]("R15Fixed")
+        R15Fixed = rbxm_file.FindFirstChild("R15Fixed")
         
         parts_to_process = []
 
@@ -97,35 +83,36 @@ def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own
                 ]
 
             for part_name in rbx_avatar_bundle_parts:
-                mesh_part = R15Fixed.FindFirstChild[MeshPart](part_name)
+                mesh_part = R15Fixed.FindFirstChild(part_name)
                 if mesh_part:
                     parts_to_process.append((mesh_part, part_name))
         else:
             dprint(f"No R15Fixed folder found. Checking for Dynamic Head MeshPart...")
-            head_part = rbxm_file.FindFirstChild[MeshPart]("Head")
-            if head_part:
+            # Search for MeshPart named "Head"
+            head_part = rbxm_file.FindFirstChild("Head")
+            if head_part and head_part.class_name == "MeshPart":
                 dprint("Found Head MeshPart. Processing as Dynamic Head.")
-                # For dynamic head, the bundle folder is the target
                 target_bundle_folder = bundle_own_folder
                 parts_to_process.append((head_part, "Head"))
             else:
                 dprint(f"No Head MeshPart found in {asset_clean_name if asset_clean_name else str(asset_id)}")
                 # Debug: List children
-                children = [c.Name for c in rbxm_file.GetChildren()]
-                dprint(f"Children found: {children}")
+                children = [c.name for c in rbxm_file.GetDescendants() if c.parent is None or c.parent not in rbxm_file.roots]
+                children_root = [c.name for c in rbxm_file.roots] if hasattr(rbxm_file, 'roots') else []
+                dprint(f"Root children found: {children_root}")
                 
                  # Fallback: check all children for MeshParts (e.g. Accessories with "Handle")
                 dprint("No Head MeshPart found. Checking all children for MeshParts...")
                 target_bundle_folder = bundle_own_folder
                  
                 found_any = False
-                for child in rbxm_file.GetChildren():
+                for child in rbxm_file.roots:
                      # 1. Check if child is an Accessory (container)
-                     if child.ClassName == "Accessory":
+                     if child.class_name == "Accessory":
                          for acc_child in child.GetChildren():
-                             if acc_child.ClassName == "MeshPart":
-                                 dprint(f"Found Accessory MeshPart: {acc_child.Name}")
-                                 parts_to_process.append((acc_child, acc_child.Name))
+                             if acc_child.class_name == "MeshPart":
+                                 dprint(f"Found Accessory MeshPart: {acc_child.name}")
+                                 parts_to_process.append((acc_child, acc_child.name))
                                  found_any = True
                                  break 
                          
@@ -133,9 +120,9 @@ def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own
                              break 
                      
                      # 2. Check if child is directly a MeshPart
-                     elif child.ClassName == "MeshPart":
-                         dprint(f"Found generic MeshPart: {child.Name}")
-                         parts_to_process.append((child, child.Name))
+                     elif child.class_name == "MeshPart":
+                         dprint(f"Found generic MeshPart: {child.name}")
+                         parts_to_process.append((child, child.name))
                          found_any = True
                          break 
                 
@@ -177,10 +164,9 @@ def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own
         
         return
     
-    # === CASE 2: Target is MeshPart (Called from Bundle Importer) ===
+    # === CASE 2: Target is MeshPart Instance (Called from Bundle Importer) ===
     else:
-        # Assuming target is a MeshPart object (or duck-typed enough)
-        # Verify it has FindFirstChild
+        # Assuming target is an rbxm_reader Instance object
         if hasattr(target, "FindFirstChild"):
              _process_single_cage(
                 target, mesh_name, bundle_own_folder, headers, 
@@ -209,28 +195,27 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
 
     # Unpack Preferences
     # at_origin and add_ver_col are now passed directly
-    
-    if not TYPE_CHECKING:
-        from RobloxFiles import WrapTarget, WrapLayer # type: ignore
 
     cage_part = None
     is_wrap_layer = False
     
     if is_layered_clothing or is_face_parts:
         # Layered Clothing and Face Parts use WrapLayer
-        # Check for any child of class WrapLayer
         for child in mesh_part.GetChildren():
-             if child.ClassName == "WrapLayer":
+             if child.class_name == "WrapLayer":
                  cage_part = child
                  is_wrap_layer = True
-                 dprint(f"    -> Found WrapLayer: {child.Name}")
+                 dprint(f"    -> Found WrapLayer: {child.name}")
                  break
     
     if not cage_part:
         # Fallback to WrapTarget (Body Parts)
-        cage_part = mesh_part.FindFirstChild[WrapTarget](mesh_name + "WrapTarget")
+        cage_part = mesh_part.FindFirstChild(mesh_name + "WrapTarget")
         if not cage_part:
-            cage_part = mesh_part.FindFirstChild[WrapTarget](mesh_name)
+            cage_part = mesh_part.FindFirstChild(mesh_name)
+            # Verify it's actually a WrapTarget
+            if cage_part and cage_part.class_name != "WrapTarget":
+                cage_part = None
     
     if cage_part:
         if not is_wrap_layer:
@@ -272,15 +257,24 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
             
             if is_wrap_layer:
                 # WrapLayer has CageMeshId (Inner) and ReferenceMeshId (Outer)
-                # Use ContainsKey for C# dictionary
-                if cage_part.Properties.ContainsKey("CageMeshId"):
-                     cages_to_import.append((cage_part.Properties["CageMeshId"].Value, "_outer_cage"))
-                if cage_part.Properties.ContainsKey("ReferenceMeshId"):
-                     cages_to_import.append((cage_part.Properties["ReferenceMeshId"].Value, "_inner_cage"))
+                cage_mesh_raw = cage_part.get("CageMeshId")
+                if cage_mesh_raw is not None:
+                    cage_uri = func_rbx_other.resolve_content_uri(cage_mesh_raw)
+                    if cage_uri:
+                        cages_to_import.append((cage_uri, "_outer_cage"))
+                
+                ref_mesh_raw = cage_part.get("ReferenceMeshId")
+                if ref_mesh_raw is not None:
+                    ref_uri = func_rbx_other.resolve_content_uri(ref_mesh_raw)
+                    if ref_uri:
+                        cages_to_import.append((ref_uri, "_inner_cage"))
             else:
                 # WrapTarget has CageMeshId (Inner)
-                if cage_part.Properties.ContainsKey("CageMeshId"):
-                    cages_to_import.append((cage_part.Properties["CageMeshId"].Value, "_inner_cage"))
+                cage_mesh_raw = cage_part.get("CageMeshId")
+                if cage_mesh_raw is not None:
+                    cage_uri = func_rbx_other.resolve_content_uri(cage_mesh_raw)
+                    if cage_uri:
+                        cages_to_import.append((cage_uri, "_inner_cage"))
 
             # Loop through cages
             for cage_mesh_id_raw, name_suffix in cages_to_import:
@@ -289,18 +283,27 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
                 if not cage_mesh_id:
                     continue
 
-                # NOTE: CageOrigin logic
-                # For WrapLayer, does it observe ImportOrigin/CageOrigin? 
-                # Docs say WrapLayer has ImportOrigin.
-                # Assuming same CFrame logic applies.
+                # CageOrigin logic
+                cage_cframe = mesh_part.get("CFrame")
+                cage_origin = cage_part.get("CageOrigin")
+                if cage_origin is not None:
+                    # cage_cframe = mesh_part.CFrame * cage_part.CageOrigin
+                    # For now, use CageOrigin as the cage CFrame offset
+                    # This is a local offset relative to mesh_part CFrame
+                    cage_cframe_matrix = funct.cframe_to_blender_matrix(cage_cframe)
+                    cage_origin_matrix = funct.cframe_to_blender_matrix(cage_origin)
+                    combined = cage_cframe_matrix @ cage_origin_matrix
+                    # Convert back to CFrame dict for downstream
+                    cage_cframe = {
+                        "position": (combined[0][3], combined[1][3], combined[2][3]),
+                        "rotation": ("matrix", (
+                            combined[0][0], combined[0][1], combined[0][2],
+                            combined[1][0], combined[1][1], combined[1][2],
+                            combined[2][0], combined[2][1], combined[2][2],
+                        ))
+                    }
                 
-                cage_cframe = mesh_part.CFrame 
-                if cage_part.Properties.ContainsKey("CageOrigin"):
-                     cage_cframe = mesh_part.CFrame * cage_part.Properties["CageOrigin"].Value
-                
-                cage_cframe_pivot = None
-                if cage_part.Properties.ContainsKey("ImportOrigin"):
-                    cage_cframe_pivot = cage_part.Properties["ImportOrigin"].Value
+                cage_cframe_pivot = cage_part.get("ImportOrigin")
                 
                 dprint(f"Processing Cage: {name_suffix} ID: {cage_mesh_id}") 
                 
@@ -308,13 +311,11 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
                     continue
 
                 # Check if MESH pivot is identity (The Cage must follow the Mesh's placement)
-                try:
-                    mesh_pivot = mesh_part.Properties["PivotOffset"].Value
-                except:
-                    from RobloxFiles.DataTypes import CFrame as RbxCFrame
-                    mesh_pivot = RbxCFrame()
+                mesh_pivot = mesh_part.get("PivotOffset")
+                if mesh_pivot is None:
+                    mesh_pivot = funct.cframe_identity()
 
-                mesh_pivot_comps = mesh_pivot.GetComponents()
+                mesh_pivot_comps = funct.cframe_get_components(mesh_pivot)
                 identity_comps = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
                 mesh_is_identity = True
                 if len(mesh_pivot_comps) == 12:
@@ -325,9 +326,9 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
 
                 is_accessory = False
                 check_obj = mesh_part
-                if mesh_part.ClassName == "SpecialMesh":
-                     check_obj = mesh_part.Parent
-                if check_obj and check_obj.Parent and check_obj.Parent.ClassName == "Accessory":
+                if mesh_part.class_name == "SpecialMesh":
+                     check_obj = mesh_part.parent
+                if check_obj and check_obj.parent and check_obj.parent.class_name == "Accessory":
                     is_accessory = True
 
                 # If pivot is identity (for the Mesh), force at_origin to False (unless accessory)
@@ -343,7 +344,7 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
                 if not os.path.exists(bundle_own_folder):
                     os.makedirs(bundle_own_folder)
                     
-                cage_mesh_file_path = os.path.join(rbx_tmp_rbxm_filepath, cage_part.Name + name_suffix + ".mesh")
+                cage_mesh_file_path = os.path.join(rbx_tmp_rbxm_filepath, cage_part.name + name_suffix + ".mesh")
                 
                 asset_data, rbx_imp_error = func_rbx_cloud_api.get_asset_data(cage_mesh_id, headers)
                 
@@ -351,7 +352,7 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
                     rbx_imp_error = func_rbx_other.save_to_file(cage_mesh_file_path, asset_data)
                     
                     if not rbx_imp_error:
-                        rbx_meshes_to_clean_up_lst.append(cage_part.Name)
+                        rbx_meshes_to_clean_up_lst.append(cage_part.name)
 
                         with open(cage_mesh_file_path, "rb") as f:
                             data = f.read()
@@ -373,11 +374,6 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
 
                             if add_ver_col:
                                 func_blndr_api.blender_api_add_ver_col(rbx_obj, cage_data)
-    
-        except Exception as e:
-            dprint(f"Error processing cage for {mesh_name}: {e}")
-            import traceback
-            traceback.print_exc()
     
         except Exception as e:
             dprint(f"Error processing cage for {mesh_name}: {e}")

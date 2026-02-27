@@ -118,7 +118,7 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     rbx_bndl_char_choice_add_meshes : bpy.props.BoolProperty(
     name="Meshes",
     description="Meshes property",
-    default = False,
+    default = True,
     update = update_mesh_dependencies
     ) # type: ignore
 
@@ -156,6 +156,12 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     rbx_bndl_char_choice_armature_at_origin : bpy.props.BoolProperty(
     name="Armature at Origin",
     description="Spawn Armature at Origin property",
+    default = True
+    ) # type: ignore
+
+    rbx_bndl_char_choice_armature_link_meshes : bpy.props.BoolProperty(
+    name="Link Armature to Meshes",
+    description="Apply skin weights to existing body part meshes when importing armature",
     default = True
     ) # type: ignore
 
@@ -655,6 +661,35 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
                  ('OP4', "Rumba Dancing", "")
                 ]
         ) # type: ignore                     
+
+    ### LC Animation V2 - Rig Selector ###
+    ### To add more rigs, add a new entry below and update RIG_MAP in func_lc_animations.py
+    rbx_lc_anim_v2_rig_enum : bpy.props.EnumProperty(
+        name = "LC Anim Rig",
+        description = "Select Rig for LC Animation",
+        default='OP1',
+        items = [
+                 ('OP1', "R15 Blocky Rig", ""),        # Rig 1
+                 ('OP2', "R15 Woman Rig", ""),          # Rig 2
+                 #('OP3', "Plushie Template", ""),      # Rig 3 (add when ready)
+                 #('OP4', "Multirig", ""),              # Rig 4 (add when ready)
+                 #('OP5', "Multirig Faceless", ""),     # Rig 5 (add when ready)
+                ]
+        ) # type: ignore
+
+    ### LC Animation V2 - Animation Type ###
+    ### Bone direction (_B_ variant) is auto-detected at runtime
+    rbx_lc_anim_v2_type_enum : bpy.props.EnumProperty(
+        name = "LC Animation Type",
+        description = "Select Animation Type",
+        default='OP1',
+        items = [
+                 ('OP1', "Walk", ""),
+                 ('OP2', "Run", ""),
+                 ('OP3', "Move", ""),
+                 ('OP4', "Idle", ""),
+                ]
+        ) # type: ignore
 
 
 

@@ -138,18 +138,24 @@ def get_user_id(rbx_user_name, headers):
     rbx_char_error = None
     glob_vars.rbx_char_error = None
     glob_vars.rbx_user_name = rbx_user_name
-    payload = {
+    payload = { 
                 "usernames": [rbx_user_name],
-                "excludeBannedUsers" : 'true'
+                "excludeBannedUsers" : True
                 }
     try:
-        data = requests.post("https://users.roblox.com/v1/usernames/users", json=payload, headers=headers)
+        data = requests.post("https://users.roblox.com/v1/usernames/users", json=payload)
+        print(data.request.headers)
+        print(data.request.body)
+        print(data.request.url)
     except:
         rbx_char_error = "Get User ID Error, no respose"
         glob_vars.rbx_char_error = rbx_char_error
     else:
         if data.status_code == 200:
             data = data.json()
+            print(data)
+            print(rbx_user_name)
+            print(requests.post("https://users.roblox.com/v1/usernames/users", json=payload))
             try:
                 rbx_user_id = data.get('data')[0]['id']
             except:

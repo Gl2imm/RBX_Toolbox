@@ -255,7 +255,8 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
                 continue
                 
             try:
-                mesh_data = mesh_reader.RBXMeshParser.parse(asset_data)
+                #mesh_data = mesh_reader.RBXMeshParser.parse(asset_data)
+                mesh_data = mesh_reader.parse(asset_data)
             except Exception as e:
                 error_msg = f"Error processing mesh {mesh_name}: {e}"
                 dprint(error_msg)

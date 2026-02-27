@@ -101,7 +101,10 @@ class BUTTON_BN(bpy.types.Operator):
                     bpy.ops.object.editmode_toggle()
  
                     bpy.ops.mesh.customdata_custom_splitnormals_clear()
-                    bpy.context.object.data.use_auto_smooth = False
+                    if float(glob_vars.bldr_fdr) < 4.1:
+                        bpy.context.object.data.use_auto_smooth = False
+                    else:
+                        bpy.ops.object.shade_auto_smooth()
                         
                     msh_error = 'done_vts'
                     print("Doubles Removed")

@@ -73,6 +73,9 @@ class URL_HANDLER(bpy.types.Operator):
         if rbx_link == "aepbr notes":
             rbx_aepbr_notes_url = "https://github.com/paribeshere/AEPBR/releases/tag/v." + glob_vars.aepbr_lts_ver
             webbrowser.open_new(rbx_aepbr_notes_url)
+
+        if rbx_link == "dotnet_download":
+            webbrowser.open_new("https://dotnet.microsoft.com/en-us/download/dotnet-framework/net48")
         
         
         return {'FINISHED'}

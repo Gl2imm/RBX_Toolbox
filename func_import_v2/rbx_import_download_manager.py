@@ -330,7 +330,8 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
                 mesh_reader, funct, 
                 rbx_prefs.rbx_bndl_char_choice_armature_at_origin, 
                 asset_name=primary_asset_name,
-                suffix=armature_suffix
+                suffix=armature_suffix,
+                link_meshes=rbx_prefs.rbx_bndl_char_choice_armature_link_meshes
             ) 
         else:
              dprint("No mesh data found to generate armature.")

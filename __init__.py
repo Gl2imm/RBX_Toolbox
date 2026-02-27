@@ -50,9 +50,10 @@ all_modules_names = [
     "functions.wear_r6_rig",
     "functions.hair_buttons",
     "functions.dmy_lc_buttons",
-    "functions.dmy_lc_buttons_anim",
+
     "functions.avatar_buttons",
     "functions.armature_buttons",
+    "func_import_v2.func_lc_animations",
     "functions.func_export",
     "functions.funct_others",
     "functions.menu_pie",
@@ -86,7 +87,8 @@ from .functions.dmy_buttons import BUTTON_DMMY
 from .functions.wear_r6_rig import BUTTON_WEAR
 from .functions.hair_buttons import BUTTON_HAIR
 from .functions.dmy_lc_buttons import RBX_BUTTON_LC
-from .functions.dmy_lc_buttons_anim import RBX_BUTTON_LC_ANIM
+
+from .func_import_v2.func_lc_animations import RBX_OT_LC_ANIM_V2, RBX_OT_LC_ANIM_V2_ADD_ANIM, RBX_OT_LC_ANIM_V2_PLAY, RBX_OT_LC_ANIM_V2_STOP, RBX_OT_LC_ANIM_V2_DELETE, RBX_OT_LC_ANIM_V2_SPEED
 from .functions.avatar_buttons import RBX_BUTTON_AVA
 from .functions.armature_buttons import BUTTON_BN
 from .functions.func_export import RBX_OPERATORS
@@ -127,7 +129,13 @@ classes = (
     BUTTON_WEAR,
     BUTTON_HAIR,
     RBX_BUTTON_LC,
-    RBX_BUTTON_LC_ANIM,
+
+    RBX_OT_LC_ANIM_V2,
+    RBX_OT_LC_ANIM_V2_ADD_ANIM,
+    RBX_OT_LC_ANIM_V2_PLAY,
+    RBX_OT_LC_ANIM_V2_STOP,
+    RBX_OT_LC_ANIM_V2_DELETE,
+    RBX_OT_LC_ANIM_V2_SPEED,
     RBX_BUTTON_AVA,
     BUTTON_BN,
     RBX_OPERATORS,
@@ -165,6 +173,21 @@ def register():
     Scene.subpanel_rigs = BoolProperty(default=False)
     Scene.subpanel_hair = BoolProperty(default=False)
     Scene.subpanel_lc = BoolProperty(default=False)
+    Scene.rbx_lc_anim_armature = bpy.props.PointerProperty(
+        type=bpy.types.Object,
+        name="Armature",
+        description="Select the armature to animate"
+    )
+    from .func_import_v2.func_lc_animations import _update_frame_scrub
+    Scene.rbx_lc_anim_scrub = bpy.props.IntProperty(
+        name="Scrub",
+        description="Scrub through the animation (0-100%)",
+        default=0,
+        min=0,
+        max=100,
+        subtype='PERCENTAGE',
+        update=_update_frame_scrub
+    )
     Scene.subpanel_ava = BoolProperty(default=False)
     Scene.subpanel_cams = BoolProperty(default=False)
     Scene.subpanel_bn = BoolProperty(default=False)
@@ -203,6 +226,8 @@ def unregister():
     del Scene.subpanel_rigs
     del Scene.subpanel_hair
     del Scene.subpanel_lc
+    del Scene.rbx_lc_anim_armature
+    del Scene.rbx_lc_anim_scrub
     del Scene.subpanel_ava
     del Scene.subpanel_cams
     del Scene.subpanel_bn

@@ -10,7 +10,187 @@ DEBUG = True
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 
-def import_bones(imported_meshes_data, mesh_reader, funct, rbx_at_origin, asset_name="R15_Character", suffix=""):
+def apply_skin_weights(imported_meshes_data, arm_obj):
+    """
+    Applies skin weights from parsed mesh data to Blender mesh objects.
+    Creates vertex groups for each bone and assigns weights based on skinIndices/skinWeights.
+    Also adds an Armature modifier to each mesh pointing to arm_obj.
+    
+    imported_meshes_data: List of dicts {'object': obj, 'mesh_data': data, 'mesh_name': name, ...}
+    arm_obj: The armature object to bind meshes to
+    
+    Data format (from mesh_reader.py):
+        skinIndices: flat list[int], stride 4 per vertex (4 bone influences per vertex)
+        skinWeights: flat list[float], stride 4 per vertex (normalized 0.0-1.0)
+        bones: list of bone dicts with 'name' key
+    """
+    if not arm_obj:
+        dprint("apply_skin_weights: No armature object provided, skipping.")
+        return
+    
+    for mesh_info in imported_meshes_data:
+        obj = mesh_info.get('object')
+        mesh_data = mesh_info.get('mesh_data', {})
+        mesh_name = mesh_info.get('mesh_name', 'Unknown')
+
+        # Skip if no valid object
+        if not obj:
+            continue
+        
+        # Skip if missing required skinning data
+        if 'bones' not in mesh_data or 'skinIndices' not in mesh_data or 'skinWeights' not in mesh_data:
+            dprint(f"apply_skin_weights: Skipping '{mesh_name}' - missing skin data.")
+            continue
+            
+        mesh_bones_array = mesh_data["bones"]
+        skin_indices = mesh_data["skinIndices"]
+        skin_weights = mesh_data["skinWeights"]
+        
+        # Create vertex groups for all referenced bones
+        used_bones = set()
+        for si in skin_indices:
+            if si < len(mesh_bones_array):
+                used_bones.add(mesh_bones_array[si]["name"])
+        
+        for bone_name in used_bones:
+            if bone_name not in obj.vertex_groups:
+                obj.vertex_groups.new(name=bone_name)
+
+        # Assign weights
+        # skinIndices/skinWeights are flat arrays with stride 4 (4 influences per vertex)
+        # vertex 0 -> indices [0,1,2,3], vertex 1 -> indices [4,5,6,7], etc.
+        count = len(skin_indices)
+        
+        for flat_i in range(count):
+            bone_idx = skin_indices[flat_i]
+            weight = skin_weights[flat_i]
+            
+            if weight <= 0:
+                continue
+                
+            vert_idx = flat_i // 4  # 4 influences per vertex
+            
+            if bone_idx < len(mesh_bones_array):
+                bone_name = mesh_bones_array[bone_idx]["name"]
+                
+                if bone_name not in obj.vertex_groups:
+                    continue 
+                    
+                obj.vertex_groups[bone_name].add([vert_idx], weight, 'ADD')
+        
+        # Add Armature Modifier
+        mod = obj.modifiers.new(name="Armature", type='ARMATURE')
+        mod.object = arm_obj
+        
+        dprint(f"apply_skin_weights: Applied weights to '{mesh_name}' ({len(used_bones)} bone groups)")
+
+
+def _strip_blender_suffix(name):
+    """
+    Strip Blender's auto-added numeric suffixes like .001, .002, etc.
+    'UpperTorso.001' -> 'UpperTorso'
+    'Head' -> 'Head'
+    """
+    import re
+    return re.sub(r'\.\d{3,}$', '', name)
+
+
+def link_armature_to_meshes(arm_obj, imported_meshes_data, asset_name=None):
+    """
+    Finds existing Blender mesh objects in the scene by matching mesh_name,
+    and applies skin weights + armature modifier to them.
+    
+    This handles the case where body part meshes were imported separately
+    before the armature was created (so 'object' is None in imported_meshes_data).
+    
+    arm_obj: The armature object to link meshes to
+    imported_meshes_data: List of dicts with 'object', 'mesh_data', 'mesh_name', etc.
+    asset_name: The main asset/bundle name — used to find the correct collection
+                (so we don't accidentally match meshes from a different rig)
+    """
+    if not arm_obj:
+        dprint("link_armature_to_meshes: No armature object provided, skipping.")
+        return
+    
+    # Gather mesh_infos that have no object but have skin data
+    unlinked = []
+    for mesh_info in imported_meshes_data:
+        if mesh_info.get('object') is not None:
+            continue  # Already has an object, skip
+        mesh_data = mesh_info.get('mesh_data', {})
+        if 'bones' in mesh_data and 'skinIndices' in mesh_data and 'skinWeights' in mesh_data:
+            unlinked.append(mesh_info)
+    
+    if not unlinked:
+        dprint("link_armature_to_meshes: No unlinked meshes with skin data found.")
+        return
+    
+    dprint(f"link_armature_to_meshes: Found {len(unlinked)} unlinked meshes, searching scene...")
+    
+    # Build candidate list: prefer objects inside the asset's collection
+    # This ensures we match the correct rig when multiple rigs exist
+    candidate_objects = []
+    
+    if asset_name:
+        # Search for a collection matching the asset name (strip restricted chars)
+        # The collection hierarchy is: asset_name -> "Body Parts" -> mesh objects
+        for col in bpy.data.collections:
+            col_base = _strip_blender_suffix(col.name)
+            if col_base == asset_name or asset_name in col.name:
+                # Collect all mesh objects recursively from this collection
+                _collect_mesh_objects_recursive(col, candidate_objects)
+                dprint(f"link_armature_to_meshes: Found collection '{col.name}' for asset '{asset_name}' ({len(candidate_objects)} mesh objects)")
+                break
+    
+    # Fallback: if no collection found or no candidates, search all scene objects
+    if not candidate_objects:
+        dprint(f"link_armature_to_meshes: No collection found for '{asset_name}', searching all scene objects...")
+        candidate_objects = [obj for obj in bpy.data.objects if obj.type == 'MESH']
+    
+    # Search for matching mesh objects
+    linked_count = 0
+    for mesh_info in unlinked:
+        mesh_name = mesh_info.get('mesh_name', '')
+        if not mesh_name:
+            continue
+        
+        found_obj = None
+        
+        for obj in candidate_objects:
+            # Strip Blender suffix for comparison
+            obj_base_name = _strip_blender_suffix(obj.name)
+            
+            if obj_base_name == mesh_name:
+                # Avoid matching objects that already have an armature modifier
+                has_armature = any(mod.type == 'ARMATURE' for mod in obj.modifiers)
+                if not has_armature:
+                    found_obj = obj
+                    break
+        
+        if found_obj:
+            dprint(f"link_armature_to_meshes: Matched '{mesh_name}' -> '{found_obj.name}'")
+            mesh_info['object'] = found_obj
+            linked_count += 1
+        else:
+            dprint(f"link_armature_to_meshes: No scene object found for '{mesh_name}'")
+    
+    if linked_count > 0:
+        dprint(f"link_armature_to_meshes: Applying weights to {linked_count} linked meshes...")
+        apply_skin_weights(imported_meshes_data, arm_obj)
+    else:
+        dprint("link_armature_to_meshes: No meshes could be matched to scene objects.")
+
+
+def _collect_mesh_objects_recursive(collection, result_list):
+    """Recursively collect all MESH type objects from a collection and its children."""
+    for obj in collection.objects:
+        if obj.type == 'MESH' and obj not in result_list:
+            result_list.append(obj)
+    for child_col in collection.children:
+        _collect_mesh_objects_recursive(child_col, result_list)
+
+
+def import_bones(imported_meshes_data, mesh_reader, funct, rbx_at_origin, asset_name="R15_Character", suffix="", link_meshes=True):
     """
     Creates an armature and applies skinning based on the imported mesh data.
     imported_meshes_data: List of dicts {'object': obj, 'mesh_data': data, 'mesh_name': name}
@@ -210,119 +390,15 @@ def import_bones(imported_meshes_data, mesh_reader, funct, rbx_at_origin, asset_
     bpy.ops.object.mode_set(mode='OBJECT')
     
     # 4. Apply Skins (Vertex Weights)
-    for mesh_info in imported_meshes_data:
-        obj = mesh_info['object']
-        mesh_data = mesh_info['mesh_data']
-
-        # If obj is None, skip skinning
-        if not obj:
-            continue
-        
-        if 'bones' not in mesh_data or 'skinIndices' not in mesh_data or 'skinWeights' not in mesh_data:
-            continue
-            
-        mesh_bones_array = mesh_data["bones"]
-        
-        # Prepare Skin Info
-        # Zip skinIndices and skinWeights
-        # They come in flat arrays, stride 1 per vertex? 
-        # Actually backup code says:
-        # for vert_idx, (si, w) in enumerate(zip(mesh_data["skinIndices"], mesh_data["skinWeights"])):
-        #     bone_name = mesh_bones_array[si]["name"]
-        #     skin_info.append((vert_idx, bone_name, w))
-        
-        # This implies si and w are single values per vertex.
-        # BUT standard Roblox mesh format is usually 4 weights per vertex.
-        # `mesh_reader` output format matters here.
-        # In `mesh_reader.py`:
-        # "skinIndices": [idx1, idx2, idx3, idx4, ...]
-        # "skinWeights": [w1, w2, w3, w4, ...]
-        # The parser seems to flatten it.
-        # The backup code's loop `zip(mesh_data["skinIndices"], mesh_data["skinWeights"])` 
-        # suggests it iterates ONE index and ONE weight at a time.
-        # If the lists are flat (4 per vertex), then `vert_idx` in `enumerate` would NOT be the true vertex index.
-        # It would be the *influence* index.
-        # Real vertex index = loop_index // 4
-        
-        # Let's check backup code again.
-        # `for vert_idx, (si, w) in enumerate(zip(mesh_data["skinIndices"], mesh_data["skinWeights"])):`
-        # `    bone_name = mesh_bones_array[si]["name"]`
-        # `    skin_info.append((vert_idx, bone_name, w))`
-        
-        # Then later:
-        # `for vert_idx, bone_name, weight in mesh_skin["skin_info"]:`
-        # `    obj.vertex_groups[bone_name].add([vert_idx], weight, 'REPLACE')`
-        
-        # If `vert_idx` allows duplicate values in `add`, then it's modifying the same vertex.
-        # BUT `enumerate` produces 0, 1, 2, 3...
-        # So it would add to vertex 0, 1, 2, 3...
-        # This implies `mesh_reader` returns 1 bone per vertex? That's unlikely for skinned meshes.
-        # OR `mesh_reader` returns lists of lists?
-        # Let's check `mesh_reader.parse`.
-        
-        # Checking `imported_meshes_data` structure implicitly.
-        # I'll Assume the backup code's logic was slightly flawed OR `mesh_reader` returns something I didn't verify perfectly.
-        # Wait, if `skinIndices` is `bytes` or flat list.
-        # If it's 4 bytes per vertex.
-        
-        # Let's implement robustly.
-        # If `skinIndices` is length N * 4 (where N is vertex count).
-        # We need to map `flat_index` to `vertex_index`.
-        # vertex_index = flat_index // 4
-        
-        skin_indices = mesh_data["skinIndices"]
-        skin_weights = mesh_data["skinWeights"]
-        
-        # Create groups first
-        used_bones = set()
-        for si in skin_indices:
-            if si < len(mesh_bones_array):
-                used_bones.add(mesh_bones_array[si]["name"])
-        
-        for bone_name in used_bones:
-             if bone_name not in obj.vertex_groups:
-                 obj.vertex_groups.new(name=bone_name)
-
-        # Iterate and assign
-        # Assuming 4 influences per vertex is standard for Roblox.
-        # If lists are same length
-        count = len(skin_indices)
-        
-        # Optimization: Batch assign? Blender's `vg.add` takes list of indices.
-        # Group by bone name.
-        bone_to_verts = {} # {bone_name: [(vert_idx, weight), ...]}
-        
-        # To handle stride correctly, we need to know if the parser structure is flat or nested.
-        # Looking at `mesh_reader.py` (viewed earlier):
-        # `skin_indices = list(reader.read_bytes(vertex_count * 4))` -> It's a flat list of bytes.
-        
-        # So yes, flat list.
-        # vertex 0 has indices at 0,1,2,3
-        # vertex 1 has indices at 4,5,6,7
-        
-        for flat_i in range(count):
-            bone_idx = skin_indices[flat_i]
-            weight = skin_weights[flat_i]
-            
-            if weight <= 0:
-                continue
-                
-            vert_idx = flat_i // 4  # Integer division
-            
-            if bone_idx < len(mesh_bones_array):
-                bone_name = mesh_bones_array[bone_idx]["name"]
-                
-                if bone_name not in obj.vertex_groups:
-                    continue 
-                    
-                obj.vertex_groups[bone_name].add([vert_idx], weight, 'ADD')
-        
-        # Add Armature Modifier
-        mod = obj.modifiers.new(name="Armature", type='ARMATURE')
-        mod.object = arm_obj
+    apply_skin_weights(imported_meshes_data, arm_obj)
+    
+    # 4b. Link existing scene meshes if objects were not spawned (armature-only import)
+    if link_meshes:
+        link_armature_to_meshes(arm_obj, imported_meshes_data, asset_name=asset_name)
+    else:
+        dprint("import_bones: Skipping mesh linking (link_meshes=False)")
 
     # 5. Position Armature Object
-    # 5. Position Armature Object (Shifting the Armature Object Origin)
     # Because we mathematically subtracted this offset from the internal bones before generating them, 
     # the inside of the Armature is 'centered' around 0. Moving the entire Armature Object forward now
     # correctly places the Origin visually where the mesh is, while sweeping the inner internal bones precisely 

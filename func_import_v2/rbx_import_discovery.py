@@ -146,7 +146,7 @@ class RBX_OT_import_discovery(bpy.types.Operator):
             glob_vars.rbx_asset_type = type_name
 
             # Reset and populate discovered items
-            glob_vars.discovered_items_data = {cat: [] for cat in glob_vars.supported_assets}
+            glob_vars.discovered_items_data = {cat: [] for cat in glob_vars.supported_assets_v2}
             glob_vars.rbx_default_head_used = False
             
             if rbx_bundledItems:
@@ -154,7 +154,7 @@ class RBX_OT_import_discovery(bpy.types.Operator):
                     if item.get('type') == 'Asset':
                         asset_type = item.get('assetType')
                         # Find which category this asset type belongs to
-                        for category, types in glob_vars.supported_assets.items():
+                        for category, types in glob_vars.supported_assets_v2.items():
                             if asset_type in types:
                                 glob_vars.discovered_items_data[category].append({
                                     'id': item.get('id'),
@@ -451,7 +451,7 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
 
         if category == "Armature":
             box.prop(rbx_prefs, 'rbx_bndl_char_choice_armature_at_origin') # Reusing bundle origin pref
-            # No other options needed for now as we just parse bones
+            box.prop(rbx_prefs, 'rbx_bndl_char_choice_armature_link_meshes')
 
         # Generic Checkbox Loop
         if category in category_checkboxes:

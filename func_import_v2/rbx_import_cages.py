@@ -355,7 +355,7 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
 
                         with open(cage_mesh_file_path, "rb") as f:
                             data = f.read()
-                        cage_data = mesh_reader.RBXMeshParser.parse(data)
+                        cage_data = mesh_reader.parse(data)
 
                         if cage_data:
                             # Naming convention: 

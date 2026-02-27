@@ -1,10 +1,31 @@
 import os
+import winreg
 from RBX_Toolbox import glob_vars
 
 
 ### Debug prints
 DEBUG = True
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
+
+
+def is_dotnet_installed() -> bool:
+	"""Check if .NET Framework 4.7.1 or newer is installed (Windows registry check)."""
+	try:
+		key_path = r"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full"
+		with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as key:
+			release, _ = winreg.QueryValueEx(key, "Release")
+			# 461808 = 4.7.1, 528040 = 4.8
+			version_map = {
+				461808: "4.7.1",
+				528040: "4.8",
+			}
+			for rel in version_map:
+				if release >= rel:
+					return True
+		return False
+	except FileNotFoundError:
+		return False
+
 
 ## Remove restricted characters from string ##
 def replace_restricted_char(str: str = None):

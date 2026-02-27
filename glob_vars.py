@@ -87,6 +87,9 @@ def clear_login_info():
 
 ## AEPBR vars ##
 rbx_aepbr_fldr = "rig_aepbr"
+
+## Anims folder (LC Animation V2) ##
+rbx_anims_fldr = "anims"
 rbx_aepbr_collection = "AEPBR (Main Preset)"
 aepbr_lts_ver = None
 aepbr_lts_title = None
@@ -265,6 +268,14 @@ rbx_bundle_types = {
 
 ### Only when you getting direct assets or LC, not bundles
 supported_assets = {
+    "Gear"          : [19],
+    "Accessory"     : [8,41,42,43,44,45,46,47],
+    "Layered Cloth" : [64,65,66,67,68,69,70,71,72],
+    "Dynamic Head"  : [79],
+    "Body Parts"    : [27,28,29,30,31]
+    }
+
+supported_assets_v2 = {
     "Gear"          : [19],
     "Accessory"     : [8,41,42,43,44,45,46,47],
     "Layered Cloth" : [64,65,66,67,68,69,70,71,72],

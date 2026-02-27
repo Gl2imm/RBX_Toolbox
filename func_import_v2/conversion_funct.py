@@ -22,7 +22,22 @@ def cframe_get_components(cframe):
 	if isinstance(cframe, dict):
 		pos = cframe.get("position", (0, 0, 0))
 		rot_type, rot_data = cframe.get("rotation", ("matrix", (1,0,0, 0,1,0, 0,0,1)))
-		return (*pos, *rot_data)
+		if rot_type == "matrix":
+			return (*pos, *rot_data)
+		elif rot_type == "special":
+			# Convert Euler angles (Y,X,Z degrees) to rotation matrix, then return 12-tuple
+			import math
+			yd, xd, zd = rot_data
+			yr, xr, zr = math.radians(yd), math.radians(xd), math.radians(zd)
+			cy, sy = math.cos(yr), math.sin(yr)
+			cx, sx = math.cos(xr), math.sin(xr)
+			cz, sz = math.cos(zr), math.sin(zr)
+			r00 = cy*cz + sy*sx*sz;  r01 = -cy*sz + sy*sx*cz;  r02 = sy*cx
+			r10 = cx*sz;             r11 = cx*cz;               r12 = -sx
+			r20 = -sy*cz + cy*sx*sz; r21 = sy*sz + cy*sx*cz;    r22 = cy*cx
+			return (*pos, r00, r01, r02, r10, r11, r12, r20, r21, r22)
+		else:
+			return (*pos, 1,0,0, 0,1,0, 0,0,1)
 	elif isinstance(cframe, (list, tuple)):
 		return tuple(cframe)
 	elif hasattr(cframe, "GetComponents"):
@@ -42,11 +57,30 @@ def cframe_to_blender_matrix(cframe):
 			raise ValueError("CFrame must have exactly 12 components")
 		px, py, pz, r00, r01, r02, r10, r11, r12, r20, r21, r22 = cframe
 	elif isinstance(cframe, dict):
-		# rbxm_reader dict format: {"position": (x,y,z), "rotation": ("matrix", (r00..r22))}
+		# rbxm_reader dict format: {"position": (x,y,z), "rotation": ("matrix", (r00..r22)) or ("special", (y,x,z) degrees)}
 		pos = cframe.get("position", (0, 0, 0))
 		px, py, pz = pos
 		rot_type, rot_data = cframe.get("rotation", ("matrix", (1,0,0, 0,1,0, 0,0,1)))
-		r00, r01, r02, r10, r11, r12, r20, r21, r22 = rot_data
+		if rot_type == "matrix":
+			r00, r01, r02, r10, r11, r12, r20, r21, r22 = rot_data
+		elif rot_type == "special":
+			# rot_data is (Y, X, Z) Euler angles in degrees — convert to rotation matrix
+			import math
+			yd, xd, zd = rot_data
+			yr, xr, zr = math.radians(yd), math.radians(xd), math.radians(zd)
+			# Rotation order: Y * X * Z (Roblox convention)
+			cy, sy = math.cos(yr), math.sin(yr)
+			cx, sx = math.cos(xr), math.sin(xr)
+			cz, sz = math.cos(zr), math.sin(zr)
+			# Combined rotation matrix: Ry * Rx * Rz
+			r00 = cy*cz + sy*sx*sz;  r01 = -cy*sz + sy*sx*cz;  r02 = sy*cx
+			r10 = cx*sz;             r11 = cx*cz;               r12 = -sx
+			r20 = -sy*cz + cy*sx*sz; r21 = sy*sz + cy*sx*cz;    r22 = cy*cx
+		else:
+			# Unknown rotation type, use identity
+			r00, r01, r02 = 1.0, 0.0, 0.0
+			r10, r11, r12 = 0.0, 1.0, 0.0
+			r20, r21, r22 = 0.0, 0.0, 1.0
 	elif hasattr(cframe, "GetComponents"):
 		# Legacy .NET CFrame object
 		px, py, pz, r00, r01, r02, r10, r11, r12, r20, r21, r22 = cframe.GetComponents()

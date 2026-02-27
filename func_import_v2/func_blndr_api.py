@@ -21,7 +21,7 @@ def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cfram
     if mesh_name:
         true_name = mesh_name
     else:
-        true_name = mesh_part.Name
+        true_name = mesh_part.name
 
     obj_file_path = os.path.join(bundle_own_folder, true_name + ".obj")
     mesh_reader.write_obj_from_mesh_json(mesh_data, obj_file_path, lod_index=0, object_name=true_name)
@@ -86,7 +86,7 @@ def blender_api_add_attachments(mesh_part_attachment, mesh_part_attachment_cfram
     bpy.ops.mesh.primitive_uv_sphere_add(segments=8, ring_count=8, radius=1, enter_editmode=False, align='WORLD', location=(0, 0, 0), scale=(0.15, 0.15, 0.15))
     bpy.ops.object.shade_smooth()
     mesh_part_attachment_obj = bpy.context.selected_objects[0]
-    mesh_part_attachment_name = str(mesh_part_attachment.Name)
+    mesh_part_attachment_name = str(mesh_part_attachment.name)
     if is_accessory and "Attachment" in mesh_part_attachment_name:
         mesh_part_attachment_name = mesh_part_attachment_name.replace("Attachment", "_att")
     mesh_part_attachment_obj.name = f"{mesh_part_attachment_name}"
@@ -211,7 +211,7 @@ def blender_api_assets_new_material(rbx_obj, mesh_part, rbx_textures, rbx_asset_
 	
 	if rbx_obj.material_slots:
 		bpy.ops.object.material_slot_remove()
-	mat = bpy.data.materials.new(name=f"{rbx_asset_name_clean}_{mesh_part.Name}_mat")
+	mat = bpy.data.materials.new(name=f"{rbx_asset_name_clean}_{mesh_part.name}_mat")
 	rbx_obj.data.materials.append(mat) 
 	mat = rbx_obj.material_slots[0].material 
 	mat.use_nodes = True

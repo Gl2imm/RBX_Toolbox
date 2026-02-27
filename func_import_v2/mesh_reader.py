@@ -1,590 +1,732 @@
 import struct
-from io import BytesIO
+import pprint
+import os
 
-def assert_condition(cond, msg):
-    if not cond:
-        raise ValueError(msg)
+from . import draco_decoder
 
-class ByteReader:
-    def __init__(self, data: bytes):
-        self.buffer = BytesIO(data)
+# ============================================================
+# DEBUG CONTROLS
+# ============================================================
+# Set to True to write parsed mesh data to a text file
+DEBUG_WRITE_OUTPUT = False
+# Path for the debug output text file
+DEBUG_OUTPUT_PATH = r"mesh_reader_output.txt"
 
-    def get_index(self):
-        return self.buffer.tell()
 
-    def set_index(self, idx):
-        self.buffer.seek(idx)
+# ============================================================
+# MAIN ENTRY POINT
+# ============================================================
 
-    def get_length(self):
-        return len(self.buffer.getbuffer())
+def parse(data):
+    """
+    Parse raw bytes of a Roblox .mesh file.
+    Detects the version from the header and routes to the
+    correct parser (text, binary, or chunked).
+    Returns a dictionary with standardized mesh data keys.
+    """
+    # Read the 12-byte version header: "version X.XX"
+    header_text = data[:12].decode("ascii")
+    version = header_text[8:].strip()
 
-    def jump(self, n):
-        self.buffer.seek(self.buffer.tell() + n)
+    print(f"Mesh version: {version}")
 
-    def byte(self):
-        return struct.unpack("<B", self.buffer.read(1))[0]
+    # Route to the appropriate parser
+    if version in ("1.00", "1.01"):
+        result = parse_text(data, version)
+    elif version in ("2.00", "3.00", "3.01", "4.00", "4.01", "5.00"):
+        result = parse_bin(data, version)
+    elif version in ("6.00", "7.00"):
+        result = parse_chunked(data, version)
+    else:
+        raise ValueError(f"Unsupported mesh version: {version}")
 
-    def uint16le(self):
-        return struct.unpack("<H", self.buffer.read(2))[0]
+    # Debug: write parsed output to text file
+    if DEBUG_WRITE_OUTPUT:
+        try:
+            with open(DEBUG_OUTPUT_PATH, "w", encoding="utf-8") as debug_file:
+                # Build a safe copy that avoids circular bone->parent references
+                safe_result = _make_debug_safe(result)
+                pprint.pprint(safe_result, stream=debug_file, width=120)
+            print(f"Debug output written to: {DEBUG_OUTPUT_PATH}")
+        except Exception as err:
+            print(f"Failed to write debug output: {err}")
 
-    def uint32le(self):
-        return struct.unpack("<I", self.buffer.read(4))[0]
+    return result
 
-    def floatle(self):
-        return struct.unpack("<f", self.buffer.read(4))[0]
 
-    def string(self, length):
-        return self.buffer.read(length).decode("utf-8", errors="ignore")
+def _make_debug_safe(mesh_dict):
+    """
+    Create a copy of the mesh dictionary that replaces circular
+    bone parent references with just the parent bone name,
+    so pprint doesn't recurse infinitely.
+    """
+    safe = dict(mesh_dict)
+    if "bones" in safe and safe["bones"]:
+        safe_bones = []
+        for bone in safe["bones"]:
+            safe_bone = dict(bone)
+            if safe_bone.get("parent") is not None:
+                safe_bone["parent"] = safe_bone["parent"]["name"]
+            safe_bones.append(safe_bone)
+        safe["bones"] = safe_bones
+    return safe
 
-    def subarray(self, start, end):
-        return self.buffer.getbuffer()[start:end]
 
-    def get_remaining(self):
-        return self.get_length() - self.get_index()
+# ============================================================
+# TEXT PARSER — v1.00, v1.01
+# ============================================================
 
-    def read(self, n):
-        return self.buffer.read(n)
+def parse_text(data, version):
+    """
+    Parse a version 1.xx mesh file.
+    The file is plain ASCII with 3 lines:
+      Line 1: version header
+      Line 2: face count
+      Line 3: concatenated bracket-delimited vertex vectors
+    Returns the standard mesh dictionary.
+    """
+    text = data.decode("ascii")
+    lines = text.split("\n")
+    # Remove empty trailing lines
+    lines = [l.strip() for l in lines if l.strip()]
 
-def buffer_to_string(buf):
-    if isinstance(buf, memoryview):
-        buf = buf.tobytes()  # convert memoryview → bytes
-    return buf.decode("utf-8", errors="ignore")
+    if len(lines) < 3:
+        raise ValueError("v1.x mesh must have at least 3 lines")
 
-class RBXMeshParser:
-    @staticmethod
-    def parse(buffer: bytes):
-        reader = ByteReader(buffer)
-        assert_condition(reader.string(8) == "version ", "Invalid mesh file")
+    face_count = int(lines[1])
+    raw_data = lines[2]
 
-        version = reader.string(4)
-        print(f"MeshReader: Mesh version - {version}")
-        if version in ("1.00", "1.01"):
-            return RBXMeshParser.parse_text(buffer_to_string(buffer))
-        elif version in ("2.00", "3.00", "3.01", "4.00", "4.01", "5.00"):
-            return RBXMeshParser.parse_bin(buffer, version)
-        elif version in ("6.00", "7.00"):
-            return RBXMeshParser.parse_chunked(buffer, version)
+    # Strip outer brackets and split by "]["
+    raw_data = raw_data.strip()
+    if raw_data.startswith("["):
+        raw_data = raw_data[1:]
+    if raw_data.endswith("]"):
+        raw_data = raw_data[:-1]
+    vector_strings = raw_data.split("][")
+
+    expected_vectors = face_count * 9  # 3 verts/face × 3 vectors/vert
+    if len(vector_strings) != expected_vectors:
+        raise ValueError(
+            f"Expected {expected_vectors} vectors, got {len(vector_strings)}"
+        )
+
+    # Scale factor: v1.00 meshes are 2x oversized
+    scale = 0.5 if version == "1.00" else 1.0
+
+    vertices = []
+    normals = []
+    uvs = []
+    faces = []
+    total_verts = face_count * 3
+
+    for vert_idx in range(total_verts):
+        base = vert_idx * 3
+
+        # Position vector
+        pos_parts = vector_strings[base].split(",")
+        px = float(pos_parts[0]) * scale
+        py = float(pos_parts[1]) * scale
+        pz = float(pos_parts[2]) * scale
+        vertices.extend([px, py, pz])
+
+        # Normal vector
+        norm_parts = vector_strings[base + 1].split(",")
+        nx = float(norm_parts[0])
+        ny = float(norm_parts[1])
+        nz = float(norm_parts[2])
+        normals.extend([nx, ny, nz])
+
+        # UV vector (only first 2 components; V is flipped)
+        uv_parts = vector_strings[base + 2].split(",")
+        tu = float(uv_parts[0])
+        tv = 1.0 - float(uv_parts[1])
+        uvs.extend([tu, tv])
+
+        # Faces are sequential — each vertex is unique in v1.x
+        faces.append(vert_idx)
+
+    return {
+        "version":      version,
+        "vertices":     vertices,
+        "normals":      normals,
+        "uvs":          uvs,
+        "tangents":     [],
+        "vertexColors": None,
+        "faces":        faces,
+        "lods":         [0, face_count],
+    }
+
+
+# ============================================================
+# BINARY PARSER — v2.00, v3.xx, v4.xx, v5.00
+# ============================================================
+
+def parse_bin(data, version):
+    """
+    Parse a version 2.00 through 5.00 mesh file.
+    The file has a text version header followed by a binary
+    fixed-layout structure whose fields vary by version.
+    Returns the standard mesh dictionary, including bones/skinning
+    data for v4+ meshes that contain skeletal data.
+    """
+    offset = 0
+
+    # --- Skip past the "version X.XX" + newline header ---
+    offset = 12  # "version X.XX"
+    # Handle CR+LF or just LF newline
+    if data[offset] == 0x0D:
+        offset += 2  # skip \r\n
+    else:
+        offset += 1  # skip \n
+
+    data_begin = offset
+
+    # --- Read version-specific header fields ---
+    vertex_size = 40  # default for v4+/v5
+    face_size = 12    # always 12 for faces
+    lod_count = 0
+    lod_size = 4
+    bone_count = 0
+    name_table_size = 0
+    subset_count = 0
+    facs_data_size = 0
+
+    if version == "2.00":
+        # v2 header: header_size(2) + vertex_size(1) + face_size(1) +
+        #            vertex_count(4) + face_count(4)
+        header_size = struct.unpack_from("<H", data, offset)[0]
+        vertex_size = struct.unpack_from("<B", data, offset + 2)[0]
+        face_size = struct.unpack_from("<B", data, offset + 3)[0]
+        vertex_count = struct.unpack_from("<I", data, offset + 4)[0]
+        face_count = struct.unpack_from("<I", data, offset + 8)[0]
+
+    elif version in ("3.00", "3.01"):
+        # v3 header: header_size(2) + vertex_size(1) + face_size(1) +
+        #            lod_size(2) + lod_count(2) + vertex_count(4) + face_count(4)
+        header_size = struct.unpack_from("<H", data, offset)[0]
+        vertex_size = struct.unpack_from("<B", data, offset + 2)[0]
+        face_size = struct.unpack_from("<B", data, offset + 3)[0]
+        lod_size = struct.unpack_from("<H", data, offset + 4)[0]
+        lod_count = struct.unpack_from("<H", data, offset + 6)[0]
+        vertex_count = struct.unpack_from("<I", data, offset + 8)[0]
+        face_count = struct.unpack_from("<I", data, offset + 12)[0]
+
+    elif version in ("4.00", "4.01"):
+        # v4 header: header_size(2) + padding(2) + vertex_count(4) +
+        #            face_count(4) + lod_count(2) + bone_count(2) +
+        #            name_table_size(4) + subset_count(2) + padding(2)
+        header_size = struct.unpack_from("<H", data, offset)[0]
+        vertex_count = struct.unpack_from("<I", data, offset + 4)[0]
+        face_count = struct.unpack_from("<I", data, offset + 8)[0]
+        lod_count = struct.unpack_from("<H", data, offset + 12)[0]
+        bone_count = struct.unpack_from("<H", data, offset + 14)[0]
+        name_table_size = struct.unpack_from("<I", data, offset + 16)[0]
+        subset_count = struct.unpack_from("<H", data, offset + 20)[0]
+
+    elif version == "5.00":
+        # v5 header: same as v4 + facs fields
+        header_size = struct.unpack_from("<H", data, offset)[0]
+        vertex_count = struct.unpack_from("<I", data, offset + 4)[0]
+        face_count = struct.unpack_from("<I", data, offset + 8)[0]
+        lod_count = struct.unpack_from("<H", data, offset + 12)[0]
+        bone_count = struct.unpack_from("<H", data, offset + 14)[0]
+        name_table_size = struct.unpack_from("<I", data, offset + 16)[0]
+        subset_count = struct.unpack_from("<H", data, offset + 20)[0]
+        # skip 2 padding + skip 4 (facsDataFormat)
+        facs_data_size = struct.unpack_from("<I", data, offset + 28)[0]
+
+    # Seek past the header to the start of vertex data
+    offset = data_begin + header_size
+
+    # --- Read vertex data ---
+    vertices, normals, uvs, tangents, vertex_colors = _read_vertices(
+        data, offset, vertex_count, vertex_size
+    )
+    offset += vertex_count * vertex_size
+
+    # --- Read skinning / envelope data (v4+ only, if bones exist) ---
+    skin_indices = []
+    skin_weights = []
+    if version in ("4.00", "4.01", "5.00") and bone_count > 0:
+        skin_indices, skin_weights = _read_skinning(data, offset, vertex_count)
+        offset += vertex_count * 8  # 4 indices + 4 weights per vertex
+
+    # --- Read face data ---
+    faces = _read_faces(data, offset, face_count)
+    offset += face_count * face_size
+    # Skip any extra bytes per face beyond the 12 we read
+    if face_size > 12:
+        pass  # already accounted for in offset calculation
+
+    # --- Read LOD offsets ---
+    lods = _read_lods_bin(data, offset, lod_count, lod_size, face_count)
+    offset += lod_count * lod_size
+
+    # --- Read bone data (v4+/v5 only, if bones exist) ---
+    bones = []
+    if version in ("4.00", "4.01", "5.00") and bone_count > 0:
+        bones = _read_bones(data, offset, bone_count, name_table_size)
+        offset += bone_count * 60
+
+    # --- Skip name table ---
+    if name_table_size > 0:
+        offset += name_table_size
+
+    # --- Read subsets and remap skin indices ---
+    if version in ("4.00", "4.01", "5.00") and subset_count > 0:
+        _read_subsets_and_remap(data, offset, subset_count, skin_indices)
+        offset += subset_count * 72
+
+    # --- Skip FACS data (v5 only) ---
+    if facs_data_size > 0:
+        offset += facs_data_size
+
+    # --- Build result dictionary ---
+    result = {
+        "version":      version,
+        "vertices":     vertices,
+        "normals":      normals,
+        "uvs":          uvs,
+        "tangents":     tangents,
+        "vertexColors": vertex_colors if vertex_colors else None,
+        "faces":        faces,
+        "lods":         lods,
+    }
+
+    if bones:
+        result["skinIndices"] = skin_indices
+        result["skinWeights"] = skin_weights
+        result["bones"] = bones
+
+    return result
+
+
+# ============================================================
+# CHUNKED PARSER — v6.00, v7.00
+# ============================================================
+
+def parse_chunked(data, version):
+    """
+    Parse a version 6.00 or 7.00 mesh file.
+    After the text header, data is organized into typed chunks
+    that are read sequentially until end of file.
+    Each chunk has an 8-byte type string, 4-byte version,
+    4-byte payload size, then payload data.
+    Returns the standard mesh dictionary.
+    """
+    offset = 12  # skip "version X.XX"
+    # Handle newline (CR+LF or LF)
+    if data[offset] == 0x0D:
+        offset += 2
+    else:
+        offset += 1
+
+    # Initialize result containers
+    vertices = []
+    normals = []
+    uvs = []
+    tangents = []
+    vertex_colors = None
+    faces = []
+    lods = None
+    skin_indices = []
+    skin_weights = []
+    bones = []
+
+    # --- Read chunks until not enough bytes remain for a chunk header ---
+    while offset + 16 <= len(data):
+        # Chunk header: type(8) + version(4) + size(4)
+        chunk_type = data[offset:offset + 8].decode("ascii").rstrip("\x00").strip()
+        chunk_ver = struct.unpack_from("<I", data, offset + 8)[0]
+        chunk_size = struct.unpack_from("<I", data, offset + 12)[0]
+        chunk_data = data[offset + 16 : offset + 16 + chunk_size]
+        offset += 16 + chunk_size
+
+        if chunk_type == "COREMESH":
+            if chunk_ver == 1:
+                # Uncompressed core mesh — same vertex layout as binary parser
+                vertices, normals, uvs, tangents, vertex_colors, faces = (
+                    _parse_coremesh_v1(chunk_data)
+                )
+            elif chunk_ver == 2:
+                # Draco-compressed mesh (v7.00)
+                # First 4 bytes are a uint32 Draco payload size, skip them
+                draco_payload = chunk_data[4:]
+                draco_result = draco_decoder.decode_draco(bytes(draco_payload))
+                vertices = draco_result.get("vertices", [])
+                normals = draco_result.get("normals", [])
+                uvs = draco_result.get("uvs", [])
+                vertex_colors = draco_result.get("vertexColors", None)
+                faces = draco_result.get("faces", [])
+                tangents = []  # Draco payload does not include tangents
+
+        elif chunk_type == "LODS":
+            if chunk_ver == 1:
+                lods = _parse_lods_chunk(chunk_data)
+
+        elif chunk_type == "SKINNING":
+            if chunk_ver == 1:
+                skin_indices, skin_weights, bones = _parse_skinning_chunk(chunk_data)
+
         else:
-            raise ValueError(f"Unsupported mesh version '{version}'")
+            # Unknown or unneeded chunk (FACS, HSRAVIS, etc.) — skip
+            pass
 
-    @staticmethod
-    def parse_text(s: str):
-        lines = s.splitlines()
-        assert_condition(len(lines) == 3, "Invalid mesh version 1 file (Wrong amount of lines)")
+    # Default LODs if none were found
+    if lods is None:
+        face_count = len(faces) // 3
+        lods = [0, face_count]
 
-        version = lines[0]
-        face_count = int(lines[1])
-        data = lines[2]
+    result = {
+        "version":      version,
+        "vertices":     vertices,
+        "normals":      normals,
+        "uvs":          uvs,
+        "tangents":     tangents,
+        "vertexColors": vertex_colors,
+        "faces":        faces,
+        "lods":         lods,
+    }
 
-        vectors = data.replace(" ", "").replace("\n", "").strip()[1:-1].split("][")
-        assert_condition(len(vectors) == face_count * 9, "Length mismatch")
+    if bones:
+        result["skinIndices"] = skin_indices
+        result["skinWeights"] = skin_weights
+        result["bones"] = bones
 
-        scale_multiplier = 0.5 if version == "version 1.00" else 1.0
-        vertex_count = face_count * 3
-
-        vertices, normals, uvs, faces = [], [], [], []
-
-        for i in range(vertex_count):
-            n = i * 3
-            vertex = list(map(float, vectors[n].split(",")))
-            normal = list(map(float, vectors[n + 1].split(",")))
-            uv = list(map(float, vectors[n + 2].split(",")))
-
-            vertices.extend([vertex[0] * scale_multiplier,
-                             vertex[1] * scale_multiplier,
-                             vertex[2] * scale_multiplier])
-
-            normals.extend(normal)
-            uvs.extend(uv[:2])
-            faces.append(i)
-
-        return {"version": version.split(" ")[1], "vertices": vertices, "normals": normals, "uvs": uvs, "faces": faces, "lods": [0, face_count]}
-
-    @staticmethod
-    def parse_bin(buffer: bytes, version: str):
-        reader = ByteReader(buffer)
-        assert_condition(reader.string(12) == f"version {version}", "Bad header")
-
-        newline = reader.byte()
-        if newline == 0x0D:
-            assert_condition(reader.byte() == 0x0A, "Bad newline")
-        else:
-            assert_condition(newline == 0x0A, "Bad newline")
-
-        begin = reader.get_index()
-
-        # defaults
-        header_size = 0
-        vertex_size = 0
-        face_size = 12
-        lod_size = 4
-        name_table_size = 0
-        facs_data_size = 0
-        lod_count = 0
-        vertex_count = 0
-        face_count = 0
-        bone_count = 0
-        subset_count = 0
-
-        if version == "2.00":
-            header_size = reader.uint16le()
-            assert_condition(header_size >= 12, f"Invalid header size {header_size}")
-            vertex_size = reader.byte()
-            face_size = reader.byte()
-            vertex_count = reader.uint32le()
-            face_count = reader.uint32le()
-
-        elif version.startswith("3."):
-            header_size = reader.uint16le()
-            assert_condition(header_size >= 16, f"Invalid header size {header_size}")
-            vertex_size = reader.byte()
-            face_size = reader.byte()
-            lod_size = reader.uint16le()
-            lod_count = reader.uint16le()
-            vertex_count = reader.uint32le()
-            face_count = reader.uint32le()
-
-        elif version.startswith("4."):
-            header_size = reader.uint16le()
-            assert_condition(header_size >= 24, f"Invalid header size {header_size}")
-            reader.jump(2)
-            vertex_count = reader.uint32le()
-            face_count = reader.uint32le()
-            lod_count = reader.uint16le()
-            bone_count = reader.uint16le()
-            name_table_size = reader.uint32le()
-            subset_count = reader.uint16le()
-            reader.jump(2)
-            vertex_size = 40
-
-        elif version.startswith("5."):
-            header_size = reader.uint16le()
-            assert_condition(header_size >= 32, f"Invalid header size {header_size}")
-            reader.jump(2)
-            vertex_count = reader.uint32le()
-            face_count = reader.uint32le()
-            lod_count = reader.uint16le()
-            bone_count = reader.uint16le()
-            name_table_size = reader.uint32le()
-            subset_count = reader.uint16le()
-            reader.jump(2)
-            reader.jump(4)
-            facs_data_size = reader.uint32le()
-            vertex_size = 40
-
-        reader.set_index(begin + header_size)
-
-        assert_condition(vertex_size >= 36, f"Invalid vertex size {vertex_size}")
-        assert_condition(face_size >= 12, f"Invalid face size {face_size}")
-        assert_condition(lod_size >= 4, f"Invalid lod size {lod_size}")
-
-        file_end = (reader.get_index() +
-            (vertex_count * vertex_size) +
-            (bone_count * 8 * vertex_count if bone_count > 0 else 0) +
-            (face_count * face_size) +
-            (lod_count * lod_size) +
-            (bone_count * 60) +
-            name_table_size +
-            (subset_count * 72) +
-            facs_data_size)
-
-        #assert_condition(file_end == reader.get_length(),
-                         #f"Invalid file size (expected {reader.get_length()}, got {file_end})")
-
-        faces = [0] * (face_count * 3)
-        vertices = [0.0] * (vertex_count * 3)
-        normals = [0.0] * (vertex_count * 3)
-        uvs = [0.0] * (vertex_count * 2)
-        tangents = [0.0] * (vertex_count * 4)
-        vertex_colors = [0] * (vertex_count * 4) if vertex_size >= 40 else None
-        lods = []
-
-        mesh = {
-            "version" : version,
-            "vertexColors": vertex_colors,
-            "vertices": vertices,
-            "tangents": tangents,
-            "normals": normals,
-            "faces": faces,
-            "lods": lods,
-            "uvs": uvs  
-        }
-
-        # Vertex[vertexCount]
-        for i in range(vertex_count):
-            vertices[i*3+0] = reader.floatle()
-            vertices[i*3+1] = reader.floatle()
-            vertices[i*3+2] = reader.floatle()
-
-            normals[i*3+0] = reader.floatle()
-            normals[i*3+1] = reader.floatle()
-            normals[i*3+2] = reader.floatle()
-
-            uvs[i*2+0] = reader.floatle()
-            uvs[i*2+1] = 1 - reader.floatle()
-
-            tangents[i*4+0] = reader.byte() / 127 - 1
-            tangents[i*4+1] = reader.byte() / 127 - 1
-            tangents[i*4+2] = reader.byte() / 127 - 1
-            tangents[i*4+3] = reader.byte() / 127 - 1
-
-            if vertex_colors is not None:
-                vertex_colors[i*4+0] = reader.byte()
-                vertex_colors[i*4+1] = reader.byte()
-                vertex_colors[i*4+2] = reader.byte()
-                vertex_colors[i*4+3] = reader.byte()
-                reader.jump(vertex_size - 40)
-            else:
-                reader.jump(vertex_size - 36)
-
-        # Envelope
-        if bone_count > 0:
-            mesh["skinIndices"] = [0] * (vertex_count * 4)
-            mesh["skinWeights"] = [0.0] * (vertex_count * 4)
-            for i in range(vertex_count):
-                for j in range(4):
-                    mesh["skinIndices"][i*4+j] = reader.byte()
-                for j in range(4):
-                    mesh["skinWeights"][i*4+j] = reader.byte() / 255
-
-        # Faces
-        for i in range(face_count):
-            faces[i*3+0] = reader.uint32le()
-            faces[i*3+1] = reader.uint32le()
-            faces[i*3+2] = reader.uint32le()
-            reader.jump(face_size - 12)
-
-        # LODs
-        if lod_count <= 2:
-            lods.extend([0, face_count])
-            reader.jump(lod_count * lod_size)
-        else:
-            for i in range(lod_count):
-                lods.append(reader.uint32le())
-                reader.jump(lod_size - 4)
-
-        # Bones
-        if bone_count > 0:
-            name_table_start = reader.get_index() + bone_count * 60
-            mesh["bones"] = [None] * bone_count
-            for i in range(bone_count):
-                bone = {}
-                name_start = name_table_start + reader.uint32le()
-                name_end = buffer_to_string(reader.subarray(name_start, reader.get_length())).find("\x00")
-                if name_end == -1:
-                    bone["name"] = buffer_to_string(reader.subarray(name_start, reader.get_length()))
-                else:
-                    bone["name"] = buffer_to_string(reader.subarray(name_start, name_start + name_end))
-
-                parent_index = reader.uint16le()
-                lod_parent_index = reader.uint16le()
-                bone["parent"] = mesh["bones"][parent_index] if parent_index < i else None
-                bone["lodParent"] = mesh["bones"][lod_parent_index] if lod_parent_index < i else None
-
-                bone["culling"] = reader.floatle()
-                bone["cframe"] = [0.0]*12
-                for j in range(9):
-                    bone["cframe"][j+3] = reader.floatle()
-                for j in range(3):
-                    bone["cframe"][j] = reader.floatle()
-
-                mesh["bones"][i] = bone
-
-        if name_table_size > 0:
-            reader.jump(name_table_size)
-
-        if subset_count > 0:
-            bone_indices = [0]*26
-            for _ in range(subset_count):
-                reader.uint32le()
-                reader.uint32le()
-                verts_begin = reader.uint32le()
-                verts_length = reader.uint32le()
-                reader.uint32le()
-                for i in range(26):
-                    bone_indices[i] = reader.uint16le()
-                verts_end = verts_begin + verts_length
-                for i in range(verts_begin, verts_end):
-                    for j in range(4):
-                        mesh["skinIndices"][i*4+j] = bone_indices[mesh["skinIndices"][i*4+j]]
-
-        if facs_data_size > 0:
-            reader.jump(facs_data_size)
-
-        return mesh
-
-    @staticmethod
-    def parse_chunked(buffer: bytes, version: str):
-        reader = ByteReader(buffer)
-        assert_condition(reader.string(12) == f"version {version}", "Bad header")
-
-        newline = reader.byte()
-        if newline == 0x0D:
-            assert_condition(reader.byte() == 0x0A, "Bad newline")
-        else:
-            assert_condition(newline == 0x0A, "Bad newline")
-
-        mesh = {}
-        
-        while reader.get_remaining() >= 16:
-            chunk_type = reader.string(8)
-            chunk_version = reader.uint32le()
-            chunk_size = reader.uint32le()
-            chunk_data = reader.read(chunk_size)
-            
-            # Create a reader for the chunk data
-            chunk = ByteReader(chunk_data)
-
-            if chunk_type.startswith("COREMESH"):
-                if chunk_version == 1:
-                    num_verts = chunk.uint32le()
-                    
-                    vertices = [0.0] * (num_verts * 3)
-                    normals = [0.0] * (num_verts * 3)
-                    uvs = [0.0] * (num_verts * 2)
-                    tangents = [0.0] * (num_verts * 4)
-                    vertex_colors = [0] * (num_verts * 4)
-                    
-                    for i in range(num_verts):
-                        vertices[i*3+0] = chunk.floatle()
-                        vertices[i*3+1] = chunk.floatle()
-                        vertices[i*3+2] = chunk.floatle()
-
-                        normals[i*3+0] = chunk.floatle()
-                        normals[i*3+1] = chunk.floatle()
-                        normals[i*3+2] = chunk.floatle()
-
-                        uvs[i*2+0] = chunk.floatle()
-                        uvs[i*2+1] = 1.0 - chunk.floatle() # Flip V
-
-                        # Tangents
-                        tangents[i*4+0] = chunk.byte() / 127.0 - 1.0
-                        tangents[i*4+1] = chunk.byte() / 127.0 - 1.0
-                        tangents[i*4+2] = chunk.byte() / 127.0 - 1.0
-                        tangents[i*4+3] = chunk.byte() / 127.0 - 1.0
-
-                        # Vertex Colors
-                        vertex_colors[i*4+0] = chunk.byte()
-                        vertex_colors[i*4+1] = chunk.byte()
-                        vertex_colors[i*4+2] = chunk.byte()
-                        vertex_colors[i*4+3] = chunk.byte()
-
-                    num_faces = chunk.uint32le()
-                    faces = [0] * (num_faces * 3)
-                    
-                    for i in range(num_faces):
-                        faces[i*3+0] = chunk.uint32le()
-                        faces[i*3+1] = chunk.uint32le()
-                        faces[i*3+2] = chunk.uint32le()
-
-                    mesh["vertices"] = vertices
-                    mesh["normals"] = normals
-                    mesh["uvs"] = uvs
-                    mesh["tangents"] = tangents
-                    mesh["vertexColors"] = vertex_colors
-                    mesh["faces"] = faces
-                    
-                    if "lods" not in mesh:
-                         mesh["lods"] = [0, num_faces]
-
-                elif chunk_version == 2:
-                     try:
-                         # Lazy import/init
-                         from .draco_decoder import DracoBitstream
-                         
-                         bitstream_size = chunk.uint32le()
-                         # Read the rest as draco bitstream
-                         draco_data = chunk.read(bitstream_size)
-                         
-                         decoded = DracoBitstream.parse(draco_data)
-                         print(f"[RBXMeshParser] Draco Decoded Keys: {list(decoded.keys())}")
-                         
-                         if "vertices" in decoded:
-                             mesh["vertices"] = decoded["vertices"]
-                             
-                         num_verts = len(mesh.get("vertices", [])) // 3
-                         
-                         if "normals" in decoded:
-                             mesh["normals"] = decoded["normals"]
-                         if "uvs" in decoded:
-                             # Roblox UVs usually need flipping: 1-v.
-                             raw_uvs = decoded["uvs"]
-                             width = 2
-                             count = len(raw_uvs) // width
-                             flipped = [0.0]*len(raw_uvs)
-                             for k in range(count):
-                                 flipped[k*2+0] = raw_uvs[k*2+0]
-                                 flipped[k*2+1] = 1.0 - raw_uvs[k*2+1]
-                             mesh["uvs"] = flipped
-                             
-                         if "faces" in decoded:
-                             mesh["faces"] = decoded["faces"]
-                             
-                         if "vertexColors" in decoded:
-                             mesh["vertexColors"] = decoded["vertexColors"]
-                         else:
-                             # Default to white (255, 255, 255, 255) if missing, to avoid KeyError downstream
-                             # Size: num_verts * 4
-                             mesh["vertexColors"] = [255] * (num_verts * 4)
-                             
-                         if "lods" not in mesh and "faces" in decoded:
-                             mesh["lods"] = [0, len(decoded["faces"]) // 3]
-
-                             
-                     except Exception as e:
-                         import traceback
-                         traceback.print_exc()
-                         print(f"[RBXMeshParser] Failed to decode Draco COREMESH: {e}")
-                         pass
-                else:
-                    print(f"[RBXMeshParser] Unknown COREMESH version {chunk_version}")
-
-            elif chunk_type.startswith("LODS"):
-                 if chunk_version == 1:
-                    lod_type = chunk.uint16le()
-                    num_high_quality_lods = chunk.byte()
-                    num_lods = chunk.uint32le()
-
-                    if num_lods <= 2:
-                        chunk.jump(num_lods * 4)
-                    else:
-                        lods = []
-                        for i in range(num_lods):
-                            lods.append(chunk.uint32le())
-                        mesh["lods"] = lods
-                 else:
-                     print(f"[RBXMeshParser] Unknown LODS version {chunk_version}")
-
-            elif chunk_type.startswith("SKINNING"):
-                if chunk_version == 1:
-                    num_verts = chunk.uint32le()
-                    
-                    skin_indices = [0] * (num_verts * 4)
-                    skin_weights = [0.0] * (num_verts * 4)
-                    
-                    for i in range(num_verts):
-                        skin_indices[i*4+0] = chunk.byte()
-                        skin_indices[i*4+1] = chunk.byte()
-                        skin_indices[i*4+2] = chunk.byte()
-                        skin_indices[i*4+3] = chunk.byte()
-                        
-                        skin_weights[i*4+0] = chunk.byte() / 255.0
-                        skin_weights[i*4+1] = chunk.byte() / 255.0
-                        skin_weights[i*4+2] = chunk.byte() / 255.0
-                        skin_weights[i*4+3] = chunk.byte() / 255.0
-                    
-                    mesh["skinIndices"] = skin_indices
-                    mesh["skinWeights"] = skin_weights
-
-                    num_bones = chunk.uint32le()
-                    mesh["bones"] = [None] * num_bones
-                    
-                    # Name table offset calculation
-                    # In JS: chunk.GetIndex() + numBones * 60 + 4
-                    # Here chunk.get_index() is currently pointing to start of bones
-                    name_table_offset = chunk.get_index() + num_bones * 60 + 4
-                    
-                    # Store bones temporarily to resolve parents later if needed, 
-                    # but index referencing handles it.
-                    bones_list = []
-
-                    for i in range(num_bones):
-                        bone = {}
-                        name_start = name_table_offset + chunk.uint32le()
-                        
-                        # Read name from buffer
-                        # We need to peek into the full chunk buffer to find the null terminator
-                        chunk_buffer = chunk.buffer.getbuffer()
-                        
-                        # Find null terminator
-                        name_end = -1
-                        for k in range(name_start, len(chunk_buffer)):
-                            if chunk_buffer[k] == 0:
-                                name_end = k
-                                break
-                        
-                        if name_end != -1:
-                           bone["name"] = buffer_to_string(chunk_buffer[name_start:name_end])
-                        else:
-                           bone["name"] = "Unknown"
-
-                        parent_idx = chunk.uint16le()
-                        lod_parent_idx = chunk.uint16le()
-                        
-                        # Resolving parent references immediately if we have the list might be tricky 
-                        # if they reference forward. But usually parents are defined before children?
-                        # JS code: bone.parent = mesh.bones[reader.UInt16LE()] 
-                        #Implies references are indices into the array we are building.
-                        #BUT if it's forward reference, it will be undefined.
-                        #However, in standard python we store indices or Resolve later.
-                        #Let's just store indices for now or try to resolve if possible.
-                        #Actually JS arrays are sparse/dynamic, so `mesh.bones[idx]` works even if empty? No.
-                        # For now, let's store indices directly or objects. The JS code seems to assign the object.
-                        # "bone.parent = mesh.bones[...]" -> returns undefined if not exists yet.
-                        # We will store the INDEX temporarily or None
-                        
-                        bone["parent_idx"] = parent_idx
-                        bone["lod_parent_idx"] = lod_parent_idx
-                        
-                        bone["culling"] = chunk.floatle()
-                        bone["cframe"] = [0.0] * 12
-                        for j in range(9):
-                            bone["cframe"][j+3] = chunk.floatle()
-                        for j in range(3):
-                            bone["cframe"][j] = chunk.floatle()
-                            
-                        bones_list.append(bone)
-                        mesh["bones"][i] = bone
-
-                    # Resolve parents
-                    for i, bone in enumerate(bones_list):
-                        p_idx = bone["parent_idx"]
-                        lp_idx = bone["lod_parent_idx"]
-                        # In JS if index is out of bounds or undefined it returns undefined.
-                        # We need to emulate that. 
-                        # Usually parent index is < i?
-                        if p_idx < len(bones_list) and p_idx != i: # Simple safety
-                             bone["parent"] = bones_list[p_idx]
-                        else:
-                             bone["parent"] = None
-                             
-                        if lp_idx < len(bones_list) and lp_idx != i:
-                             bone["lodParent"] = bones_list[lp_idx]
-                        else:
-                             bone["lodParent"] = None
-
-                    name_table_size = chunk.uint32le()
-                    chunk.jump(name_table_size)
-                    
-                    num_subsets = chunk.uint32le()
-                    # subset processing...
-                    bone_indices_map = [0] * 26
-                    
-                    for _ in range(num_subsets):
-                        chunk.uint32le() # facesBegin
-                        chunk.uint32le() # facesLength
-                        verts_begin = chunk.uint32le()
-                        verts_length = chunk.uint32le()
-                        chunk.uint32le() # numBoneIndices
-                        
-                        for k in range(26):
-                            bone_indices_map[k] = chunk.uint16le()
-                            
-                        verts_end = verts_begin + verts_length
-                        for v_idx in range(verts_begin, verts_end):
-                             for j in range(4):
-                                 old_idx = mesh["skinIndices"][v_idx*4+j]
-                                 if old_idx < 26:
-                                     mesh["skinIndices"][v_idx*4+j] = bone_indices_map[old_idx]
-
-                else:
-                    print(f"[RBXMeshParser] Unknown SKINNING version {chunk_version}")
-        
-        # Post-process: Add 'version' to mesh dict
-        mesh["version"] = version
-        return mesh
+    return result
 
 
+# ============================================================
+# CHUNK SUB-PARSERS
+# ============================================================
+
+def _parse_coremesh_v1(chunk_data):
+    """
+    Parse an uncompressed COREMESH v1 chunk.
+    Reads vertex count, vertex data, face count, and face data.
+    Vertex layout is identical to the binary parser (40 bytes each).
+    Returns vertices, normals, uvs, tangents, vertex_colors, faces.
+    """
+    pos = 0
+    num_verts = struct.unpack_from("<I", chunk_data, pos)[0]
+    pos += 4
+
+    # Each vertex is 40 bytes: pos(12) + norm(12) + uv(8) + tangent(4) + color(4)
+    vertex_size = 40
+    vertices, normals, uvs, tangents, vertex_colors = _read_vertices(
+        chunk_data, pos, num_verts, vertex_size
+    )
+    pos += num_verts * vertex_size
+
+    num_faces = struct.unpack_from("<I", chunk_data, pos)[0]
+    pos += 4
+
+    faces = _read_faces(chunk_data, pos, num_faces)
+
+    return vertices, normals, uvs, tangents, vertex_colors, faces
+
+
+def _parse_lods_chunk(chunk_data):
+    """
+    Parse a LODS v1 chunk.
+    Reads lod_type, num_high_quality_lods, and the array of
+    face-count boundary offsets.
+    Returns the LOD offsets list, or a default if <= 2 entries.
+    """
+    pos = 0
+    lod_type = struct.unpack_from("<H", chunk_data, pos)[0]
+    pos += 2
+    num_high_quality = struct.unpack_from("<B", chunk_data, pos)[0]
+    pos += 1
+    num_lods = struct.unpack_from("<I", chunk_data, pos)[0]
+    pos += 4
+
+    if num_lods <= 2:
+        return None  # caller will use default
+
+    lod_offsets = []
+    for i in range(num_lods):
+        val = struct.unpack_from("<I", chunk_data, pos)[0]
+        lod_offsets.append(val)
+        pos += 4
+
+    return lod_offsets
+
+
+def _parse_skinning_chunk(chunk_data):
+    """
+    Parse a SKINNING v1 chunk.
+    Reads per-vertex skinning data, bones with name table,
+    and subsets with bone index remapping.
+    Returns skin_indices, skin_weights, bones.
+    """
+    pos = 0
+
+    # --- Skinning per vertex ---
+    num_verts = struct.unpack_from("<I", chunk_data, pos)[0]
+    pos += 4
+    skin_indices, skin_weights = _read_skinning(chunk_data, pos, num_verts)
+    pos += num_verts * 8
+
+    # --- Bones ---
+    num_bones = struct.unpack_from("<I", chunk_data, pos)[0]
+    pos += 4
+
+    # The name table starts after all bone records + 4 bytes for name_table_size
+    name_table_offset = pos + num_bones * 60 + 4
+
+    bone_list = []
+    for bone_idx in range(num_bones):
+        bone, bytes_read = _read_single_bone(
+            chunk_data, pos, bone_idx, bone_list, name_table_offset
+        )
+        bone_list.append(bone)
+        pos += 60
+
+    # Resolve forward parent references in a second pass
+    for bone_idx, bone in enumerate(bone_list):
+        parent_idx = bone.pop("_parent_index", None)
+        if parent_idx is not None and parent_idx != 0xFFFF and parent_idx < len(bone_list):
+            bone["parent"] = bone_list[parent_idx]
+
+    # --- Skip name table ---
+    name_table_size = struct.unpack_from("<I", chunk_data, pos)[0]
+    pos += 4
+    pos += name_table_size
+
+    # --- Subsets ---
+    num_subsets = struct.unpack_from("<I", chunk_data, pos)[0]
+    pos += 4
+    _read_subsets_and_remap(chunk_data, pos, num_subsets, skin_indices)
+
+    return skin_indices, skin_weights, bone_list
+
+
+# ============================================================
+# SHARED BINARY READING HELPERS
+# ============================================================
+
+def _read_vertices(data, offset, vertex_count, vertex_size):
+    """
+    Read an array of mesh vertices from binary data.
+    Each vertex contains position (3 floats), normal (3 floats),
+    UV (2 floats, V flipped), tangent (4 signed bytes mapped to
+    -1..+1), and optionally RGBA vertex color (4 bytes).
+    Returns five lists: vertices, normals, uvs, tangents, vertex_colors.
+    """
+    vertices = []
+    normals = []
+    uvs = []
+    tangents = []
+    vertex_colors = []
+    has_colors = vertex_size >= 40
+
+    for i in range(vertex_count):
+        base = offset + i * vertex_size
+
+        # Position: 3 × float32 (12 bytes)
+        px, py, pz = struct.unpack_from("<3f", data, base)
+        vertices.extend([px, py, pz])
+
+        # Normal: 3 × float32 (12 bytes)
+        nx, ny, nz = struct.unpack_from("<3f", data, base + 12)
+        normals.extend([nx, ny, nz])
+
+        # UV: 2 × float32 (8 bytes), V is flipped
+        tu, tv = struct.unpack_from("<2f", data, base + 24)
+        uvs.extend([tu, 1.0 - tv])
+
+        # Tangent: 4 × uint8 (4 bytes), each mapped from [0,254] to [-1,+1]
+        t0, t1, t2, t3 = struct.unpack_from("<4B", data, base + 32)
+        tangents.extend([
+            t0 / 127.0 - 1.0,
+            t1 / 127.0 - 1.0,
+            t2 / 127.0 - 1.0,
+            t3 / 127.0 - 1.0,
+        ])
+
+        # Vertex Color: 4 × uint8 (4 bytes), optional
+        if has_colors:
+            cr, cg, cb, ca = struct.unpack_from("<4B", data, base + 36)
+            vertex_colors.extend([cr, cg, cb, ca])
+
+    if not has_colors:
+        vertex_colors = None
+
+    return vertices, normals, uvs, tangents, vertex_colors
+
+
+def _read_skinning(data, offset, vertex_count):
+    """
+    Read per-vertex skinning data: 4 bone indices (uint8 each)
+    and 4 bone weights (uint8 each, normalized to 0.0–1.0).
+    Returns two flat lists: skin_indices and skin_weights.
+    """
+    skin_indices = []
+    skin_weights = []
+
+    for i in range(vertex_count):
+        base = offset + i * 8
+        # 4 bone subset indices
+        si0, si1, si2, si3 = struct.unpack_from("<4B", data, base)
+        skin_indices.extend([si0, si1, si2, si3])
+        # 4 bone weights, each byte / 255.0
+        sw0, sw1, sw2, sw3 = struct.unpack_from("<4B", data, base + 4)
+        skin_weights.extend([
+            sw0 / 255.0,
+            sw1 / 255.0,
+            sw2 / 255.0,
+            sw3 / 255.0,
+        ])
+
+    return skin_indices, skin_weights
+
+
+def _read_faces(data, offset, face_count):
+    """
+    Read an array of triangle faces from binary data.
+    Each face is 3 × uint32 vertex indices (12 bytes total).
+    Returns a flat list of 0-based indices.
+    """
+    faces = []
+    for i in range(face_count):
+        base = offset + i * 12
+        a, b, c = struct.unpack_from("<3I", data, base)
+        faces.extend([a, b, c])
+    return faces
+
+
+def _read_lods_bin(data, offset, lod_count, lod_size, face_count):
+    """
+    Read LOD face-count boundary offsets from binary data.
+    If lod_count <= 2, returns a default [0, face_count].
+    Otherwise reads lod_count × uint32 values.
+    Returns a list of face-count boundaries.
+    """
+    if lod_count <= 2:
+        # Skip any LOD bytes that may still exist
+        return [0, face_count]
+
+    lod_offsets = []
+    for i in range(lod_count):
+        val = struct.unpack_from("<I", data, offset + i * lod_size)[0]
+        lod_offsets.append(val)
+    return lod_offsets
+
+
+def _read_bones(data, offset, bone_count, name_table_size):
+    """
+    Read an array of bone records from binary data.
+    Each bone is 60 bytes: name_offset(4), parent_index(2),
+    lod_parent_index(2), culling(4), rotation_matrix(36),
+    position(12).
+    Resolves bone names from the name table that follows.
+    Returns a list of bone dictionaries.
+    """
+    name_table_start = offset + bone_count * 60
+    bone_list = []
+
+    for bone_idx in range(bone_count):
+        base = offset + bone_idx * 60
+
+        name_offset = struct.unpack_from("<I", data, base)[0]
+        parent_index = struct.unpack_from("<H", data, base + 4)[0]
+        lod_parent_index = struct.unpack_from("<H", data, base + 6)[0]
+        culling = struct.unpack_from("<f", data, base + 8)[0]
+
+        # Rotation matrix: 9 × float32 (36 bytes)
+        rot = struct.unpack_from("<9f", data, base + 12)
+        # Position: 3 × float32 (12 bytes)
+        pos = struct.unpack_from("<3f", data, base + 48)
+
+        # CFrame: [px, py, pz, r00, r01, r02, r10, r11, r12, r20, r21, r22]
+        cframe = [pos[0], pos[1], pos[2]] + list(rot)
+
+        # Read bone name from name table (null-terminated UTF-8)
+        name_start = name_table_start + name_offset
+        name_end = data.index(b"\x00", name_start)
+        bone_name = data[name_start:name_end].decode("utf-8")
+
+        # Resolve parent: only if parent_index points to an already-read bone
+        parent = None
+        if parent_index != 0xFFFF and parent_index < bone_idx:
+            parent = bone_list[parent_index]
+
+        bone_list.append({
+            "name":    bone_name,
+            "parent":  parent,
+            "cframe":  cframe,
+            "culling": culling,
+        })
+
+    return bone_list
+
+
+def _read_single_bone(data, offset, bone_idx, bone_list, name_table_offset):
+    """
+    Read a single 60-byte bone record from chunk data.
+    Used by the chunked SKINNING parser where parent resolution
+    may require a second pass (forward references).
+    Returns the bone dict and 60 (bytes consumed).
+    """
+    name_offset_val = struct.unpack_from("<I", data, offset)[0]
+    parent_index = struct.unpack_from("<H", data, offset + 4)[0]
+    lod_parent_index = struct.unpack_from("<H", data, offset + 6)[0]
+    culling = struct.unpack_from("<f", data, offset + 8)[0]
+
+    rot = struct.unpack_from("<9f", data, offset + 12)
+    pos = struct.unpack_from("<3f", data, offset + 48)
+
+    cframe = [pos[0], pos[1], pos[2]] + list(rot)
+
+    # Read bone name from the name table
+    name_start = name_table_offset + name_offset_val
+    name_end = data.index(b"\x00", name_start)
+    bone_name = data[name_start:name_end].decode("utf-8")
+
+    bone = {
+        "name":          bone_name,
+        "parent":        None,
+        "cframe":        cframe,
+        "culling":       culling,
+        "_parent_index": parent_index,  # temporary, resolved later
+    }
+
+    return bone, 60
+
+
+def _read_subsets_and_remap(data, offset, subset_count, skin_indices):
+    """
+    Read mesh subsets and remap per-vertex skinIndices from
+    local subset bone indices to global bone array indices.
+    Each subset is 72 bytes: facesBegin(4), facesLength(4),
+    vertsBegin(4), vertsLength(4), numBoneIndices(4),
+    boneIndices(26 × uint16 = 52).
+    Modifies skin_indices in place.
+    """
+    for s in range(subset_count):
+        base = offset + s * 72
+
+        faces_begin = struct.unpack_from("<I", data, base)[0]
+        faces_length = struct.unpack_from("<I", data, base + 4)[0]
+        verts_begin = struct.unpack_from("<I", data, base + 8)[0]
+        verts_length = struct.unpack_from("<I", data, base + 12)[0]
+        num_bone_indices = struct.unpack_from("<I", data, base + 16)[0]
+
+        # 26 × uint16 bone index lookup table
+        bone_lut = struct.unpack_from("<26H", data, base + 20)
+
+        # Remap each vertex's 4 skin indices using the lookup table
+        for v in range(verts_begin, verts_begin + verts_length):
+            for j in range(4):
+                idx = v * 4 + j
+                if idx < len(skin_indices):
+                    local_idx = skin_indices[idx]
+                    if local_idx < len(bone_lut):
+                        skin_indices[idx] = bone_lut[local_idx]
+
+
+#####################
 def write_obj_from_mesh_json(mesh, out_path, lod_index=0, object_name="mesh"):
     flip_v=False
     ver = mesh["version"] 
@@ -650,11 +792,15 @@ def write_obj_from_mesh_json(mesh, out_path, lod_index=0, object_name="mesh"):
             elif use_uvs and not use_nrm:
                 f.write(f"f {idx1(a)}/{idx1(a)} {idx1(b)}/{idx1(b)} {idx1(c)}/{idx1(c)}\n")
             elif use_nrm and not use_uvs:
-                f.write(f"f {idx1(a)}//{idx1(a)} {idx1(b)}//{idx1(b)} {idx1(c)}//{idx1(c)}\n")
+                f.write(f"f {idx1(a)}//{idx1(a)} {idx1(b)}//{idx1(b)} {idx1()}//{idx1(c)}\n")
             else:
                 f.write(f"f {idx1(a)} {idx1(b)} {idx1(c)}\n")
 
 
+'''with open(r"D:\Mine\GDrive\Blender\Roblox\0. Addon\mesh reader\test files\lower_torso_4.1.mesh", "rb") as f:
+    data = f.read()
+    mesh = parse(data)
+write_obj_from_mesh_json(mesh, "out.obj", lod_index=0, object_name="mesh")'''
 
 
 '''mesh_file = r""
@@ -671,5 +817,4 @@ with open(mesh_file, "rb") as f:
 
 
 #write_obj_from_mesh_json(mesh, otput_obj, lod_index=0, object_name="mesh")
-
 

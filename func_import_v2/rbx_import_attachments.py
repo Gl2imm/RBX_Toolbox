@@ -20,7 +20,7 @@ def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bund
     
     # Reload Dependencies & Setup Context
     from . import func_rbx_cloud_api as api_cloud, func_rbx_other as api_other, func_blndr_api as api_blend
-    from . import rbxm_reader
+    from .readers import rbxm_reader
     
     if func_rbx_cloud_api is None: func_rbx_cloud_api = api_cloud
     if func_rbx_other is None: func_rbx_other = api_other

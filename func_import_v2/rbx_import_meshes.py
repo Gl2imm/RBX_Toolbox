@@ -14,7 +14,8 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
                        parent_name: str = None, skip_download: bool = False, is_layered_clothing: bool = False, is_face_parts: bool = False, parse_bones: bool = False):
     
     # Reload Dependencies
-    from . import func_blndr_api, rbx_import_textures, rbxm_reader
+    from .readers import rbxm_reader
+    from . import func_blndr_api, rbx_import_textures
     importlib.reload(func_blndr_api)
     importlib.reload(rbx_import_textures)
 
@@ -363,7 +364,7 @@ def process_dynamic_head(headers: dict, rbx_tmp_rbxm_filepath: str, rbxm_file,
     Checks for and processes a Dynamic Head from the RBXM file.
     Returns the MeshPart Instance if found and successfully processed/reloaded, else None.
     """
-    from . import rbxm_reader
+    from .readers import rbxm_reader
 
     # Check if we already have the Dynamic Head (e.g. upgraded by download manager)
     head_part_existing = rbxm_file.FindFirstChild("Head")

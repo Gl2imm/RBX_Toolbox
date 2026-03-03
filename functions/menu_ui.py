@@ -12,9 +12,7 @@ from RBX_Toolbox import props
 
 
 
-
-addon_version = "v.6.3"
-#to update in __init__ as well
+from RBX_Toolbox import addon_version, addon_label
 #clean public lib, pycache and imports folder
 #set debug to false
 
@@ -31,10 +29,69 @@ def get_aepbr_cur_ver():
     return aepbr_cur_ver
 
 
+####################################
+# Terms of Use Operator (Import Beta)
+####################################
+class RBX_OT_terms_of_use(bpy.types.Operator):
+    """Terms of Use for Import (Beta)"""
+    bl_idname = "object.rbx_terms_of_use"
+    bl_label = "Terms of Use"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    action: bpy.props.StringProperty(default="SHOW") # type: ignore
+
+    def invoke(self, context, event):
+        if self.action == "ACCEPT":
+            prefs = context.preferences.addons["RBX_Toolbox"].preferences
+            prefs.accepted_terms_of_use = True
+            self.report({'INFO'}, "Terms of Use accepted.")
+            return {'FINISHED'}
+        elif self.action == "DECLINE":
+            self.report({'WARNING'}, "Terms of Use declined.")
+            return {'CANCELLED'}
+        # SHOW: open the dialog
+        return context.window_manager.invoke_props_dialog(self, width=420)
+
+    def draw(self, context):
+        layout = self.layout
+
+        # Agreement section
+        box = layout.box()
+        box.label(text="Agreement:", icon='BOOKMARKS')
+        col = box.column(align=True)
+        col.label(text="By using this tool, you agree that anything you")
+        col.label(text="download is strictly for your personal use, reference,")
+        col.label(text="and research purposes only. You hereby make a")
+        col.label(text="completely serious, legally-binding-in-spirit Pinky")
+        col.label(text="Promise not to reupload, redistribute, resell, or claim")
+        col.label(text="the downloaded content as your own.")
+
+        layout.separator()
+
+        # Warning section
+        box = layout.box()
+        box.alert = True
+        box.label(text="WARNING!", icon='ERROR')
+        col = box.column(align=True)
+        col.label(text="Roblox is actively tracking asset access and related")
+        col.label(text="activity. This includes hashes, device information, IP")
+        col.label(text="addresses, and usage patterns. They can technically")
+        col.label(text="pinpoint the source of misuse. Abuse of this tool may")
+        col.label(text="result in account suspension, termination, or further")
+        col.label(text="action. Use responsibly.")
+
+    def execute(self, context):
+        # "OK" button on the dialog acts as Accept
+        prefs = context.preferences.addons["RBX_Toolbox"].preferences
+        prefs.accepted_terms_of_use = True
+        self.report({'INFO'}, "Terms of Use accepted.")
+        return {'FINISHED'}
+
+
     #PANEL UI
 ####################################
 class TOOLBOX_MENU(bpy.types.Panel):
-    bl_label = f"Roblox Toolbox (" + addon_version + ")"
+    bl_label = addon_label
     bl_idname = "RBX_PT_panel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -448,130 +505,174 @@ class TOOLBOX_MENU(bpy.types.Panel):
             row.label(text='Import (Beta)', icon='IMPORT')
             # some data on the subpanel
             if context.scene.subpanel_imp_beta:
-                box = layout.box()
-                box.label(text = 'Enter ID or URL')
-                
-                row = box.row()
-                row.enabled = not rbx_prefs.rbx_import_beta_active
-                row.prop(rbx_prefs, 'rbx_item_field_entry', text ='')
+                # Terms of Use gate: must accept before using Import (Beta)
+                addon_prefs = context.preferences.addons["RBX_Toolbox"].preferences
+                if not addon_prefs.accepted_terms_of_use:
+                    box = layout.box()
+                    box.label(text="Please accept the Terms of Use", icon='INFO')
+                    box.label(text="before using Import (Beta).")
+                    box.operator('object.rbx_terms_of_use', text="Terms of Use", icon='BOOKMARKS').action = "SHOW"
+                else:
+                    box = layout.box()
+                    box.label(text = 'Enter ID or URL')
+                    
+                    row = box.row()
+                    row.enabled = not rbx_prefs.rbx_import_beta_active
+                    row.prop(rbx_prefs, 'rbx_item_field_entry', text ='')
 
-                row = box.row()
-                row.enabled = not rbx_prefs.rbx_import_beta_active
-                row.operator('object.rbx_import_discovery', text = "Asset Discovery")
-                
-                box_reset = box.box()
-                if rbx_prefs.rbx_import_beta_active:
-                     box_reset.alert = True
-                box_reset.operator('object.rbx_import_reset', text = "Reset")
-                
-                if glob_vars.rbx_imp_error:
-                    box_reset.label(text=glob_vars.rbx_imp_error, icon='ERROR')
+                    row = box.row()
+                    row.enabled = not rbx_prefs.rbx_import_beta_active
+                    row.operator('object.rbx_import_discovery', text = "Asset Discovery")
+                    
+                    box_reset = box.box()
+                    if rbx_prefs.rbx_import_beta_active:
+                         box_reset.alert = True
+                    box_reset.operator('object.rbx_import_reset', text = "Reset")
+                    
+                    if glob_vars.rbx_imp_error:
+                        box_reset.label(text=glob_vars.rbx_imp_error, icon='ERROR')
 
-                # Discovered Items UI
-                if hasattr(glob_vars, 'discovered_items_data') and glob_vars.discovered_items_data:
-                        # Check if any category has items
-                        has_items = any(glob_vars.discovered_items_data.values())
-                        
-                        if has_items:
-                            box = layout.box()
-                            box.label(text="Discovered Items:", icon='PREFERENCES')
+                    # Discovered Items UI
+                    if hasattr(glob_vars, 'discovered_items_data') and glob_vars.discovered_items_data:
+                            # Check if any category has items
+                            has_items = any(glob_vars.discovered_items_data.values())
                             
-                            # Asset Details
-                            if glob_vars.rbx_asset_name:
-                                box.label(text=f"Name: {glob_vars.rbx_asset_name}")
-                            if glob_vars.rbx_asset_type:
-                                box.label(text=f"Type: {glob_vars.rbx_asset_type}")
-                            if glob_vars.rbx_asset_creator:
-                                box.label(text=f"Creator: {glob_vars.rbx_asset_creator}")
-
-                            # Thumbnail Preview
-                            try:
-                                if glob_vars.rbx_asset_name_clean:
-                                    rbx_asset_img_prev = bpy.data.images.get(glob_vars.rbx_asset_name_clean + ".png")
-                                    if rbx_asset_img_prev:
-                                        rbx_asset_img_prev.preview_ensure()
-                                        box.template_icon(rbx_asset_img_prev.preview.icon_id, scale=10.0)
-                            except:
-                                pass
-                            
-                            # Import the configuration
-                            from RBX_Toolbox.func_import_v2 import rbx_import_discovery as discovery_config
-
-                            # Helper to draw a category box
-                            def draw_discovery_category(layout, category_name, icon, enum_prop, download_operator_text):
+                            if has_items:
                                 box = layout.box()
+                                box.label(text="Discovered Items:", icon='PREFERENCES')
                                 
-                                # Header Row: Label + Options Button
-                                row_header = box.row()
-                                row_header.alert = True
-                                row_header.label(text=category_name, icon=icon)
+                                # Asset Details
+                                if glob_vars.rbx_asset_name:
+                                    box.label(text=f"Name: {glob_vars.rbx_asset_name}")
+                                if glob_vars.rbx_asset_type:
+                                    box.label(text=f"Type: {glob_vars.rbx_asset_type}")
+                                if glob_vars.rbx_asset_creator:
+                                    box.label(text=f"Creator: {glob_vars.rbx_asset_creator}")
+
+                                # Thumbnail Preview
+                                try:
+                                    if glob_vars.rbx_asset_name_clean:
+                                        rbx_asset_img_prev = bpy.data.images.get(glob_vars.rbx_asset_name_clean + ".png")
+                                        if rbx_asset_img_prev:
+                                            rbx_asset_img_prev.preview_ensure()
+                                            box.template_icon(rbx_asset_img_prev.preview.icon_id, scale=10.0)
+                                except:
+                                    pass
                                 
-                                if category_name != "Classics":
-                                    row_header.operator("object.rbx_import_discovery_options", text="", icon='PREFERENCES').category = category_name
-                                
-                                box.separator()
-                                
-                                box.prop(rbx_prefs, enum_prop, text="")
-                                
-                                if category_name == "Dynamic Head" and getattr(glob_vars, 'rbx_default_head_used', False):
-                                    # Manual text wrapping for info message
-                                    col_info = box.column(align=True)
-                                    col_info.label(text="Dynamic head not found in bundle,", icon='INFO')
-                                    col_info.label(text="Default is used.")
-                                
-                                # Checkboxes and options are now handling in the pop-up operator
-                                
-                                box.separator()
-                                box.separator()
-                                box.operator('object.rbx_import_discovery_download', text=download_operator_text).category = category_name
-                                
-                                # User Request: Remove open folder button for Armature box
-                                if category_name != "Armature":
-                                    box.operator('object.rbx_import_discovery_open_folder', text="Open Folder").category = category_name
-                                else:
-                                    if getattr(glob_vars, 'rbx_armature_warning_active', False):
+                                # Import the configuration
+                                from RBX_Toolbox.func_import_v2 import rbx_import_discovery as discovery_config
+
+                                # Helper to draw a category box
+                                def draw_discovery_category(layout, category_name, icon, enum_prop, download_operator_text):
+                                    box = layout.box()
+                                    
+                                    # Header Row: Label + Options Button
+                                    row_header = box.row()
+                                    row_header.alert = True
+                                    row_header.label(text=category_name, icon=icon)
+                                    
+                                    if category_name != "Classics":
+                                        row_header.operator("object.rbx_import_discovery_options", text="", icon='PREFERENCES').category = category_name
+                                    
+                                    box.separator()
+                                    
+                                    box.prop(rbx_prefs, enum_prop, text="")
+                                    
+                                    if category_name == "Dynamic Head" and getattr(glob_vars, 'rbx_default_head_used', False):
+                                        # Manual text wrapping for info message
                                         col_info = box.column(align=True)
-                                        col_info.label(text="Item meshes version is below 4.00", icon='ERROR')
-                                        col_info.label(text="and does not have Armature.")
-                                        col_info.label(text="Older mesh armatures are not yet implemented.")
+                                        col_info.label(text="Dynamic head not found in bundle,", icon='INFO')
+                                        col_info.label(text="Default is used.")
+                                    
+                                    # Checkboxes and options are now handling in the pop-up operator
+                                    
+                                    box.separator()
+                                    box.separator()
+                                    box.operator('object.rbx_import_discovery_download', text=download_operator_text).category = category_name
+                                    
+                                    # User Request: Remove open folder button for Armature box
+                                    if category_name != "Armature":
+                                        box.operator('object.rbx_import_discovery_open_folder', text="Open Folder").category = category_name
+                                    else:
+                                        if getattr(glob_vars, 'rbx_armature_warning_active', False):
+                                            col_info = box.column(align=True)
+                                            col_info.label(text="Item meshes version is below 4.00", icon='ERROR')
+                                            col_info.label(text="and does not have Armature.")
+                                            col_info.label(text="Older mesh armatures are not yet implemented.")
 
-                            # Define categories to display
-                            categories_to_draw = []
-                            if glob_vars.discovered_items_data.get("Body Parts"):
-                                categories_to_draw.append(("Body Parts", 'OUTLINER_OB_ARMATURE', "rbx_enum_body_parts", "Download Body Parts"))
-                            if glob_vars.discovered_items_data.get("Accessory"):
-                                categories_to_draw.append(("Accessory", 'MOD_CLOTH', "rbx_enum_accessory", "Download Accessories"))
-                            if glob_vars.discovered_items_data.get("Dynamic Head"):
-                                categories_to_draw.append(("Dynamic Head", 'MONKEY', "rbx_enum_dynamic_head", "Download Dynamic Heads"))
-                            if glob_vars.discovered_items_data.get("Layered Cloth"):
-                                categories_to_draw.append(("Layered Cloth", 'MOD_CLOTH', "rbx_enum_layered_cloth", "Download Layered Cloth"))
-                            if glob_vars.discovered_items_data.get("Face Parts"):
-                                categories_to_draw.append(("Face Parts", 'FACESEL', "rbx_enum_face_parts", "Download Face Parts"))
-                            if glob_vars.discovered_items_data.get("Classics"):
-                                categories_to_draw.append(("Classics", 'MOD_CLOTH', "rbx_enum_classics", "Download Classics"))
-                            if glob_vars.discovered_items_data.get("Gear"):
-                                categories_to_draw.append(("Gear", 'MODIFIER', "rbx_enum_gear", "Download Gear"))
-                            
-                            # Check if Armature category should be shown (if any mesh-containing category exists)
-                            armature_relevant_cats = ["Body Parts", "Dynamic Head", "Layered Cloth", "Face Parts"]
-                            if any(glob_vars.discovered_items_data.get(cat) for cat in armature_relevant_cats):
-                                 # Use a dummy enum or None for now, or maybe create one if needed for specific options
-                                 # For now reusing body parts enum as placeholder or None if logic allows
-                                 # But wait, draw_discovery_category expects an enum_prop name for `box.prop(rbx_prefs, enum_prop, ...)`
-                                 # We can pass None if we handle it in drawing function, but `draw_discovery_category` uses it directly.
-                                 # Let's use `rbx_arma_enum` which exists in props.py (Armatures)
-                                 categories_to_draw.append(("Armature", 'OUTLINER_OB_ARMATURE', "rbx_arma_enum", "Download Armature"))
-
-                            # Stack Layout (Vertical)
-                            for cat_name, icon, enum, dl_text in categories_to_draw:
-                                draw_discovery_category(layout, cat_name, icon, enum, dl_text)
+                                # Define categories to display
+                                categories_to_draw = []
+                                if glob_vars.discovered_items_data.get("Body Parts"):
+                                    categories_to_draw.append(("Body Parts", 'OUTLINER_OB_ARMATURE', "rbx_enum_body_parts", "Download Body Parts"))
+                                if glob_vars.discovered_items_data.get("Accessory"):
+                                    categories_to_draw.append(("Accessory", 'MOD_CLOTH', "rbx_enum_accessory", "Download Accessories"))
+                                if glob_vars.discovered_items_data.get("Dynamic Head"):
+                                    categories_to_draw.append(("Dynamic Head", 'MONKEY', "rbx_enum_dynamic_head", "Download Dynamic Heads"))
+                                if glob_vars.discovered_items_data.get("Layered Cloth"):
+                                    categories_to_draw.append(("Layered Cloth", 'MOD_CLOTH', "rbx_enum_layered_cloth", "Download Layered Cloth"))
+                                if glob_vars.discovered_items_data.get("Face Parts"):
+                                    categories_to_draw.append(("Face Parts", 'FACESEL', "rbx_enum_face_parts", "Download Face Parts"))
+                                if glob_vars.discovered_items_data.get("Classics"):
+                                    categories_to_draw.append(("Classics", 'MOD_CLOTH', "rbx_enum_classics", "Download Classics"))
+                                if glob_vars.discovered_items_data.get("Gear"):
+                                    categories_to_draw.append(("Gear", 'MODIFIER', "rbx_enum_gear", "Download Gear"))
                                 
-                            # Download Everything Button - Only show if more than one category
-                            if len(categories_to_draw) > 1:
-                                box_dl_all = layout.box()
-                                box_dl_all.label(text="Process All:", icon='IMPORT')
-                                box_dl_all.label(text="Select checkboxes in above menus")
-                                box_dl_all.operator('object.rbx_import_discovery_download', text="Download Everything").category = "ALL_CATEGORIES"
+                                # Check if Armature category should be shown (if any mesh-containing category exists)
+                                armature_relevant_cats = ["Body Parts", "Dynamic Head", "Layered Cloth", "Face Parts"]
+                                if any(glob_vars.discovered_items_data.get(cat) for cat in armature_relevant_cats):
+                                     categories_to_draw.append(("Armature", 'OUTLINER_OB_ARMATURE', "rbx_arma_enum", "Download Armature"))
+
+                                # Models category
+                                if glob_vars.discovered_items_data.get("Models"):
+                                    categories_to_draw.append(("Models", 'MESH_CUBE', "rbx_enum_models", "Download Model"))
+
+                                # Stack Layout (Vertical)
+                                for cat_name, icon, enum, dl_text in categories_to_draw:
+                                    draw_discovery_category(layout, cat_name, icon, enum, dl_text)
+                                
+                                # ── Animations Box (custom, separate from categories_to_draw) ──
+                                if glob_vars.discovered_items_data.get("Animations"):
+                                    box = layout.box()
+                                    row_header = box.row()
+                                    row_header.alert = True
+                                    row_header.label(text="Animations", icon='ACTION')
+                                    
+                                    box.separator()
+                                    
+                                    # Armature selector (dropper)
+                                    box.label(text="Target Armature:")
+                                    box.prop(rbx_prefs, 'rbx_anim_armature_target', text="")
+                                    
+                                    box.separator()
+                                    
+                                    # Animation item selector
+                                    box.prop(rbx_prefs, 'rbx_enum_animations', text="")
+                                    
+                                    # Check alt animations button (fetches + parses sub-animations)
+                                    box.operator(
+                                        'object.rbx_import_discovery_download',
+                                        text="Check alt animations"
+                                    ).category = "Animations"
+                                    
+                                    # Animation buttons (visible after download)
+                                    anim_subs = getattr(glob_vars, 'rbx_anim_sub_items', [])
+                                    if anim_subs:
+                                        box.separator()
+                                        box.label(text=f"Found {len(anim_subs)} animation(s):")
+                                        for idx, sub in enumerate(anim_subs):
+                                            box.operator(
+                                                'object.rbx_import_discovery_download',
+                                                text=sub.get('name', f"Animation {idx}"),
+                                                icon='PLAY'
+                                            ).category = f"Animations_Apply_{idx}"
+
+                                # Download Everything Button - Only show if more than one category
+                                # NOTE: Animations are excluded from Download Everything per user request
+                                if len(categories_to_draw) > 1:
+                                    box_dl_all = layout.box()
+                                    box_dl_all.label(text="Process All:", icon='IMPORT')
+                                    box_dl_all.label(text="Select checkboxes in above menus")
+                                    box_dl_all.operator('object.rbx_import_discovery_download', text="Download Everything").category = "ALL_CATEGORIES"
 
 
 
@@ -956,6 +1057,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
             ###### LC ANIMATION TEST ######
             box = layout.box()
             box.label(text = 'LC Animation Test')
+            box.label(text = '(Blocky & Woman only)')
             box.label(text = '1. Select LC Armature')
             box.prop_search(scene, "rbx_lc_anim_armature", scene, "objects")
             box.label(text = '2. Select Rig to spawn')
@@ -975,6 +1077,12 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 row = box.row(align=True)
                 row.operator('object.rbx_lc_anim_v2_add_anim', text="Move", icon='ARMATURE_DATA').anim_type = "MOVE"
                 row.operator('object.rbx_lc_anim_v2_add_anim', text="Run", icon='ARMATURE_DATA').anim_type = "RUN"
+                row = box.row(align=True)
+                row.operator('object.rbx_lc_anim_v2_add_anim', text="Swim", icon='ARMATURE_DATA').anim_type = "SWIM"
+                row.operator('object.rbx_lc_anim_v2_add_anim', text="Climb", icon='ARMATURE_DATA').anim_type = "CLIMB"
+                row = box.row(align=True)
+                row.operator('object.rbx_lc_anim_v2_add_anim', text="Jump", icon='ARMATURE_DATA').anim_type = "JUMP"
+                row.operator('object.rbx_lc_anim_v2_add_anim', text="Fall", icon='ARMATURE_DATA').anim_type = "FALL"
 
                 box.separator()
                 # Play/Pause toggle + Delete Rig

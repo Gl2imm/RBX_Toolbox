@@ -454,6 +454,14 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     ) # type: ignore
 
 
+    ### Model Import Properties ###
+    rbx_model_choice_add_textures : bpy.props.BoolProperty(
+    name="Import Textures / Colors",
+    description="Apply part colors and material properties (roughness, metallic) to imported parts",
+    default = True
+    ) # type: ignore
+
+
     ### Import Character ###
     rbx_username_entered: bpy.props.StringProperty(
         name="Username Entered",
@@ -781,8 +789,8 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
                 # Identifier (Asset ID), Name (Asset Name), Description
                 items.append((str(item['id']), item['name'], f"Asset ID: {item['id']}"))
         
-        # Add "All Items" if there are multiple items
-        if len(items) > 1:
+        # Add "All Items" if there are multiple items (but NOT for Animations)
+        if len(items) > 1 and category != "Animations":
             items.append(('ALL', "All Items", "Process all items in this category"))
             
         if not items:
@@ -835,6 +843,50 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
         name = "Armature",
         description = "Discovered Armature Items",
         items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Armature")
+    ) # type: ignore
+
+    rbx_enum_models : bpy.props.EnumProperty(
+        name = "Models",
+        description = "Discovered Models",
+        items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Models")
+    ) # type: ignore
+
+    ### Animations Properties ###
+
+    rbx_enum_animations : bpy.props.EnumProperty(
+        name = "Animations",
+        description = "Discovered Animations",
+        items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Animations")
+    ) # type: ignore
+
+    def poll_armature(self, obj):
+        """Filter for armature objects only."""
+        return obj.type == 'ARMATURE'
+
+    rbx_anim_armature_target : bpy.props.PointerProperty(
+        name = "Target Armature",
+        description = "Select armature to apply animation to",
+        type = bpy.types.Object,
+        poll = poll_armature
+    ) # type: ignore
+
+    def get_anim_sub_callback(self, context):
+        """Dynamically list sub-animations (KeyframeSequences) from glob_vars."""
+        items = []
+        anim_subs = getattr(glob_vars, 'rbx_anim_sub_items', [])
+        for idx, sub in enumerate(anim_subs):
+            identifier = str(idx)
+            name = sub.get('name', f"Animation {idx}")
+            desc = f"Sub-animation: {name}"
+            items.append((identifier, name, desc))
+        if not items:
+            items.append(('NONE', "No Sub-Animations", "Download animation first"))
+        return items
+
+    rbx_anim_sub_enum : bpy.props.EnumProperty(
+        name = "Sub-Animation",
+        description = "Select which animation to import from the file",
+        items = get_anim_sub_callback
     ) # type: ignore
 
     ##### OTHER FUNCTIONS ##### 

@@ -53,7 +53,8 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
     # Initialize Context — .NET no longer needed, sub-modules use rbxm_reader
     
     # Reload Dependencies
-    from . import mesh_reader, conversion_funct as funct, func_rbx_other, func_rbx_api, func_blndr_api, func_rbx_cloud_api
+    from .readers import mesh_reader
+    from . import conversion_funct as funct, func_rbx_other, func_rbx_api, func_blndr_api, func_rbx_cloud_api
     from . import rbx_import_meshes, rbx_import_cages, rbx_import_attachments, rbx_import_textures
     
     importlib.reload(mesh_reader)
@@ -275,13 +276,19 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
                     
                     dprint(f"Processing bones for: {asset_name} ({asset_id})...")
                     
+                    # Create per-item subfolder in tmp_rbxm
+                    item_clean_name = func_rbx_other.replace_restricted_char(asset_name)
+                    item_tmp_path = os.path.join(rbx_tmp_rbxm_filepath, item_clean_name)
+                    if not os.path.exists(item_tmp_path):
+                        os.makedirs(item_tmp_path)
+                    
                     # Ensure Asset Local (Download if needed)
                     # Use appropriate format if known, else default
                     asset_format = None
                     if cat == "Dynamic Head": asset_format = "avatar_meshpart_head"
                     elif cat == "Layered Cloth": asset_format = "avatar_meshpart_accessory"
                     
-                    success = ensure_local_asset(asset_id, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=asset_format)
+                    success = ensure_local_asset(asset_id, headers, item_tmp_path, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=asset_format)
                     if not success: continue
 
                     # Process for Bones Only
@@ -295,7 +302,7 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
                     
                     mesh_results = rbx_import_meshes.process_mesh_asset(
                         asset_id, asset_name, headers, bone_prefs, 
-                        bundles_folder, rbx_tmp_rbxm_filepath, 
+                        bundles_folder, item_tmp_path, 
                         mesh_reader, funct, func_rbx_cloud_api, func_rbx_other, func_blndr_api,
                         parent_name=None,
                         skip_download=True, is_layered_clothing=(cat=="Layered Cloth"),
@@ -347,6 +354,13 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         asset_name = item['name']
         dprint(f"Processing Item: {asset_name} ({asset_id})")
         
+        # Create per-item subfolder in tmp_rbxm so each item's temp files
+        # are isolated (e.g. tmp_rbxm/Korblox_Deathspeaker/)
+        item_clean_name = func_rbx_other.replace_restricted_char(asset_name)
+        item_tmp_path = os.path.join(rbx_tmp_rbxm_filepath, item_clean_name)
+        if not os.path.exists(item_tmp_path):
+            os.makedirs(item_tmp_path)
+        
         # Centralized Download Step
         # Determine format based on category
         asset_format = None
@@ -355,7 +369,7 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         elif category_name == "Layered Cloth":
             asset_format = "avatar_meshpart_accessory" # Layered Cloth are accessories
             
-        success = ensure_local_asset(asset_id, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=asset_format)
+        success = ensure_local_asset(asset_id, headers, item_tmp_path, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=asset_format)
         if not success:
             dprint(f"Skipping {asset_name} due to download failure.")
             continue
@@ -363,10 +377,10 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         if category_name == "Classics":
             dprint(f"Processing Classic Textures for {asset_name}...")
             rbx_import_textures.classic_shirt_import(
-                asset_id, asset_name, bundles_folder, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other
+                asset_id, asset_name, bundles_folder, headers, item_tmp_path, func_rbx_cloud_api, func_rbx_other
             )
             rbx_import_textures.classic_pants_import(
-                asset_id, asset_name, bundles_folder, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other
+                asset_id, asset_name, bundles_folder, headers, item_tmp_path, func_rbx_cloud_api, func_rbx_other
             )
             continue
 
@@ -384,7 +398,7 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         if prefs['add_meshes']:
             mesh_results = rbx_import_meshes.process_mesh_asset(
                 asset_id, asset_name, headers, prefs, 
-                asset_own_folder, rbx_tmp_rbxm_filepath, 
+                asset_own_folder, item_tmp_path, 
                 mesh_reader, funct, func_rbx_cloud_api, func_rbx_other, func_blndr_api,
                 parent_name=parent_name,
                 skip_download=True, is_layered_clothing=is_layered_clothing, is_face_parts=is_face_parts
@@ -397,7 +411,7 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
              asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)
              rbx_import_cages.download_and_apply_cages(
                 asset_id, asset_name, asset_own_folder, headers, 
-                asset_clean_name, rbx_tmp_rbxm_filepath, 
+                asset_clean_name, item_tmp_path, 
                 prefs['at_origin'], prefs['add_ver_col'],
                 mesh_reader, funct, [],
                 func_rbx_cloud_api, func_rbx_other, func_blndr_api,
@@ -409,7 +423,7 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
              asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)
              rbx_import_attachments.download_and_apply_attachments(
                 asset_id, asset_name, asset_own_folder, headers, 
-                asset_clean_name, rbx_tmp_rbxm_filepath, 
+                asset_clean_name, item_tmp_path, 
                 prefs['at_origin'], prefs['add_attachment'], prefs.get('add_motor6d_attachment', False),
                 mesh_reader, funct,
                 func_rbx_cloud_api, func_rbx_other, func_blndr_api,
@@ -423,17 +437,296 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
     #    importlib.reload(rbx_import_bones)
     #    rbx_import_bones.import_bones(all_imported_meshes, mesh_reader, funct, prefs.get('at_origin'))
 
-    # Cleanup RBXM file if requested
+    # Cleanup per-item tmp folder if requested
     if prefs.get('clean_tmp_meshes', False):
-        rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
-        if os.path.exists(rbx_tmp_rbxm_file):
-            try:
-                os.remove(rbx_tmp_rbxm_file)
-                dprint(f"Cleaned up RBXM: {rbx_tmp_rbxm_file}")
-            except Exception as e:
-                dprint(f"Error cleaning up RBXM {asset_id}: {e}")
+        import shutil
+        for item in items_to_process:
+            clean_name = func_rbx_other.replace_restricted_char(item['name'])
+            item_folder = os.path.join(rbx_tmp_rbxm_filepath, clean_name)
+            if os.path.exists(item_folder):
+                try:
+                    shutil.rmtree(item_folder)
+                    dprint(f"Cleaned up item tmp folder: {item_folder}")
+                except Exception as e:
+                    dprint(f"Error cleaning up item tmp folder: {e}")
 
     dprint(f"Download Finished for {category_name}.")
 
 
+def download_animation(context, apply_index=-1):
+    """Download animation RBXM and parse KeyframeSequences or CurveAnimations.
+    
+    If apply_index < 0: downloads and discovers sub-animations, storing them in glob_vars.
+    If apply_index >= 0: applies that sub-animation index to the selected armature.
+    """
+    from .readers import rbxm_reader, animation_reader, curve_animation_reader
+    from . import func_rbx_cloud_api, func_rbx_other, func_blndr_api
+    importlib.reload(func_rbx_cloud_api)
+    importlib.reload(func_rbx_other)
+    importlib.reload(func_blndr_api)
+    importlib.reload(animation_reader)
+    importlib.reload(curve_animation_reader)
+
+    rbx_prefs = context.scene.rbx_prefs
+    
+    if apply_index >= 0:
+        # Apply the sub-animation at the given index to the selected armature
+        armature = rbx_prefs.rbx_anim_armature_target
+        if armature is None or armature.type != 'ARMATURE':
+            dprint("No armature selected.")
+            glob_vars.rbx_imp_error = "No armature found. Select an armature first."
+            return
+        
+        anim_subs = getattr(glob_vars, 'rbx_anim_sub_items', [])
+        if apply_index >= len(anim_subs):
+            dprint(f"Invalid sub-animation index: {apply_index}")
+            glob_vars.rbx_imp_error = "Invalid animation index."
+            return
+        
+        sub = anim_subs[apply_index]
+        anim_data = sub['anim_data']
+        action_name = sub['name']
+        
+        if sub.get('is_curve_anim', False):
+            func_blndr_api.blender_api_apply_curve_animation(
+                armature, anim_data, action_name=action_name
+            )
+        else:
+            func_blndr_api.blender_api_apply_animation(
+                armature, anim_data, action_name=action_name
+            )
+        dprint(f"Animation '{action_name}' applied to '{armature.name}'.")
+        return
+    
+    # Phase 1: Download and discover sub-animations
+    # Get auth headers
+    loop = asyncio.get_event_loop()
+    access_token = loop.run_until_complete(func_rbx_other.renew_token(context))
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    selected_item_id = rbx_prefs.rbx_enum_animations
+    if selected_item_id == 'NONE':
+        dprint("No animation item selected.")
+        return
+    
+    all_items = glob_vars.discovered_items_data.get("Animations", [])
+    
+    # Find selected items
+    items_to_process = []
+    if selected_item_id == 'ALL':
+        items_to_process = all_items
+    else:
+        for item in all_items:
+            if str(item['id']) == selected_item_id:
+                items_to_process.append(item)
+                break
+    
+    if not items_to_process:
+        dprint("No animation items to process.")
+        return
+    
+    # Setup tmp folder
+    rbx_tmp_rbxm_filepath = os.path.join(addon_path, glob_vars.rbx_import_main_folder, 'tmp_rbxm')
+    if not os.path.exists(rbx_tmp_rbxm_filepath):
+        os.makedirs(rbx_tmp_rbxm_filepath)
+    
+    # Clear previous sub-animations
+    glob_vars.rbx_anim_sub_items = []
+    
+    for item in items_to_process:
+        asset_id = item['id']
+        asset_name = item['name']
+        dprint(f"Downloading animation: {asset_name} (ID: {asset_id})")
+        
+        # Create per-item subfolder in tmp_rbxm
+        item_clean_name = func_rbx_other.replace_restricted_char(asset_name)
+        item_tmp_path = os.path.join(rbx_tmp_rbxm_filepath, item_clean_name)
+        if not os.path.exists(item_tmp_path):
+            os.makedirs(item_tmp_path)
+        
+        # Download
+        if not ensure_local_asset(asset_id, headers, item_tmp_path, func_rbx_cloud_api, func_rbx_other):
+            continue
+        
+        rbxm_file_path = os.path.join(item_tmp_path, str(asset_id) + ".rbxm")
+        
+        try:
+            model = rbxm_reader.parse(rbxm_file_path)
+        except Exception as e:
+            dprint(f"Error parsing animation RBXM {asset_id}: {e}")
+            continue
+        
+        # Find all KeyframeSequences in the file
+        ks_list = []
+        for inst in model.GetDescendants():
+            if inst.class_name == "KeyframeSequence":
+                ks_list.append(inst)
+        
+        # Find all CurveAnimations in the file
+        ca_list = []
+        for inst in model.GetDescendants():
+            if inst.class_name == "CurveAnimation":
+                ca_list.append(inst)
+        
+        # If no direct KeyframeSequence found, check for Animation instances
+        # Animation instances have an AnimationId property pointing to the actual data
+        if not ks_list and not ca_list:
+            dprint(f"No direct KeyframeSequence/CurveAnimation in {asset_name}. Checking for Animation instances...")
+            for inst in model.GetDescendants():
+                if inst.class_name == "Animation":
+                    anim_id_raw = inst.get("AnimationId")
+                    anim_uri = func_rbx_other.resolve_content_uri(anim_id_raw)
+                    if anim_uri:
+                        anim_content_id = func_rbx_other.strip_rbxassetid(anim_uri)
+                        dprint(f"  Found Animation '{inst.name}' → AnimationId: {anim_content_id}")
+                        
+                        # Download the actual animation data
+                        anim_data_bytes, err = func_rbx_cloud_api.get_asset_data(anim_content_id, headers)
+                        if not err and anim_data_bytes:
+                            anim_tmp_path = os.path.join(item_tmp_path, f"anim_{anim_content_id}.rbxm")
+                            with open(anim_tmp_path, "wb") as f:
+                                f.write(anim_data_bytes)
+                            
+                            try:
+                                anim_model = rbxm_reader.parse(anim_tmp_path)
+                                for sub_inst in anim_model.GetDescendants():
+                                    if sub_inst.class_name == "KeyframeSequence":
+                                        ks_list.append(sub_inst)
+                                    elif sub_inst.class_name == "CurveAnimation":
+                                        ca_list.append(sub_inst)
+                            except Exception as e2:
+                                dprint(f"  Error parsing animation content {anim_content_id}: {e2}")
+                        else:
+                            dprint(f"  Error downloading animation content {anim_content_id}: {err}")
+        
+        if not ks_list and not ca_list:
+            dprint(f"No KeyframeSequence or CurveAnimation found in {asset_name} (even after AnimationId lookup)")
+            continue
+        
+        # Parse KeyframeSequences
+        if ks_list:
+            dprint(f"Found {len(ks_list)} KeyframeSequence(s) in {asset_name}")
+        
+        for ks in ks_list:
+            try:
+                anim_data = animation_reader.read_animation(ks)
+                sub_name = anim_data.get("name", ks.name or asset_name)
+                # Prefix with asset name if multiple items
+                if len(items_to_process) > 1:
+                    sub_name = f"{asset_name} - {sub_name}"
+                
+                glob_vars.rbx_anim_sub_items.append({
+                    'name': sub_name,
+                    'anim_data': anim_data
+                })
+                dprint(f"  Parsed sub-animation: {sub_name} ({len(anim_data['keyframes'])} tracks, {anim_data['length']:.2f}s)")
+            except Exception as e:
+                dprint(f"  Error parsing KeyframeSequence '{ks.name}': {e}")
+                continue
+        
+        # Parse CurveAnimations
+        if ca_list:
+            dprint(f"Found {len(ca_list)} CurveAnimation(s) in {asset_name}")
+        
+        for ca in ca_list:
+            try:
+                anim_data = curve_animation_reader.read_curve_animation(ca)
+                sub_name = anim_data.get("name", ca.name or asset_name)
+                if len(items_to_process) > 1:
+                    sub_name = f"{asset_name} - {sub_name}"
+                
+                glob_vars.rbx_anim_sub_items.append({
+                    'name': sub_name,
+                    'anim_data': anim_data,
+                    'is_curve_anim': True
+                })
+                dprint(
+                    f"  Parsed CurveAnimation: {sub_name} "
+                    f"({len(anim_data['keyframes'])} tracks, {anim_data['length']:.2f}s)"
+                )
+            except Exception as e:
+                dprint(f"  Error parsing CurveAnimation '{ca.name}': {e}")
+                continue
+    
+    dprint(f"Total sub-animations discovered: {len(glob_vars.rbx_anim_sub_items)}")
+
+
+def download_model(context, download_all=False):
+    """
+    Download and import Roblox Model (.rbxm) as Blender primitives.
+    """
+    from . import func_rbx_other
+    importlib.reload(func_rbx_other)
+    from . import func_rbx_cloud_api
+    importlib.reload(func_rbx_cloud_api)
+    from . import rbx_import_models
+    importlib.reload(rbx_import_models)
+
+    rbx_prefs = context.scene.rbx_prefs
+    add_textures = rbx_prefs.rbx_model_choice_add_textures
+
+    # Auth
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    access_token = loop.run_until_complete(func_rbx_other.renew_token(context))
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    # Get items from discovered data
+    items = glob_vars.discovered_items_data.get("Models", [])
+    if not items:
+        dprint("No Model items found in discovered data.")
+        return
+
+    # Filter if not downloading all
+    if not download_all:
+        selected = rbx_prefs.rbx_enum_models
+        if selected == "ALL":
+            items_to_process = items
+        elif selected == "NONE":
+            return
+        else:
+            items_to_process = [i for i in items if str(i['id']) == selected]
+    else:
+        items_to_process = items
+
+    # Determine tmp path
+    rbx_tmp_rbxm_filepath = os.path.join(addon_path, glob_vars.rbx_import_main_folder, "tmp_rbxm")
+    if not os.path.exists(rbx_tmp_rbxm_filepath):
+        os.makedirs(rbx_tmp_rbxm_filepath)
+
+    for item in items_to_process:
+        asset_id = item['id']
+        asset_name = item['name']
+        dprint(f"Downloading Model: {asset_name} ({asset_id})")
+
+        # Per-item subfolder
+        item_clean_name = func_rbx_other.replace_restricted_char(asset_name)
+        item_tmp_path = os.path.join(rbx_tmp_rbxm_filepath, item_clean_name)
+        if not os.path.exists(item_tmp_path):
+            os.makedirs(item_tmp_path)
+
+        # Download RBXM
+        success = ensure_local_asset(
+            asset_id, headers, item_tmp_path,
+            func_rbx_cloud_api, func_rbx_other
+        )
+        if not success:
+            dprint(f"Failed to download model {asset_name}")
+            continue
+
+        # Import model
+        rbxm_path = os.path.join(item_tmp_path, str(asset_id) + ".rbxm")
+        if os.path.isfile(rbxm_path):
+            rbx_import_models.import_model(
+                rbxm_file_path=rbxm_path,
+                model_name=asset_name,
+                at_origin=False,
+                add_textures=add_textures,
+                func_rbx_other=func_rbx_other
+            )
+
+    dprint("Model download and import complete.")
 

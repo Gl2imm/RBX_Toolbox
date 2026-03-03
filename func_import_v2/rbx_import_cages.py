@@ -21,7 +21,7 @@ def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own
     
     # Reload Dependencies & Setup Context
     from . import func_rbx_cloud_api as api_cloud, func_rbx_other as api_other, func_blndr_api as api_blend
-    from . import rbxm_reader
+    from .readers import rbxm_reader
     
     if func_rbx_cloud_api is None: func_rbx_cloud_api = api_cloud
     if func_rbx_other is None: func_rbx_other = api_other
@@ -269,12 +269,12 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
                     if ref_uri:
                         cages_to_import.append((ref_uri, "_inner_cage"))
             else:
-                # WrapTarget has CageMeshId (Inner)
+                # WrapTarget has CageMeshId (Body)
                 cage_mesh_raw = cage_part.get("CageMeshId")
                 if cage_mesh_raw is not None:
                     cage_uri = func_rbx_other.resolve_content_uri(cage_mesh_raw)
                     if cage_uri:
-                        cages_to_import.append((cage_uri, "_inner_cage"))
+                        cages_to_import.append((cage_uri, "_body_cage"))
 
             # Loop through cages
             for cage_mesh_id_raw, name_suffix in cages_to_import:

@@ -19,13 +19,18 @@ import traceback
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (6, 3, 0),  # to update in menu_ui as well #clean public lib, pycache and imports folder
+    "version": (7, 0, 0),
     "blender": (3, 6, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
     "warning": "Subscribe to NYTV :)",
     "category": "Object"
 }
+
+# Centralized version string — edit bl_info["version"] above, these derive from it
+addon_version = "v." + ".".join(str(x) for x in bl_info["version"][:2])
+addon_label = f"Roblox Toolbox ({addon_version})"
+
 # Addon path and package name for installed addon
 addon_path = os.path.dirname(os.path.abspath(__file__))
 package_name = os.path.basename(addon_path)
@@ -100,7 +105,7 @@ from .functions.menu_pie import RBX_MT_MENU2_2
 from .functions.menu_pie import RBX_MT_MENU2_3
 from .functions.menu_pie import RBX_MT_MENU3
 from .functions.menu_pie import RBX_MT_MENU4
-from .functions.menu_ui import TOOLBOX_MENU
+from .functions.menu_ui import TOOLBOX_MENU, RBX_OT_terms_of_use
 from .func_import_v2.rbx_import_discovery import RBX_OT_import_discovery, RBX_OT_import_reset, RBX_OT_import_discovery_download, RBX_OT_import_discovery_options, RBX_OT_import_discovery_open_folder
 from . import oauth
 import bpy
@@ -147,6 +152,7 @@ classes = (
     RBX_MT_MENU2_3,
     RBX_MT_MENU3,
     RBX_MT_MENU4,
+    RBX_OT_terms_of_use,
     TOOLBOX_MENU
 )
 

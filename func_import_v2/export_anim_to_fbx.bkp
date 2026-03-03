@@ -1,0 +1,62 @@
+import bpy, os, math
+from mathutils import Matrix
+
+ANIM_NAME = "SwimAnim"
+B_VERSION = 3
+ANIMS_DIR = r"d:\Mine\GDrive\Blender\Roblox\0. Addon\RBX_Toolbox\anims"
+
+# Set True to bake a 90° rotation on X into the root bone
+ROTATE_X_90 = True
+
+arm = bpy.context.active_object
+os.makedirs(ANIMS_DIR, exist_ok=True)
+
+# Save originals, then rename + snap to origin for export
+orig_loc = arm.location.copy()
+orig_rot = arm.rotation_euler.copy()
+orig_arm_name = arm.name
+orig_data_name = arm.data.name
+orig_action_name = arm.animation_data.action.name if arm.animation_data and arm.animation_data.action else None
+
+arm.location = (0, 0, 0)
+arm.name = ANIM_NAME
+arm.data.name = ANIM_NAME
+if orig_action_name is not None:
+    arm.animation_data.action.name = ANIM_NAME
+
+# Apply 90° X rotation to the armature object before export
+if ROTATE_X_90:
+    arm.rotation_euler.x += math.radians(90)
+
+bpy.context.view_layer.update()
+
+for suffix in [f"_2.fbx", f"_B_{B_VERSION}.fbx"]:
+    bpy.ops.object.select_all(action='DESELECT')
+    arm.select_set(True)
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.export_scene.fbx(
+        filepath=os.path.join(ANIMS_DIR, ANIM_NAME + suffix),
+        use_selection=True,
+        object_types={'ARMATURE'},
+        axis_forward='-Z',
+        axis_up='Y',
+        bake_anim=True,
+        bake_anim_use_all_bones=True,
+        bake_anim_use_nla_strips=False,
+        bake_anim_use_all_actions=False,
+        bake_anim_force_startend_keying=True,
+        bake_anim_simplify_factor=0.0,
+        add_leaf_bones=False,
+        global_scale=0.01,
+        apply_scale_options='FBX_SCALE_ALL',
+    )
+
+# Restore originals
+arm.location = orig_loc
+arm.rotation_euler = orig_rot
+arm.name = orig_arm_name
+arm.data.name = orig_data_name
+if orig_action_name is not None:
+    arm.animation_data.action.name = orig_action_name
+
+bpy.context.view_layer.update()

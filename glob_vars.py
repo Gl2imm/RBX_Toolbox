@@ -153,6 +153,7 @@ rbx_is_bundled_item = False
 
 rbx_imp_error = None
 rbx_default_head_used = False
+rbx_anim_sub_items = []  # List of dicts with sub-animation info: [{"name": str, "anim_data": dict}, ...]
 discovered_items_data = {}
 rbx_armature_warning_active = False
 
@@ -255,7 +256,18 @@ rbx_asset_types = {
     76 :'EyebrowAccessory',
     77 :'EyelashAccessory',
     78 :'MoodAnimation',
-    79 :'DynamicHead'
+    79 :'DynamicHead',
+    80 :'None',
+    81 :'None',
+    82 :'None',
+    83 :'None',
+    84 :'None',
+    85 :'None',
+    86 :'None',
+    87 :'None',
+    88 :'FaceMakeup',
+    89 :'LipMakeup',
+    90 :'EyeMakeup'
     }
 
 rbx_bundle_types = {
@@ -272,7 +284,8 @@ supported_assets = {
     "Accessory"     : [8,41,42,43,44,45,46,47],
     "Layered Cloth" : [64,65,66,67,68,69,70,71,72],
     "Dynamic Head"  : [79],
-    "Body Parts"    : [27,28,29,30,31]
+    "Body Parts"    : [27,28,29,30,31],
+    "Models"        : [10]
     }
 
 supported_assets_v2 = {
@@ -282,7 +295,9 @@ supported_assets_v2 = {
     "Dynamic Head"  : [79, 17],
     "Body Parts"    : [27,28,29,30,31],
     "Face Parts"    : [76,77],
-    "Classics"      : [11,12]
+    "Classics"      : [11,12],
+    "Animations"    : [48,49,50,51,52,53,54,55,56,61,78],
+    "Models"        : [10]
     }
 
 supported_bundles = {

@@ -240,7 +240,7 @@ def classic_shirt_import(asset_id, asset_name, bundles_folder, headers, rbx_tmp_
     rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
     if not os.path.exists(rbx_tmp_rbxm_file): return
 
-    from . import rbxm_reader
+    from .readers import rbxm_reader
         
     try:
         file = rbxm_reader.parse(rbx_tmp_rbxm_file)
@@ -268,7 +268,7 @@ def classic_pants_import(asset_id, asset_name, bundles_folder, headers, rbx_tmp_
     rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
     if not os.path.exists(rbx_tmp_rbxm_file): return
 
-    from . import rbxm_reader
+    from .readers import rbxm_reader
         
     try:
         file = rbxm_reader.parse(rbx_tmp_rbxm_file)

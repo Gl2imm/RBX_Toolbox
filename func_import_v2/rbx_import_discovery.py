@@ -27,7 +27,8 @@ category_checkboxes = {
     "Classics": ["rbx_enum_classics"],
     "Gear": ["rbx_enum_gear"],
     "Armature": [],
-    "Store Model": []
+    "Store Model": [],
+    "Models": []
 }
 
 class RBX_OT_import_discovery(bpy.types.Operator):
@@ -40,7 +41,7 @@ class RBX_OT_import_discovery(bpy.types.Operator):
         # Clear previous errors
         glob_vars.rbx_imp_error = None
 
-        from . import mesh_reader
+        from .readers import mesh_reader
         importlib.reload(mesh_reader)
         from . import func_rbx_other
         importlib.reload(func_rbx_other)
@@ -233,6 +234,7 @@ class RBX_OT_import_reset(bpy.types.Operator):
         glob_vars.discovered_items_data = {}
         glob_vars.rbx_default_head_used = False
         glob_vars.rbx_armature_warning_active = False
+        glob_vars.rbx_anim_sub_items = []
 
         self.report({'INFO'}, "Import (Beta) Reset")
         return {'FINISHED'}
@@ -288,6 +290,21 @@ class RBX_OT_import_discovery_download(bpy.types.Operator):
         if self.category == "Armature" or self.category == "ALL_CATEGORIES":
              self.report({'INFO'}, "Downloading Armature...")
              rbx_import_download_manager.download_body_parts(context, category_name="Armature", download_all=download_all_items)
+
+        # Animations are NOT included in ALL_CATEGORIES per user request
+        if self.category == "Animations":
+             self.report({'INFO'}, "Downloading Animations...")
+             rbx_import_download_manager.download_animation(context)
+
+        # Models download handler
+        if self.category == "Models" or self.category == "ALL_CATEGORIES":
+             self.report({'INFO'}, "Downloading Models...")
+             rbx_import_download_manager.download_model(context, download_all=download_all_items)
+
+        if self.category.startswith("Animations_Apply_"):
+             anim_idx = int(self.category.split("_")[-1])
+             self.report({'INFO'}, "Applying Animation...")
+             rbx_import_download_manager.download_animation(context, apply_index=anim_idx)
 
         return {'FINISHED'}
 
@@ -429,6 +446,9 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
             box.prop(rbx_prefs, 'rbx_bndl_char_choice_armature_at_origin') # Reusing bundle origin pref
             box.prop(rbx_prefs, 'rbx_bndl_char_choice_armature_link_meshes')
 
+        if category == "Models":
+            box.prop(rbx_prefs, 'rbx_model_choice_add_textures')
+
         # Generic Checkbox Loop
         if category in category_checkboxes:
             for prop_name in category_checkboxes[category]:
@@ -477,6 +497,8 @@ class RBX_OT_import_discovery_open_folder(bpy.types.Operator):
             target_subfolder = "Classics"
         elif category == "Armature":
             target_subfolder = glob_vars.rbx_import_v2_bundles # Armatures come from bundles mostly
+        elif category == "Models":
+            target_subfolder = "Models"
         
         # Construct full path
         folder_path = os.path.join(addon_path, glob_vars.rbx_import_main_folder, target_subfolder)

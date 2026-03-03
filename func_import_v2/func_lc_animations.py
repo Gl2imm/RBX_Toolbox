@@ -27,6 +27,7 @@ class _LC_Anim_V2_Globals:
     originalEnd = None
     originalFps = None
     spawned_armature_name = None  # track spawned rig
+    importedFbxObjects = []       # track FBX-imported object names for cleanup
 
 
 # ───────────────────────────── helpers ──────────────────────────────
@@ -79,10 +80,14 @@ def _get_anim_fbx_path(anim_type, bones_face_down):
     anims_dir = _get_anims_dir()
     # (normal_fbx, bone_down_fbx, start_normal, end_normal, start_B, end_B)
     mapping = {
-        "WALK": ("WalkAnim_2.fbx",  "WalkAnim_B_4.fbx",  2, 17,  3, 19),
-        "RUN":  ("RunAnim_2.fbx",   "RunAnim_B_5.fbx",   2, 17,  3, 17),
-        "MOVE": ("MoveAnim_2.fbx",  "MoveAnim_B_7.fbx",  2, 660, 2, 660),
-        "IDLE": ("IdleAnim_2.fbx",  "IdleAnim_B_5.fbx",  2, 242, 2, 242),
+        "WALK":  ("WalkAnim_2.fbx",   "WalkAnim_B_4.fbx",   2, 17,   3, 19),
+        "RUN":   ("RunAnim_2.fbx",    "RunAnim_B_5.fbx",    2, 17,   3, 17),
+        "MOVE":  ("MoveAnim_2.fbx",   "MoveAnim_B_7.fbx",   2, 660,  2, 660),
+        "IDLE":  ("IdleAnim_2.fbx",   "IdleAnim_B_5.fbx",   2, 242,  2, 242),
+        "SWIM":  ("SwimAnim_2.fbx",   "SwimAnim_B_3.fbx",   2, 137,  2, 137),
+        "CLIMB": ("ClimbAnim_2.fbx",  "ClimbAnim_B_3.fbx",  2, 94,   2, 94),
+        "FALL":  ("FallAnim_2.fbx",   "FallAnim_B_3.fbx",   2, 47,   2, 47),
+        "JUMP":  ("JumpAnim_2.fbx",   "JumpAnim_B_3.fbx",   2, 64,   2, 64),
     }
     if anim_type not in mapping:
         return None, 0, 0
@@ -124,13 +129,26 @@ def _remove_existing_anim(armature):
     except RuntimeError:
         pass
 
-    # Collect ALL unique constraint targets before removing constraints
+    # Collect ALL unique constraint targets and track which bones had constraints
     targets_to_delete = set()
+    constrained_bones = []
     for pb in armature.pose.bones:
+        had_constraint = False
         for c in list(pb.constraints):
             if hasattr(c, 'target') and c.target is not None:
                 targets_to_delete.add(c.target)
             pb.constraints.remove(c)
+            had_constraint = True
+        if had_constraint:
+            constrained_bones.append(pb)
+
+    # Reset only constrained pose bones to rest position so stale rotations
+    # from the previous animation don't carry over
+    for pb in constrained_bones:
+        pb.rotation_quaternion = (1, 0, 0, 0)
+        pb.rotation_euler = (0, 0, 0)
+        pb.location = (0, 0, 0)
+        pb.scale = (1, 1, 1)
 
     # Delete all collected animation armature targets
     for target in targets_to_delete:
@@ -138,6 +156,16 @@ def _remove_existing_anim(armature):
             bpy.data.objects.remove(target, do_unlink=True)
         except ReferenceError:
             pass
+
+    # Delete tracked FBX-imported objects that weren't constraint targets
+    for obj_name in list(_LC_Anim_V2_Globals.importedFbxObjects):
+        obj = bpy.data.objects.get(obj_name)
+        if obj is not None:
+            try:
+                bpy.data.objects.remove(obj, do_unlink=True)
+            except ReferenceError:
+                pass
+    _LC_Anim_V2_Globals.importedFbxObjects = []
 
     # Clean up orphan armatures
     for arm in [a for a in bpy.data.armatures if a.users == 0]:
@@ -313,34 +341,19 @@ class RBX_OT_LC_ANIM_V2(bpy.types.Operator):
             bpy.context.view_layer.update()
 
             # Step 3: Parent to spawned rig
+            # Check bone existence without entering EDIT mode
             if parent_type == 'BONE' and parent_bone_name:
+                bone = spawned_armature.data.bones.get(parent_bone_name)
                 bpy.ops.object.select_all(action='DESELECT')
+                dup.select_set(True)
                 spawned_armature.select_set(True)
                 bpy.context.view_layer.objects.active = spawned_armature
-                bpy.ops.object.mode_set(mode='EDIT')
 
-                bone_found = False
-                for bone in spawned_armature.data.edit_bones:
-                    if bone.name == parent_bone_name:
-                        bpy.ops.armature.select_all(action='DESELECT')
-                        bone.select = True
-                        spawned_armature.data.edit_bones.active = bone
-                        bone_found = True
-                        break
-
-                bpy.ops.object.mode_set(mode='OBJECT')
-
-                if bone_found:
-                    bpy.ops.object.select_all(action='DESELECT')
-                    dup.select_set(True)
-                    spawned_armature.select_set(True)
-                    bpy.context.view_layer.objects.active = spawned_armature
+                if bone:
+                    # Set active bone so parent_set(type='BONE') knows which bone
+                    spawned_armature.data.bones.active = bone
                     bpy.ops.object.parent_set(type='BONE')
                 else:
-                    bpy.ops.object.select_all(action='DESELECT')
-                    dup.select_set(True)
-                    spawned_armature.select_set(True)
-                    bpy.context.view_layer.objects.active = spawned_armature
                     bpy.ops.object.parent_set(type='OBJECT', keep_transform=True)
             else:
                 bpy.ops.object.select_all(action='DESELECT')
@@ -404,18 +417,29 @@ class RBX_OT_LC_ANIM_V2_ADD_ANIM(bpy.types.Operator):
         # Import FBX animation
         bpy.ops.object.select_all(action='DESELECT')
         bpy.ops.import_scene.fbx(filepath=fbx_path)
-        anim_arm = bpy.context.selected_objects[0] if bpy.context.selected_objects else None
+        imported_objects = list(bpy.context.selected_objects)
+
+        # Find the armature among imported objects (don't assume [0])
+        anim_arm = None
+        for obj in imported_objects:
+            if obj.type == 'ARMATURE':
+                anim_arm = obj
+                break
 
         if anim_arm and anim_arm.type == 'ARMATURE':
             _LC_Anim_V2_Globals.importedAction = (
                 anim_arm.animation_data.action if anim_arm.animation_data else None
             )
 
+            # Track all FBX-imported object names for cleanup on animation switch
+            _LC_Anim_V2_Globals.importedFbxObjects = [obj.name for obj in imported_objects]
+
             # Wire constraints
             _attach_constraints(spawned_armature, anim_arm)
 
-            # Hide the animation source armature
-            anim_arm.hide_set(True)
+            # Hide all FBX-imported objects
+            for obj in imported_objects:
+                obj.hide_set(True)
 
             # Set frame range but do NOT play
             scene.frame_start = frame_start
@@ -513,6 +537,7 @@ class RBX_OT_LC_ANIM_V2_DELETE(bpy.types.Operator):
         _LC_Anim_V2_Globals.originalEnd = None
         _LC_Anim_V2_Globals.originalFps = None
         _LC_Anim_V2_Globals.spawned_armature_name = None
+        _LC_Anim_V2_Globals.importedFbxObjects = []
 
         # Clean up orphans
         for arm in [a for a in bpy.data.armatures if a.users == 0]:

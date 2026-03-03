@@ -140,6 +140,13 @@ class RBXToolsPreferences(bpy.types.AddonPreferences):
         default=True,
     ) # type: ignore
 
+    # Terms of Use acceptance for Import (Beta)
+    accepted_terms_of_use: BoolProperty(
+        name="Terms of Use Accepted",
+        description="Whether the user has accepted the Import (Beta) Terms of Use",
+        default=False,
+    ) # type: ignore
+
     def draw(self, context):
         self.layout.label(text="Include")
         include_box = self.layout.box()

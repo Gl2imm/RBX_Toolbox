@@ -56,7 +56,6 @@ def get_catalog_asset_data(rbx_asset_id, headers):
 		rbx_imp_error = f"Connection Error: {str(e)}"
 		return None, None, None, rbx_imp_error
 		
-	print(f"DEBUG ASSET DATA - Status: {response.status_code}, Body: {response.text}")
 	if response.status_code == 200:
 		data = response.json()
 		rbx_asset_name = data.get("name")
@@ -66,7 +65,7 @@ def get_catalog_asset_data(rbx_asset_id, headers):
 		return rbx_asset_name, rbx_asset_type_id, rbx_asset_creator, None
 	else:
 		if response.status_code in [404, 400]:
-			# Fallback for Classic Clothes (Shirts/Pants) which 400 on the Catalog API
+			# Fallback: Economy API (handles Store Models, Classic Clothes, etc.)
 			eco_url = f"https://economy.roblox.com/v2/assets/{rbx_asset_id}/details"
 			try:
 				eco_response = requests.get(eco_url)
@@ -77,7 +76,7 @@ def get_catalog_asset_data(rbx_asset_id, headers):
 					creator_data = eco_data.get("Creator", {})
 					rbx_asset_creator = creator_data.get("Name")
 					return rbx_asset_name, rbx_asset_type_id, rbx_asset_creator, None
-			except:
+			except Exception:
 				pass
 			rbx_imp_error = f"{response.status_code}: Invalid Asset ID"
 		else:

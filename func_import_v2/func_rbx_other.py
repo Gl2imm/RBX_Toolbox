@@ -80,18 +80,20 @@ def create_and_open_folders(folder):
 
 
 
-def cleanup_tmp_files(filenames:list, extension:str):
+def cleanup_tmp_files(filenames:list, extension:str, folder_path:str = None):
 	"""
 	Deletes files from folder_path whose names match the list, with the given extension.
+	If folder_path is not provided, defaults to tmp_rbxm.
 	"""
-	rbx_tmp_rbxm_filepath = os.path.join(glob_vars.addon_path, glob_vars.rbx_import_main_folder, 'tmp_rbxm')
+	if folder_path is None:
+		folder_path = os.path.join(glob_vars.addon_path, glob_vars.rbx_import_main_folder, 'tmp_rbxm')
 	# make sure extension starts with "."
 	if not extension.startswith("."):
 		extension = "." + extension
 
 	missing = []
 	for name in filenames:
-		file_path = os.path.join(rbx_tmp_rbxm_filepath, str(name) + extension)
+		file_path = os.path.join(folder_path, str(name) + extension)
 
 		if os.path.exists(file_path):
 			try:
@@ -126,6 +128,7 @@ def item_field_extract_id(rbx_item_field_entry):
 
 	rbx_cat_url = "https://www.roblox.com/catalog/"
 	rbx_bndl_url = "https://www.roblox.com/bundles/"
+	rbx_store_url = "https://create.roblox.com/store/asset/"
 	
 	# Clean up input
 	if rbx_item_field_entry.startswith("http://"):
@@ -137,6 +140,11 @@ def item_field_extract_id(rbx_item_field_entry):
 	elif rbx_bndl_url in rbx_item_field_entry:
 		rbx_asset_id = rbx_item_field_entry.replace(rbx_bndl_url, "")
 		rbx_asset_id = rbx_asset_id.split("/")[0]
+	elif rbx_store_url in rbx_item_field_entry:
+		# Handle: https://create.roblox.com/store/asset/17253530672/rainbow-obby
+		rbx_asset_id = rbx_item_field_entry.replace(rbx_store_url, "")
+		rbx_asset_id = rbx_asset_id.split("/")[0]
+		rbx_asset_id = rbx_asset_id.split("?")[0]  # Strip query params
 	elif rbx_item_field_entry.isdigit():
 		rbx_asset_id = rbx_item_field_entry
 	else:

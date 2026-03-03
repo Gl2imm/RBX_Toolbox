@@ -336,3 +336,387 @@ def blender_api_transparent_textures():
 
 			# Connect Mix → BSDF base color
 			links.new(mix_node.outputs['Color'], bsdf_node.inputs[0])
+
+
+#################################
+##### Animation Functions #####
+#################################
+
+# Threshold for animated position (Roblox units).
+# Bones whose position delta (after mean subtraction) stays below this
+# are rotation-only — their position is just the baked anatomical joint offset.
+POSITION_THRESHOLD = 0.002
+
+def _apply_face_front_quat(qw, qx, qy, qz):
+	"""180° rotation around the physical up axis (Arm Y = World Z)."""
+	return (qw, -qx, qy, -qz)
+
+def _apply_face_front_pos(rx, ry, rz):
+	"""180° mirror for position to match FACE_FRONT rotation."""
+	return (-rx, ry, -rz)
+
+def _compute_position_info(keyframes_by_track):
+	"""
+	Roblox Pose positions are ABSOLUTE joint positions in parent-bone space
+	(anatomical rest offset + animated delta). Blender pose_bone.location
+	expects only the delta from the armature rest pose.
+
+	Solution: subtract the per-bone mean position (which approximates the
+	rest offset) to extract only the animated oscillation.
+	"""
+	info = {}
+	for track, kfs in keyframes_by_track.items():
+		xs = [k["pos"][0] for k in kfs]
+		ys = [k["pos"][1] for k in kfs]
+		zs = [k["pos"][2] for k in kfs]
+		n  = len(kfs)
+		mx, my, mz = sum(xs)/n, sum(ys)/n, sum(zs)/n
+		max_delta = max(
+			max(abs(x - mx) for x in xs),
+			max(abs(y - my) for y in ys),
+			max(abs(z - mz) for z in zs),
+		)
+		info[track] = {
+			"mean":     (mx, my, mz),
+			"animated": max_delta > POSITION_THRESHOLD,
+		}
+	return info
+
+
+def _detect_armature_type(armature):
+	"""Auto-detect whether an armature uses 'standard' or 'imported' bone orientations.
+
+	Standard armatures (e.g. manually created rigs):
+	  - Bone local Y axis ≈ Blender +Y in armature space (identity bone axes)
+	  - Armature object has a 90° X rotation for Roblox→Blender conversion
+
+	Imported armatures (from Import Beta):
+	  - Bone local Y axis ≈ Blender +Z in armature space (conversion baked into bones)
+	  - Armature object has identity world rotation
+
+	Returns:
+	  'standard'  – animation quaternions can be applied directly
+	  'imported'  – quaternions need rest-pose compensation
+	"""
+	from mathutils import Vector as Vec
+
+	# Check a reference bone (LowerTorso, UpperTorso, or Head — any spine bone)
+	ref_names = ["LowerTorso", "UpperTorso", "Head"]
+	for ref_name in ref_names:
+		bone = armature.data.bones.get(ref_name)
+		if bone is None:
+			continue
+
+		# bone.matrix_local is the bone's rest pose matrix in armature space
+		# Column 1 (index 1) is the bone's local Y axis direction
+		local_y = bone.matrix_local.col[1].to_3d().normalized()
+
+		# Standard: bone local Y ≈ armature +Y (0, 1, 0)
+		# Imported: bone local Y ≈ armature +Z (0, 0, 1)
+		dot_y = abs(local_y.dot(Vec((0, 1, 0))))
+		dot_z = abs(local_y.dot(Vec((0, 0, 1))))
+
+		if dot_y > 0.9:
+			print(f"[Animation] Armature type: STANDARD (bone '{ref_name}' Y-axis ≈ armature +Y)")
+			return "standard"
+		elif dot_z > 0.9:
+			print(f"[Animation] Armature type: IMPORTED (bone '{ref_name}' Y-axis ≈ armature +Z)")
+			return "imported"
+
+	# Fallback: assume standard
+	print("[Animation] Armature type: STANDARD (fallback, no reference bone found)")
+	return "standard"
+
+
+def _convert_roblox_quat_for_imported_bone(pose_bone, qw, qx, qy, qz, face_front=True):
+	"""Convert a Roblox animation quaternion for a bone with non-identity rest pose.
+
+	For imported armatures, the Roblox→Blender axis conversion (90° around X)
+	is baked into each bone's rest orientation instead of the armature object.
+
+	Roblox animation data is expressed in Roblox bone-local space:
+	  X = right, Y = up, Z = backward
+
+	Blender's pose_bone.rotation_quaternion is a delta FROM the bone's rest pose,
+	expressed in the bone's local coordinate system.
+
+	We need to:
+	  1. Apply face_front 180° correction in Roblox space (if enabled)
+	  2. Convert from Roblox space to Blender world space
+	  3. Transform into bone-local space using the bone's rest rotation
+	"""
+	from mathutils import Quaternion as Quat
+
+	# Apply face_front in Roblox space (180° around Roblox Y = up axis)
+	# Same as _apply_face_front_quat but done before axis conversion
+	if face_front:
+		qw, qx, qy, qz = qw, -qx, qy, -qz
+
+	q_roblox = Quat((qw, qx, qy, qz))
+
+	# Roblox→Blender axis conversion: 90° rotation around X
+	# This is the same transform as blender_matrix_axis_conversion:
+	#   from_forward='-Z', from_up='Y' → to_forward='-Y', to_up='Z'
+	ROT_X_90 = Quat((0.7071068, 0.7071068, 0, 0))  # 90° around X
+
+	# The Roblox quaternion in Blender world space
+	q_blender_world = ROT_X_90 @ q_roblox @ ROT_X_90.conjugated()
+
+	# Get bone rest rotation in armature space
+	rest_rot = pose_bone.bone.matrix_local.to_quaternion()
+
+	# Convert world-space rotation to bone-local delta:
+	# pose_quat = rest_inv @ world_rotation
+	q_pose = rest_rot.conjugated() @ q_blender_world @ rest_rot
+
+	return q_pose.w, q_pose.x, q_pose.y, q_pose.z
+
+
+def _convert_roblox_pos_for_imported_bone(pose_bone, dx, dy, dz, face_front=True):
+	"""Convert a Roblox position delta for a bone with non-identity rest pose.
+
+	Same logic as quaternion conversion — transform from Roblox bone-local space
+	into the Blender bone's local coordinate system.
+	"""
+	from mathutils import Vector as Vec
+
+	# Apply face_front mirror in Roblox space first
+	if face_front:
+		dx, dy, dz = -dx, dy, -dz
+
+	pos_roblox = Vec((dx, dy, dz))
+
+	# Roblox→Blender axis conversion for positions:
+	# Blender X = Roblox X, Blender Y = Roblox -Z, Blender Z = Roblox Y
+	pos_blender = Vec((pos_roblox.x, -pos_roblox.z, pos_roblox.y))
+
+	# Rotate into bone-local space
+	rest_rot = pose_bone.bone.matrix_local.to_quaternion()
+	pos_local = rest_rot.conjugated() @ pos_blender
+
+	return pos_local.x, pos_local.y, pos_local.z
+
+
+def blender_api_apply_animation(armature, anim_data, action_name=None, speed=1.0, reverse=False, face_front=True):
+	"""Apply parsed Roblox animation data to a Blender armature.
+
+	Automatically detects whether the armature uses standard bone orientations
+	(identity axes, armature-level rotation) or imported bone orientations
+	(Roblox→Blender conversion baked into bone rest poses) and applies the
+	correct transformation.
+
+	Args:
+		armature:    Blender armature object (bpy.types.Object with type='ARMATURE')
+		anim_data:   Dict from animation_reader.read_animation(ks)
+		action_name: Optional custom action name (defaults to anim_data['name'])
+		speed:       Playback speed multiplier (default 1.0)
+		reverse:     If True, reverse the animation timeline
+		face_front:  If True, apply 180° rotation so character faces Blender +Y
+	"""
+	from mathutils import Quaternion as Quat, Vector as Vec
+
+	if armature is None or armature.type != "ARMATURE":
+		print("[Animation] ERROR: No valid armature provided.")
+		return None
+
+	# Must be 60 — Roblox keyframes are at 1/60s intervals
+	FPS = 60
+
+	length     = anim_data["length"]
+	keyframes  = anim_data["keyframes"]
+
+	if not keyframes:
+		print("[Animation] WARNING: No keyframe tracks found.")
+		return None
+
+	# Auto-detect armature type for correct quaternion handling
+	arm_type = _detect_armature_type(armature)
+	is_imported = (arm_type == "imported")
+
+	pos_info = _compute_position_info(keyframes)
+
+	# Setup scene timing
+	bpy.context.scene.render.fps = FPS
+	bpy.context.scene.frame_start = 1
+	bpy.context.scene.frame_end   = int((length / speed) * FPS) + 1
+
+	# Create action
+	name = action_name or anim_data.get("name") or "RobloxAnim"
+	action = bpy.data.actions.new(name=name)
+	armature.animation_data_create()
+	armature.animation_data.action = action
+
+	skipped = set()
+
+	for track, track_kfs in keyframes.items():
+		bone_name = track.split(".")[1] if "." in track else track
+		pose_bone = armature.pose.bones.get(bone_name)
+		if not pose_bone:
+			skipped.add(f"{track} → '{bone_name}'")
+			continue
+
+		pose_bone.rotation_mode = "QUATERNION"
+		pinfo      = pos_info[track]
+		apply_loc  = pinfo["animated"]
+		mx, my, mz = pinfo["mean"]
+
+		for kf in track_kfs:
+			t     = length - kf["time"] if reverse else kf["time"]
+			frame = (t / speed) * FPS + 1
+
+			qw, qx, qy, qz = kf["rot"]
+			# Position delta: subtract mean to remove baked anatomical offset
+			dx = kf["pos"][0] - mx
+			dy = kf["pos"][1] - my
+			dz = kf["pos"][2] - mz
+
+			if is_imported:
+				# Imported armature: compensate for bone rest-pose orientation
+				qw, qx, qy, qz = _convert_roblox_quat_for_imported_bone(
+					pose_bone, qw, qx, qy, qz, face_front=face_front
+				)
+				if apply_loc:
+					dx, dy, dz = _convert_roblox_pos_for_imported_bone(
+						pose_bone, dx, dy, dz, face_front=face_front
+					)
+			else:
+				# Standard armature: direct assignment with optional face-front
+				if face_front:
+					qw, qx, qy, qz = _apply_face_front_quat(qw, qx, qy, qz)
+					dx, dy, dz      = _apply_face_front_pos(dx, dy, dz)
+
+			pose_bone.rotation_quaternion = Quat((qw, qx, qy, qz))
+			pose_bone.keyframe_insert(data_path="rotation_quaternion", frame=frame)
+
+			if apply_loc:
+				pose_bone.location = Vec((dx, dy, dz))
+				pose_bone.keyframe_insert(data_path="location", frame=frame)
+
+	if skipped:
+		print(f"[Animation] Skipped {len(skipped)} tracks (no matching bone):")
+		for s in sorted(skipped):
+			print(f"  {s}")
+
+	print(f"[Animation] Applied '{action.name}' to '{armature.name}' ({arm_type}) — Frames: 1 → {bpy.context.scene.frame_end}")
+	return action
+
+
+def blender_api_apply_curve_animation(armature, anim_data, action_name=None, speed=1.0, reverse=False, face_front=True):
+	"""Apply parsed CurveAnimation data to a Blender armature.
+
+	Separate function from blender_api_apply_animation to avoid breaking
+	the working KeyframeSequence pipeline. CurveAnimation data may have
+	different length/timing characteristics that need special handling.
+
+	Args:
+		armature:    Blender armature object (bpy.types.Object with type='ARMATURE')
+		anim_data:   Dict from curve_animation_reader.read_curve_animation(ca)
+		action_name: Optional custom action name (defaults to anim_data['name'])
+		speed:       Playback speed multiplier (default 1.0)
+		reverse:     If True, reverse the animation timeline
+		face_front:  If True, apply 180° rotation so character faces Blender +Y
+	"""
+	from mathutils import Quaternion as Quat, Vector as Vec
+
+	if armature is None or armature.type != "ARMATURE":
+		print("[CurveAnim] ERROR: No valid armature provided.")
+		return None
+
+	FPS = 60
+
+	length    = anim_data.get("length", 0.0)
+	keyframes = anim_data.get("keyframes", {})
+
+	if not keyframes:
+		print("[CurveAnim] WARNING: No keyframe tracks found.")
+		return None
+
+	# Guard against invalid length values (NaN, inf, negative, or absurdly large)
+	if not isinstance(length, (int, float)) or length != length:  # NaN check
+		print(f"[CurveAnim] WARNING: Invalid length ({length}), defaulting to 1.0s")
+		length = 1.0
+	elif length <= 0:
+		# Static pose: compute length from the max keyframe time across all tracks
+		max_time = 0.0
+		for track_kfs in keyframes.values():
+			for kf in track_kfs:
+				t = kf.get("time", 0.0)
+				if isinstance(t, (int, float)) and t == t and t > max_time:
+					max_time = t
+		length = max(max_time, 1.0 / FPS)  # At least one frame
+		print(f"[CurveAnim] Computed length from keyframes: {length:.4f}s")
+
+	# Cap frame_end to a safe int32 range
+	raw_frame_end = (length / max(speed, 0.001)) * FPS + 1
+	frame_end = min(int(raw_frame_end), 2_000_000)  # ~9 hours at 60fps should be plenty
+
+	# Auto-detect armature type for correct quaternion handling
+	arm_type = _detect_armature_type(armature)
+	is_imported = (arm_type == "imported")
+
+	pos_info = _compute_position_info(keyframes)
+
+	# Setup scene timing
+	bpy.context.scene.render.fps = FPS
+	bpy.context.scene.frame_start = 1
+	bpy.context.scene.frame_end   = frame_end
+
+	# Create action
+	name = action_name or anim_data.get("name") or "CurveAnimation"
+	action = bpy.data.actions.new(name=name)
+	armature.animation_data_create()
+	armature.animation_data.action = action
+
+	skipped = set()
+
+	for track, track_kfs in keyframes.items():
+		bone_name = track.split(".")[1] if "." in track else track
+		pose_bone = armature.pose.bones.get(bone_name)
+		if not pose_bone:
+			skipped.add(f"{track} → '{bone_name}'")
+			continue
+
+		pose_bone.rotation_mode = "QUATERNION"
+		pinfo      = pos_info[track]
+		apply_loc  = pinfo["animated"]
+		mx, my, mz = pinfo["mean"]
+
+		for kf in track_kfs:
+			t     = length - kf["time"] if reverse else kf["time"]
+			frame = (t / max(speed, 0.001)) * FPS + 1
+
+			qw, qx, qy, qz = kf["rot"]
+			# Position delta: subtract mean to remove baked anatomical offset
+			dx = kf["pos"][0] - mx
+			dy = kf["pos"][1] - my
+			dz = kf["pos"][2] - mz
+
+			if is_imported:
+				# Imported armature: compensate for bone rest-pose orientation
+				qw, qx, qy, qz = _convert_roblox_quat_for_imported_bone(
+					pose_bone, qw, qx, qy, qz, face_front=face_front
+				)
+				if apply_loc:
+					dx, dy, dz = _convert_roblox_pos_for_imported_bone(
+						pose_bone, dx, dy, dz, face_front=face_front
+					)
+			else:
+				# Standard armature: direct assignment with optional face-front
+				if face_front:
+					qw, qx, qy, qz = _apply_face_front_quat(qw, qx, qy, qz)
+					dx, dy, dz      = _apply_face_front_pos(dx, dy, dz)
+
+			pose_bone.rotation_quaternion = Quat((qw, qx, qy, qz))
+			pose_bone.keyframe_insert(data_path="rotation_quaternion", frame=frame)
+
+			if apply_loc:
+				pose_bone.location = Vec((dx, dy, dz))
+				pose_bone.keyframe_insert(data_path="location", frame=frame)
+
+	if skipped:
+		print(f"[CurveAnim] Skipped {len(skipped)} tracks (no matching bone):")
+		for s in sorted(skipped):
+			print(f"  {s}")
+
+	print(f"[CurveAnim] Applied '{action.name}' to '{armature.name}' ({arm_type}) — Frames: 1 → {frame_end}")
+	return action

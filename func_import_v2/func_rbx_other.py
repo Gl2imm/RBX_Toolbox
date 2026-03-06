@@ -129,6 +129,7 @@ def item_field_extract_id(rbx_item_field_entry):
 	rbx_cat_url = "https://www.roblox.com/catalog/"
 	rbx_bndl_url = "https://www.roblox.com/bundles/"
 	rbx_store_url = "https://create.roblox.com/store/asset/"
+	rbx_games_url = "https://www.roblox.com/games/"
 	
 	# Clean up input
 	if rbx_item_field_entry.startswith("http://"):
@@ -143,6 +144,11 @@ def item_field_extract_id(rbx_item_field_entry):
 	elif rbx_store_url in rbx_item_field_entry:
 		# Handle: https://create.roblox.com/store/asset/17253530672/rainbow-obby
 		rbx_asset_id = rbx_item_field_entry.replace(rbx_store_url, "")
+		rbx_asset_id = rbx_asset_id.split("/")[0]
+		rbx_asset_id = rbx_asset_id.split("?")[0]  # Strip query params
+	elif rbx_games_url in rbx_item_field_entry:
+		# Handle: https://www.roblox.com/games/7016965078/mama-boss332s-Place
+		rbx_asset_id = rbx_item_field_entry.replace(rbx_games_url, "")
 		rbx_asset_id = rbx_asset_id.split("/")[0]
 		rbx_asset_id = rbx_asset_id.split("?")[0]  # Strip query params
 	elif rbx_item_field_entry.isdigit():

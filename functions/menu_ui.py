@@ -591,7 +591,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
                                     box.operator('object.rbx_import_discovery_download', text=download_operator_text).category = category_name
                                     
                                     # User Request: Remove open folder button for Armature box
-                                    if category_name != "Armature":
+                                    if category_name not in ("Armature", "Models"):
                                         box.operator('object.rbx_import_discovery_open_folder', text="Open Folder").category = category_name
                                     else:
                                         if getattr(glob_vars, 'rbx_armature_warning_active', False):
@@ -625,6 +625,10 @@ class TOOLBOX_MENU(bpy.types.Panel):
                                 # Models category
                                 if glob_vars.discovered_items_data.get("Models"):
                                     categories_to_draw.append(("Models", 'MESH_CUBE', "rbx_enum_models", "Download Model"))
+
+                                # Places category
+                                if glob_vars.discovered_items_data.get("Places"):
+                                    categories_to_draw.append(("Places", 'WORLD', "rbx_enum_places", "Download Place"))
 
                                 # Stack Layout (Vertical)
                                 for cat_name, icon, enum, dl_text in categories_to_draw:

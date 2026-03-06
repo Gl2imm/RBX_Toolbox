@@ -25,7 +25,10 @@ def parse(data):
     Returns a dictionary with standardized mesh data keys.
     """
     # Read the 12-byte version header: "version X.XX"
-    header_text = data[:12].decode("ascii")
+    try:
+        header_text = data[:12].decode("ascii")
+    except UnicodeDecodeError:
+        raise ValueError("Data is not a valid Roblox mesh (invalid header encoding).")
     version = header_text[8:].strip()
 
     print(f"Mesh version: {version}")
@@ -136,10 +139,14 @@ def parse_text(data, version):
         nz = float(norm_parts[2])
         normals.extend([nx, ny, nz])
 
-        # UV vector (only first 2 components; V is flipped)
+        # UV vector (only first 2 components)
+        # v1.00 stores tex_V in OpenGL convention (V=0 at bottom),
+        # which Roblox docs call "upside down" vs their DirectX standard.
+        # Blender also uses OpenGL convention, so NO flip is needed here.
+        # (The v2+ binary parser flips because v2+ stores V in DirectX convention.)
         uv_parts = vector_strings[base + 2].split(",")
         tu = float(uv_parts[0])
-        tv = 1.0 - float(uv_parts[1])
+        tv = float(uv_parts[1])
         uvs.extend([tu, tv])
 
         # Faces are sequential — each vertex is unique in v1.x
@@ -728,8 +735,12 @@ def _read_subsets_and_remap(data, offset, subset_count, skin_indices):
 
 #####################
 def write_obj_from_mesh_json(mesh, out_path, lod_index=0, object_name="mesh"):
-    flip_v=False
-    ver = mesh["version"] 
+    ver = mesh["version"]
+    if ver in ("1.00", "1.01", "2.00", "3.00", "3.01"):
+        flip_v=False
+    else:
+        flip_v=True
+     
     V = mesh["vertices"]                  # flat [x,y,z,...]
     N = mesh.get("normals")               # flat [nx,ny,nz,...]  (optional)
     UV = mesh.get("uvs")                  # flat [u,v,...]       (optional)

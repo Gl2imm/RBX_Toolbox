@@ -56,6 +56,7 @@ def get_catalog_asset_data(rbx_asset_id, headers):
 		rbx_imp_error = f"Connection Error: {str(e)}"
 		return None, None, None, rbx_imp_error
 		
+	print(f"DEBUG ASSET DATA - Status: {response.status_code}, Body: {response.text}")
 	if response.status_code == 200:
 		data = response.json()
 		rbx_asset_name = data.get("name")
@@ -69,6 +70,7 @@ def get_catalog_asset_data(rbx_asset_id, headers):
 			eco_url = f"https://economy.roblox.com/v2/assets/{rbx_asset_id}/details"
 			try:
 				eco_response = requests.get(eco_url)
+				print(f"DEBUG ECONOMY API - Status: {eco_response.status_code}, Body: {eco_response.text[:500]}")
 				if eco_response.status_code == 200:
 					eco_data = eco_response.json()
 					rbx_asset_name = eco_data.get("Name")
@@ -76,8 +78,10 @@ def get_catalog_asset_data(rbx_asset_id, headers):
 					creator_data = eco_data.get("Creator", {})
 					rbx_asset_creator = creator_data.get("Name")
 					return rbx_asset_name, rbx_asset_type_id, rbx_asset_creator, None
-			except Exception:
-				pass
+				else:
+					print(f"DEBUG ECONOMY API failed with {eco_response.status_code}")
+			except Exception as eco_e:
+				print(f"DEBUG ECONOMY API exception: {eco_e}")
 			rbx_imp_error = f"{response.status_code}: Invalid Asset ID"
 		else:
 			rbx_imp_error = f"Error {response.status_code} fetching asset details"

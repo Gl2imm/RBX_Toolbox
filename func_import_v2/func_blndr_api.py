@@ -39,8 +39,8 @@ def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cfram
     # Apply Scale if provided (e.g. SpecialMesh)
     if special_mesh_scale:
         try:
-             # SpecialMesh.Scale is Vector3
-             rbx_obj.scale = (special_mesh_scale.X, special_mesh_scale.Y, special_mesh_scale.Z)
+             # SpecialMesh.Scale comes as a tuple (x, y, z) from rbxm reader
+             rbx_obj.scale = (special_mesh_scale[0], special_mesh_scale[1], special_mesh_scale[2])
         except Exception as e:
              print(f"Error applying special mesh scale: {e}")
 

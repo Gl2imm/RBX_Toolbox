@@ -663,6 +663,7 @@ def download_model(context, download_all=False):
     importlib.reload(rbx_import_models)
 
     rbx_prefs = context.scene.rbx_prefs
+    at_origin = rbx_prefs.rbx_model_choice_at_origin
     add_textures = rbx_prefs.rbx_model_choice_add_textures
 
     # Auth
@@ -723,10 +724,12 @@ def download_model(context, download_all=False):
             rbx_import_models.import_model(
                 rbxm_file_path=rbxm_path,
                 model_name=asset_name,
-                at_origin=False,
+                at_origin=at_origin,
                 add_textures=add_textures,
-                func_rbx_other=func_rbx_other
+                func_rbx_other=func_rbx_other,
+                headers=headers,
+                tmp_path=item_tmp_path,
+                func_rbx_cloud_api=func_rbx_cloud_api
             )
 
     dprint("Model download and import complete.")
-

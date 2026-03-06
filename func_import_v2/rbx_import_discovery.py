@@ -301,6 +301,13 @@ class RBX_OT_import_discovery_download(bpy.types.Operator):
              self.report({'INFO'}, "Downloading Models...")
              rbx_import_download_manager.download_model(context, download_all=download_all_items)
 
+        # Places download handler
+        if self.category == "Places" or self.category == "ALL_CATEGORIES":
+             self.report({'INFO'}, "Downloading Places...")
+             from . import rbx_import_places
+             importlib.reload(rbx_import_places)
+             rbx_import_places.download_place(context, download_all=download_all_items)
+
         if self.category.startswith("Animations_Apply_"):
              anim_idx = int(self.category.split("_")[-1])
              self.report({'INFO'}, "Applying Animation...")
@@ -447,7 +454,12 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
             box.prop(rbx_prefs, 'rbx_bndl_char_choice_armature_link_meshes')
 
         if category == "Models":
+            box.prop(rbx_prefs, 'rbx_model_choice_at_origin')
             box.prop(rbx_prefs, 'rbx_model_choice_add_textures')
+
+        if category == "Places":
+            box.prop(rbx_prefs, 'rbx_place_choice_at_origin')
+            box.prop(rbx_prefs, 'rbx_place_choice_add_textures')
 
         # Generic Checkbox Loop
         if category in category_checkboxes:

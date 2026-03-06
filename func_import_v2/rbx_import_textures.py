@@ -85,6 +85,9 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
 
     # Check for SurfaceAppearance (PBR)
     rbx_SurfaceAppearance = mesh_part.FindFirstChildOfClass("SurfaceAppearance")
+    # For SpecialMesh, SurfaceAppearance is a sibling (child of parent Part), not a child
+    if rbx_SurfaceAppearance is None and mesh_part.parent:
+        rbx_SurfaceAppearance = mesh_part.parent.FindFirstChildOfClass("SurfaceAppearance")
     
     # Aligning logic with bundle_char
     rbx_textures = {}

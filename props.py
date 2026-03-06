@@ -455,7 +455,27 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
 
 
     ### Model Import Properties ###
+    rbx_model_choice_at_origin : bpy.props.BoolProperty(
+    name="Spawn at Origin",
+    description="Move imported model to world origin (preserving part offsets)",
+    default = True
+    ) # type: ignore
+
     rbx_model_choice_add_textures : bpy.props.BoolProperty(
+    name="Import Textures / Colors",
+    description="Apply part colors and material properties (roughness, metallic) to imported parts",
+    default = True
+    ) # type: ignore
+
+
+    ### Place Import Properties ###
+    rbx_place_choice_at_origin : bpy.props.BoolProperty(
+    name="Spawn at Origin",
+    description="Move imported place to world origin (preserving part offsets)",
+    default = True
+    ) # type: ignore
+
+    rbx_place_choice_add_textures : bpy.props.BoolProperty(
     name="Import Textures / Colors",
     description="Apply part colors and material properties (roughness, metallic) to imported parts",
     default = True
@@ -849,6 +869,12 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
         name = "Models",
         description = "Discovered Models",
         items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Models")
+    ) # type: ignore
+
+    rbx_enum_places : bpy.props.EnumProperty(
+        name = "Places",
+        description = "Discovered Places",
+        items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Places")
     ) # type: ignore
 
     ### Animations Properties ###

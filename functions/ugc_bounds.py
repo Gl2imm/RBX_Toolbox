@@ -62,8 +62,16 @@ class BUTTON_BNDS(bpy.types.Operator):
             ### Add Dummy ###
             if rbx_prefs.rbx_bnds_hide == False:
                 bpy.ops.wm.append(directory = glob_vars.addon_path + glob_vars.rbx_blend_file + glob_vars.ap_object, filename ='R15 Blocky')
-                rbx_col_num = len(bpy.data.collections)
-                bpy.ops.object.move_to_collection(collection_index=rbx_col_num)
+                
+                # Robustly move appended dummy to the boundary collection
+                target_col = bpy.data.collections.get('UGC '+ bnds_spwn + ' Bounds')
+                if target_col:
+                    for obj in bpy.context.selected_objects:
+                        if target_col.objects.get(obj.name) is None:
+                            target_col.objects.link(obj)
+                        for c in list(obj.users_collection):
+                            if c != target_col:
+                                c.objects.unlink(obj)
 
         ### Avatar Boundary ###
         if bnds == "AVA":         

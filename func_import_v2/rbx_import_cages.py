@@ -6,7 +6,7 @@ from RBX_Toolbox import glob_vars
 from typing import TYPE_CHECKING, List, Any, Dict, Union
 
 ### Debug prints
-DEBUG = True
+DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 def download_and_apply_cages(target: Union[int, Any], mesh_name: str, bundle_own_folder: str, headers: dict, 
@@ -310,31 +310,9 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
                 if cage_cframe is None: 
                     continue
 
-                # Check if MESH pivot is identity (The Cage must follow the Mesh's placement)
-                mesh_pivot = mesh_part.get("PivotOffset")
-                if mesh_pivot is None:
-                    mesh_pivot = funct.cframe_identity()
-
-                mesh_pivot_comps = funct.cframe_get_components(mesh_pivot)
-                identity_comps = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-                mesh_is_identity = True
-                if len(mesh_pivot_comps) == 12:
-                    for a, b in zip(mesh_pivot_comps, identity_comps):
-                        if abs(a - b) > 0.0001: 
-                            mesh_is_identity = False
-                            break
-
-                is_accessory = False
-                check_obj = mesh_part
-                if mesh_part.class_name == "SpecialMesh":
-                     check_obj = mesh_part.parent
-                if check_obj and check_obj.parent and check_obj.parent.class_name == "Accessory":
-                    is_accessory = True
-
-                # If pivot is identity (for the Mesh), force at_origin to False (unless accessory)
+                # The 'is_identity' origin hack was removed;
+                # Spawn at origin is now handled consistently by global tracker block.
                 actual_at_origin = at_origin
-                if mesh_is_identity and not is_accessory:
-                    actual_at_origin = False
                     
                 # The cage shares the exact same logical pivot as the mesh part it's wrapped around
                 cage_cframe_pivot = mesh_pivot

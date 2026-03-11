@@ -9,5 +9,4 @@ aiolimiter ~= 1.0.0
 pyjwt[crypto] ~= 2.6.0
 cryptography ~= 40.0.1
 pyjwt-key-fetcher ~= 0.4.0
-pythonnet ~= 3.0.5
 

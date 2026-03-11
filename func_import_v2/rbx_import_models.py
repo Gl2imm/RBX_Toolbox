@@ -6,7 +6,7 @@ from RBX_Toolbox import glob_vars
 from typing import Any, Dict, List
 
 ### Debug prints
-DEBUG = True
+DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 
@@ -198,6 +198,7 @@ def apply_part_material(blender_obj, part_instance, func_rbx_other=None):
     using the Roblox Part's color, Material, Transparency, and Reflectance.
     
     Color is resolved from Color3uint8 or BrickColor (ID or name).
+    Each object gets its own unique material named "{obj_name}_mat_01".
     This is a standalone function that can be called separately.
     """
     color_raw = _resolve_part_color(part_instance)
@@ -205,51 +206,49 @@ def apply_part_material(blender_obj, part_instance, func_rbx_other=None):
     transparency = part_instance.get("Transparency") or 0.0
     reflectance = part_instance.get("Reflectance") or 0.0
 
-    # Create unique material name per color+material combo
-    if color_raw:
-        r, g, b = color_raw
-        mat_name = f"RBX_{r}_{g}_{b}_M{material_id}"
-    else:
-        mat_name = f"RBX_Default_M{material_id}"
+    # Create unique material per object
+    base_mat_name = f"{blender_obj.name}_mat"
+    mat_idx = 1
+    mat_name = f"{base_mat_name}_{mat_idx:02d}"
+    while bpy.data.materials.get(mat_name):
+        mat_idx += 1
+        mat_name = f"{base_mat_name}_{mat_idx:02d}"
 
-    # Reuse existing material if it already exists (same color + material)
-    mat = bpy.data.materials.get(mat_name)
-    if mat is None:
-        mat = bpy.data.materials.new(name=mat_name)
-        mat.use_nodes = True
-        bsdf = mat.node_tree.nodes.get("Principled BSDF")
+    mat = bpy.data.materials.new(name=mat_name)
+    mat.use_nodes = True
+    bsdf = mat.node_tree.nodes.get("Principled BSDF")
 
-        if bsdf:
-            # Base Color from resolved color
-            if color_raw:
-                bsdf.inputs["Base Color"].default_value = _color3uint8_to_linear(color_raw)
+    if bsdf:
+        # Base Color from resolved color
+        if color_raw:
+            bsdf.inputs["Base Color"].default_value = _color3uint8_to_linear(color_raw)
 
-            # Roughness from Material enum
-            roughness = _roblox_material_to_roughness(material_id)
-            bsdf.inputs["Roughness"].default_value = roughness
+        # Roughness from Material enum
+        roughness = _roblox_material_to_roughness(material_id)
+        bsdf.inputs["Roughness"].default_value = roughness
 
-            # Metallic from Reflectance (0.0-1.0)
-            bsdf.inputs["Metallic"].default_value = min(reflectance, 1.0)
+        # Metallic from Reflectance (0.0-1.0)
+        bsdf.inputs["Metallic"].default_value = min(reflectance, 1.0)
 
-            # Alpha from Transparency
-            if transparency > 0.0:
-                bsdf.inputs["Alpha"].default_value = 1.0 - transparency
-                if hasattr(mat, 'blend_method'):
-                    mat.blend_method = 'BLEND'
-                mat.use_backface_culling = True
+        # Alpha from Transparency
+        if transparency > 0.0:
+            bsdf.inputs["Alpha"].default_value = 1.0 - transparency
+            if hasattr(mat, 'blend_method'):
+                mat.blend_method = 'BLEND'
+            mat.use_backface_culling = True
 
-            # Neon material gets emission
-            if material_id == 1296 and color_raw:
-                linear_color = _color3uint8_to_linear(color_raw)
-                # Blender 4.x: "Emission Color" input
-                emission_input = bsdf.inputs.get("Emission Color")
-                if emission_input is None:
-                    emission_input = bsdf.inputs.get("Emission")
-                if emission_input:
-                    emission_input.default_value = linear_color
-                emission_str = bsdf.inputs.get("Emission Strength")
-                if emission_str:
-                    emission_str.default_value = 3.0
+        # Neon material gets emission
+        if material_id == 1296 and color_raw:
+            linear_color = _color3uint8_to_linear(color_raw)
+            # Blender 4.x: "Emission Color" input
+            emission_input = bsdf.inputs.get("Emission Color")
+            if emission_input is None:
+                emission_input = bsdf.inputs.get("Emission")
+            if emission_input:
+                emission_input.default_value = linear_color
+            emission_str = bsdf.inputs.get("Emission Strength")
+            if emission_str:
+                emission_str.default_value = 3.0
 
     # Assign to object
     if blender_obj.data.materials:
@@ -599,6 +598,195 @@ def _create_part(name, size_roblox, cframe_dict, shape=1, class_name="Part"):
     return obj
 
 
+# Mesh modifier class names — these override the parent Part's geometry
+MESH_MODIFIER_CLASSES = ("BlockMesh", "CylinderMesh", "Mesh", "SpecialMesh")
+
+# SpecialMesh MeshType enum values
+# https://create.roblox.com/docs/reference/engine/enums/MeshType
+MESH_TYPE_HEAD     = 0
+MESH_TYPE_TORSO    = 1
+MESH_TYPE_WEDGE    = 2
+MESH_TYPE_SPHERE   = 3  # also called "Ball" in some contexts
+MESH_TYPE_CYLINDER = 6
+MESH_TYPE_BRICK    = 4
+MESH_TYPE_FILEMESH = 5
+
+
+def _get_template_mesh_capsule() -> bpy.types.Mesh:
+    """Create a cylinder with hemispherical caps (capsule shape) for CylinderMesh."""
+    cache_key = "CylinderMesh_Capsule"
+    if cache_key in _mesh_template_cache:
+        return _mesh_template_cache[cache_key]
+
+    import bmesh
+    bm = bmesh.new()
+
+    # Create a cylinder body (shorter to leave room for caps)
+    segments = 24
+    half_depth = 0.3  # body half-length, caps add 0.2 each → total depth ~1.0
+    radius = 0.5
+
+    # Create cylinder body
+    bmesh.ops.create_cone(
+        bm, segments=segments,
+        radius1=radius, radius2=radius,
+        depth=half_depth * 2,
+        cap_ends=False
+    )
+
+    # Add top hemisphere
+    top_sphere = bmesh.new()
+    bmesh.ops.create_uvsphere(top_sphere, u_segments=segments, v_segments=8, radius=radius)
+    # Keep only top half (z >= -0.01 tolerance)
+    verts_to_del = [v for v in top_sphere.verts if v.co.z < -0.01]
+    bmesh.ops.delete(top_sphere, geom=verts_to_del, context='VERTS')
+    # Offset upward
+    for v in top_sphere.verts:
+        v.co.z += half_depth
+
+    # Add bottom hemisphere
+    bot_sphere = bmesh.new()
+    bmesh.ops.create_uvsphere(bot_sphere, u_segments=segments, v_segments=8, radius=radius)
+    verts_to_del = [v for v in bot_sphere.verts if v.co.z > 0.01]
+    bmesh.ops.delete(bot_sphere, geom=verts_to_del, context='VERTS')
+    for v in bot_sphere.verts:
+        v.co.z -= half_depth
+
+    # Merge all into main bmesh
+    # Convert hemispheres to mesh data, then add to bm
+    top_mesh_tmp = bpy.data.meshes.new("_tmp_top")
+    top_sphere.to_mesh(top_mesh_tmp)
+    top_sphere.free()
+    bm.from_mesh(top_mesh_tmp)
+    bpy.data.meshes.remove(top_mesh_tmp)
+
+    bot_mesh_tmp = bpy.data.meshes.new("_tmp_bot")
+    bot_sphere.to_mesh(bot_mesh_tmp)
+    bot_sphere.free()
+    bm.from_mesh(bot_mesh_tmp)
+    bpy.data.meshes.remove(bot_mesh_tmp)
+
+    # Weld overlapping verts at seams
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.01)
+
+    mesh = bpy.data.meshes.new(f"_template_{cache_key}")
+    bm.to_mesh(mesh)
+    bm.free()
+
+    for p in mesh.polygons:
+        p.use_smooth = True
+
+    _mesh_template_cache[cache_key] = mesh
+    return mesh
+
+
+def _get_specialmesh_shape_key(mesh_type):
+    """Map SpecialMesh MeshType enum to a template cache shape key."""
+    if mesh_type == MESH_TYPE_BRICK:
+        return "Block"
+    elif mesh_type == MESH_TYPE_CYLINDER:
+        return "Cylinder"
+    elif mesh_type == MESH_TYPE_SPHERE:
+        return "Ball"
+    elif mesh_type == MESH_TYPE_WEDGE:
+        return "WedgePart"
+    elif mesh_type == MESH_TYPE_HEAD:
+        return "Ball"  # Head is a slightly squashed sphere
+    elif mesh_type == MESH_TYPE_TORSO:
+        return "Block"  # Torso is a block with tapered top
+    else:
+        return "Block"
+
+
+def _create_mesh_modifier_part(part_name, parent_part, mesh_modifier):
+    """
+    Create a Blender object for a Part that has a mesh modifier child
+    (BlockMesh, CylinderMesh, Mesh, or SpecialMesh without MeshId).
+
+    The parent Part provides CFrame (position/rotation).
+    The mesh modifier provides Scale (multiplier on parent size) and
+    Offset (studs, in parent's local space).
+
+    Returns the created Blender object or None.
+    """
+    from mathutils import Matrix, Vector
+
+    parent_size = parent_part.get("size") or (4.0, 1.2, 2.0)
+    parent_cframe = parent_part.get("CFrame")
+
+    # Get Scale and Offset from the mesh modifier
+    mod_scale = mesh_modifier.get("Scale")
+    if mod_scale is None:
+        mod_scale = (1.0, 1.0, 1.0)
+    mod_offset = mesh_modifier.get("Offset")
+    if mod_offset is None:
+        mod_offset = (0.0, 0.0, 0.0)
+
+    # Final size = parent size * modifier scale
+    final_size = (
+        parent_size[0] * mod_scale[0],
+        parent_size[1] * mod_scale[1],
+        parent_size[2] * mod_scale[2],
+    )
+
+    # Determine which shape template to use
+    mod_class = mesh_modifier.class_name
+
+    if mod_class == "BlockMesh":
+        shape_key = "Block"
+    elif mod_class == "CylinderMesh":
+        shape_key = "CylinderMesh_Capsule"
+    elif mod_class in ("SpecialMesh", "Mesh"):
+        mesh_type = mesh_modifier.get("MeshType")
+        if mesh_type is None:
+            mesh_type = MESH_TYPE_BRICK
+        shape_key = _get_specialmesh_shape_key(mesh_type)
+    else:
+        shape_key = "Block"
+
+    # Get or create the template mesh
+    if shape_key == "CylinderMesh_Capsule":
+        template_mesh = _get_template_mesh_capsule()
+    else:
+        template_mesh = _get_template_mesh(shape_key)
+
+    new_mesh = template_mesh.copy()
+    new_mesh.name = part_name
+    obj = bpy.data.objects.new(part_name, new_mesh)
+    bpy.context.collection.objects.link(obj)
+
+    # Convert final size: Roblox (sx, sy, sz) → Blender (sx, sz, sy)
+    bsx = final_size[0]
+    bsy = final_size[2]  # Roblox Z → Blender Y
+    bsz = final_size[1]  # Roblox Y → Blender Z
+
+    # CylinderMesh axis along Y in Roblox (same as regular Cylinder along X)
+    if shape_key == "CylinderMesh_Capsule":
+        obj.rotation_euler[1] = math.radians(90)
+
+    obj.scale = (bsx, bsy, bsz)
+
+    # Apply CFrame from parent Part
+    if parent_cframe:
+        transform = _cframe_to_blender_transform(parent_cframe)
+
+        # Apply Offset in parent's local space
+        # Offset is in studs, in Roblox coords → convert to Blender
+        if mod_offset[0] != 0 or mod_offset[1] != 0 or mod_offset[2] != 0:
+            # Convert offset: Roblox (x, y, z) → Blender (x, -z, y)
+            bl_offset = Vector((mod_offset[0], -mod_offset[2], mod_offset[1]))
+            # Rotate offset by parent's rotation to get world-space offset
+            rot_mat = transform.to_3x3()
+            world_offset = rot_mat @ bl_offset
+            transform.translation += world_offset
+
+        obj.matrix_world = transform
+        obj.scale = (bsx, bsy, bsz)
+
+    dprint(f"  MeshModifier '{part_name}' type={mod_class} shape={shape_key} scale={mod_scale} offset={mod_offset}")
+    return obj
+
+
 def _import_special_mesh(
     mesh_instance, parent_part, part_name,
     headers, tmp_path, func_rbx_other, func_rbx_cloud_api
@@ -659,13 +847,42 @@ def _import_special_mesh(
     bpy.data.objects[rbx_obj.name].select_set(True)
     bpy.context.view_layer.objects.active = bpy.data.objects[rbx_obj.name]
 
-    # Apply SpecialMesh Scale if available
+    # Determine the correct scale for this mesh object.
+    # SpecialMesh/Mesh: uses the "Scale" property (multiplier on parent Part size).
+    # MeshPart: has no "Scale" — uses the Part's "size" property compared against
+    #           the mesh's actual bounding box to compute the correct scale factor.
     special_mesh_scale = mesh_instance.get("Scale")
+    final_scale = None
+
     if special_mesh_scale:
+        # SpecialMesh Scale — direct multiplier
+        final_scale = (special_mesh_scale[0], special_mesh_scale[1], special_mesh_scale[2])
+    elif parent_part.class_name in ("MeshPart", "UnionOperation"):
+        # MeshPart/UnionOperation: scale mesh to match the Part's size property
+        part_size = parent_part.get("size")
+        if part_size:
+            # Compute bounding box of the imported mesh vertices
+            bbox_corners = [rbx_obj.bound_box[i][:] for i in range(8)]
+            bbox_min = [min(c[ax] for c in bbox_corners) for ax in range(3)]
+            bbox_max = [max(c[ax] for c in bbox_corners) for ax in range(3)]
+            bbox_dim = [bbox_max[ax] - bbox_min[ax] for ax in range(3)]
+
+            # Mesh vertices are in Roblox Y-up space (not yet converted).
+            # OBJ local axes: X=Roblox X, Y=Roblox Y, Z=Roblox Z
+            # Part size is (sx, sy, sz) in Roblox coords.
+            sx, sy, sz = part_size
+            mesh_sx = bbox_dim[0] if bbox_dim[0] > 1e-6 else 1.0
+            mesh_sy = bbox_dim[1] if bbox_dim[1] > 1e-6 else 1.0
+            mesh_sz = bbox_dim[2] if bbox_dim[2] > 1e-6 else 1.0
+
+            final_scale = (sx / mesh_sx, sy / mesh_sy, sz / mesh_sz)
+            dprint(f"    MeshPart '{part_name}' size={part_size} bbox={bbox_dim} scale={final_scale}")
+
+    if final_scale:
         try:
-            rbx_obj.scale = (special_mesh_scale[0], special_mesh_scale[1], special_mesh_scale[2])
+            rbx_obj.scale = final_scale
         except Exception as e:
-            dprint(f"    Error applying special mesh scale: {e}")
+            dprint(f"    Error applying mesh scale: {e}")
 
     # Apply CFrame from parent Part using the mesh-specific coordinate conversion
     # Uses _cframe_to_blender_transform_mesh (R_conv @ R_roblox) because
@@ -676,9 +893,9 @@ def _import_special_mesh(
         transform = _cframe_to_blender_transform_mesh(cframe)
         rbx_obj.matrix_world = transform
         # Re-apply scale after setting matrix_world
-        if special_mesh_scale:
+        if final_scale:
             try:
-                rbx_obj.scale = (special_mesh_scale[0], special_mesh_scale[1], special_mesh_scale[2])
+                rbx_obj.scale = final_scale
             except Exception:
                 pass
 
@@ -801,7 +1018,7 @@ def _move_collection_objects_to_origin(collection):
 
 # Part class names that should be imported as geometry
 PART_CLASS_NAMES = (
-    "Part", "MeshPart", "WedgePart", "TrussPart",
+    "Part", "MeshPart", "UnionOperation", "WedgePart", "TrussPart",
     "CornerWedgePart", "SpawnLocation"
 )
 
@@ -873,14 +1090,20 @@ def import_model(
         if transparency >= 1.0:
             return
 
-        # Check for SpecialMesh/Mesh children
-        special_mesh = None
+        # Check for mesh modifier children (SpecialMesh, Mesh, BlockMesh, CylinderMesh)
+        special_mesh = None       # SpecialMesh/Mesh WITH MeshId (downloads geometry)
+        mesh_modifier = None      # Any mesh modifier WITHOUT MeshId (local shape override)
         for sub_child in child.GetChildren():
             if sub_child.class_name in ("SpecialMesh", "Mesh"):
                 mesh_id = sub_child.get("MeshId")
                 if mesh_id:
                     special_mesh = sub_child
-                    break
+                else:
+                    mesh_modifier = sub_child
+            elif sub_child.class_name in ("BlockMesh", "CylinderMesh"):
+                mesh_modifier = sub_child
+            if special_mesh:
+                break  # MeshId-based mesh takes priority
 
         obj = None
         if special_mesh and headers and func_rbx_cloud_api:
@@ -892,8 +1115,8 @@ def import_model(
             )
 
         if obj is None:
-            if child.class_name == "MeshPart":
-                # MeshPart with MeshId — try importing its own mesh
+            if child.class_name in ("MeshPart", "UnionOperation"):
+                # MeshPart/UnionOperation with MeshId — try importing its own mesh
                 mesh_id_raw = child.get("MeshId")
                 if mesh_id_raw and headers and func_rbx_cloud_api:
                     mesh_tmp = tmp_path or os.path.dirname(rbxm_file_path)
@@ -901,6 +1124,16 @@ def import_model(
                         child, child, part_name,
                         headers, mesh_tmp, func_rbx_other, func_rbx_cloud_api
                     )
+
+            # Try mesh modifier (BlockMesh, CylinderMesh, SpecialMesh/Mesh without MeshId)
+            if obj is None and mesh_modifier:
+                try:
+                    obj = _create_mesh_modifier_part(part_name, child, mesh_modifier)
+                except Exception as e:
+                    dprint(f"  Error creating mesh modifier part '{part_name}': {e}")
+                    import traceback
+                    traceback.print_exc()
+                    obj = None
 
             # Fallback to primitive shape if no mesh imported
             if obj is None:
@@ -966,31 +1199,32 @@ def import_model(
             # Binary parser may return a plain string URI
             return bool(str(tid).strip())
 
-        if child.class_name == "MeshPart":
+        if child.class_name in ("MeshPart", "UnionOperation"):
             try:
                 tid = child.get("TextureID")
                 if _is_valid_texture_ref(tid):
                     has_texture_id = True
             except:
                 pass
-        # Also check SpecialMesh TextureId
-        if special_mesh:
+        # Also check SpecialMesh / mesh modifier TextureId
+        tex_mesh_source = special_mesh or mesh_modifier
+        if tex_mesh_source:
             try:
-                tid = special_mesh.get("TextureId") or special_mesh.get("TextureID")
+                tid = tex_mesh_source.get("TextureId") or tex_mesh_source.get("TextureID")
                 if _is_valid_texture_ref(tid):
                     has_texture_id = True
             except:
                 pass
 
-        mesh_imported = (special_mesh is not None) or (child.class_name == "MeshPart")
+        mesh_imported = (special_mesh is not None) or (mesh_modifier is not None) or (child.class_name in ("MeshPart", "UnionOperation"))
 
         if add_textures and mesh_imported and (has_surface_appearance or has_texture_id) and headers and func_rbx_cloud_api:
             # Use the full texture pipeline (SurfaceAppearance PBR, TextureId, Decals)
             from . import rbx_import_textures
             importlib.reload(rbx_import_textures)
             mesh_tmp = tmp_path or os.path.dirname(rbxm_file_path)
-            # The texture source is either the SpecialMesh or the MeshPart itself
-            tex_source = special_mesh if special_mesh else child
+            # The texture source is the SpecialMesh, mesh modifier, or the MeshPart itself
+            tex_source = special_mesh or mesh_modifier or child
             asset_clean = func_rbx_other.replace_restricted_char(part_name)
             rbx_import_textures.download_and_apply_textures(
                 tex_source, part_name, mesh_tmp,
@@ -1170,21 +1404,7 @@ def import_model(
         _move_collection_objects_to_origin(root_col)
 
     # Collapse all collections in the outliner for a clean view
-    try:
-        for area in bpy.context.screen.areas:
-            if area.type == 'OUTLINER':
-                for region in area.regions:
-                    if region.type == 'WINDOW':
-                        with bpy.context.temp_override(area=area, region=region):
-                            # Select all items first so collapse applies to everything
-                            bpy.ops.outliner.select_all(action='SELECT')
-                            # Collapse multiple levels deep
-                            for _ in range(10):
-                                bpy.ops.outliner.show_one_level(open=False)
-                            bpy.ops.outliner.select_all(action='DESELECT')
-                        break
-                break
-    except Exception as e:
-        dprint(f"Could not collapse outliner: {e}")
+    from . import func_blndr_api as _api
+    _api.blender_api_collapse_outliner()
 
     return root_col

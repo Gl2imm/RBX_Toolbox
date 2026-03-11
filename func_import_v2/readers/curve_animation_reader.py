@@ -1,50 +1,43 @@
 """
-curve_animation_reader.py
-─────────────────────────
-Converts a Roblox CurveAnimation (parsed by rbxm_reader.py) into
-sparse per-bone keyframe data ready for the Blender animation script.
+Roblox Curve Animation Reader
+-----------------------------
 
-CurveAnimation structure (from rbxm tree):
-  CurveAnimation
-    Folder (root part, e.g. "HumanoidRootPart")
-      Folder (bone, e.g. "LowerTorso")
-        Vector3Curve "Position"
-          FloatCurve "X"   ← ValuesAndTimes binary
-          FloatCurve "Y"
-          FloatCurve "Z"
-        EulerRotationCurve "Rotation"  ← has RotationOrder property
-          FloatCurve "X"
-          FloatCurve "Y"
-          FloatCurve "Z"
-        Folder (child bone, e.g. "UpperTorso")
-          ... (recursive)
+Copyright (c) 2026
+https://www.roblox.com/users/1244794402/profile
+Papa_boss332
 
-FloatCurve binary format (ValuesAndTimes):
-  uint32  kf_count        total keyframes
-  uint32  segment_count   number of non-trivial segments (0 = constant curve)
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, merge, publish, distribute, and/or sublicense the Software.
 
-  If segment_count == 0 (constant / identity curve):
-    uint32  interp_mode   (usually 1)
-    float32 const_value   single constant value for the entire curve
+Conditions:
+1. This notice and the attribution information below must remain intact in all
+   copies or substantial portions of the Software.
+2. The origin of this file must not be misrepresented.
 
-  If segment_count > 0:
-    Per keyframe (14 bytes each):
-      uint8   interp_mode   (0=constant, 1=linear, 2=cubic)
-      uint8   reserved
-      float32 value
-      float32 left_tangent
-      float32 right_tangent
-    Trailing time data:
-      uint32  time_format   (usually 1)
-      uint32  time_count    (matches kf_count)
-      float32[] times       one per keyframe
+Attribution:
+Project Repository:
+https://github.com/Gl2imm/RBX_Toolbox
 
-Rotation uses Euler angles (radians), converted to quaternion by rotation order.
-RotationOrder enum: 0=XYZ, 1=XZY, 2=YZX, 3=YXZ, 4=ZXY, 5=ZYX
+This curve animation reader was created through reverse engineering
+with the assistance of AI (Claude Opus 4.6 Thinking) and extensive
+independent testing.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 """
 
 import struct
 import math
+
+
+# ─────────────────────────────────────────────
+#  DEBUG FLAG
+# ─────────────────────────────────────────────
+### Debug prints
+DEBUG = False
+dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 
 # ─────────────────────────────────────────────
@@ -501,11 +494,11 @@ def read_curve_animation(ca):
     }
 
     # Debug summary
-    print(f"[CurveAnim] === PARSED: '{result['name']}' ===")
-    print(f"[CurveAnim]   Length={length:.4f}s, Tracks={len(keyframes)}, Loop={result['loop']}")
+    dprint(f"[CurveAnim] === PARSED: '{result['name']}' ===")
+    dprint(f"[CurveAnim]   Length={length:.4f}s, Tracks={len(keyframes)}, Loop={result['loop']}")
     for tk, kfs in keyframes.items():
         times = [round(k["time"], 4) for k in kfs[:5]]
-        print(f"[CurveAnim]   {tk}: {len(kfs)} kf, times(first5)={times}")
+        dprint(f"[CurveAnim]   {tk}: {len(kfs)} kf, times(first5)={times}")
 
     return result
 

@@ -2,6 +2,10 @@ import bpy
 import bpy_extras
 import mathutils
 
+### Debug prints
+DEBUG = False
+dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
+
 '''
 Blender Matrix
 matrix = | m[0][0]  m[0][1]  m[0][2] |	# X axis vector
@@ -100,22 +104,21 @@ def cframe_to_blender_matrix(cframe):
 
 def blender_matrix_axis_conversion(matrix: mathutils.Matrix, loc_vector_only: bool = False):
 	"""Takes blender 4x4 matrix and transfoming it from Roblox orientation into blender orientation"""
-	print("ORIGINAL MATRIX")
-	print(matrix)
+	dprint(f"ORIGINAL MATRIX (Roblox Space):\n{matrix}")
 	identity_matrix = mathutils.Matrix.Identity(4)	#creates no rotations 4x4 matrix
 	## transform from roblox -Z forward to blender Y forward and from Y up to Z up
 	### transformation pattern
 	transform_to_blender = bpy_extras.io_utils.axis_conversion(from_forward='-Z', from_up='Y', to_forward='-Y', to_up='Z').to_4x4()
+	dprint(f"AXIS CONVERSION MATRIX:\n{transform_to_blender}")
 
 	### conversion of blender matrix to new pattern
 	transformed_blender_matrix = transform_to_blender @ matrix
-	print("TRANSFORMED MATRIX")
-	print(transformed_blender_matrix)
+	dprint(f"TRANSFORMED MATRIX (Blender Space):\n{transformed_blender_matrix}")
 
 	if loc_vector_only:
 		transformed_blender_matrix = transformed_blender_matrix.to_translation()
-		print("PIVOT MATRIX")
-		print(transformed_blender_matrix)
+		dprint("PIVOT MATRIX")
+		dprint(transformed_blender_matrix)
 
 	return transformed_blender_matrix
 

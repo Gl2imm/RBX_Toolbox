@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from rbx_import_discovery import *
 
 ### Debug prints
-DEBUG = True
+DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 
@@ -113,11 +113,13 @@ class RBX_OT_import_discovery(bpy.types.Operator):
                         }]
                     else:
                         dprint("Single Asset check failed:", asset_error)
-                        self.report({'ERROR'}, f"Discovery Failed: {asset_error}")
+                        if "429" not in str(asset_error):
+                            self.report({'ERROR'}, f"Discovery Failed: {asset_error}")
                         return {'CANCELLED'}
                 else:
                     # Some other error occurred
-                    self.report({'ERROR'}, f"Bundle Discovery Failed: {rbx_imp_error}")
+                    if "429" not in str(rbx_imp_error):
+                        self.report({'ERROR'}, f"Bundle Discovery Failed: {rbx_imp_error}")
                     return {'CANCELLED'}
 
             dprint("rbx_bundledItems: ", rbx_bundledItems)
@@ -144,6 +146,17 @@ class RBX_OT_import_discovery(bpy.types.Operator):
                         # Find which category this asset type belongs to
                         for category, types in glob_vars.supported_assets_v2.items():
                             if asset_type in types:
+                                # User Request: If importing a character bundle or dynamic head that happens to have default animations,
+                                # do NOT show the Animation UI. Only show Animations if it is explicitly an Animation Bundle (Type 2)
+                                # or if it's a standalone Animation asset.
+                                if category == "Animations":
+                                    # Bundle Type 2 is 'Bundle - Animations'. 
+                                    # Asset Type 24 is Animation. 
+                                    # Bundle type 1 is 'Body Parts', 3 is 'Shoe', etc.
+                                    # If the top level search was for a bundle but NOT an animation bundle, skip getting its animations.
+                                    if rbx_asset_type_id is not None and rbx_asset_type_id != 2 and rbx_asset_type_id != "Animation":
+                                        break # Skip adding to Animations category
+                                
                                 glob_vars.discovered_items_data[category].append({
                                     'id': item.get('id'),
                                     'name': item.get('name')
@@ -161,6 +174,13 @@ class RBX_OT_import_discovery(bpy.types.Operator):
                 glob_vars.rbx_default_head_used = True
 
             dprint("Grouped Items:", glob_vars.discovered_items_data)
+
+            # Check if asset type is unsupported (no items were categorized)
+            has_discovered = any(items for items in glob_vars.discovered_items_data.values())
+            if not has_discovered:
+                type_name = glob_vars.rbx_asset_types.get(rbx_asset_type_id, f"Type {rbx_asset_type_id}")
+                glob_vars.rbx_imp_error = f"Asset Type:{rbx_asset_type_id} ({type_name}) Not supported"
+                dprint(f"Unsupported asset type: {type_name} ({rbx_asset_type_id})")
 
             # --- Thumbnail Preview Implementation ---
             # 1. Clean Name
@@ -301,17 +321,18 @@ class RBX_OT_import_discovery_download(bpy.types.Operator):
              self.report({'INFO'}, "Downloading Models...")
              rbx_import_download_manager.download_model(context, download_all=download_all_items)
 
-        # Places download handler
-        if self.category == "Places" or self.category == "ALL_CATEGORIES":
-             self.report({'INFO'}, "Downloading Places...")
-             from . import rbx_import_places
-             importlib.reload(rbx_import_places)
-             rbx_import_places.download_place(context, download_all=download_all_items)
-
         if self.category.startswith("Animations_Apply_"):
              anim_idx = int(self.category.split("_")[-1])
              self.report({'INFO'}, "Applying Animation...")
              rbx_import_download_manager.download_animation(context, apply_index=anim_idx)
+
+        # Trigger group move for all spawned objects
+        rbx_import_download_manager.execute_global_spawn_tracker()
+
+        # Collapse all outliner collections after import
+        from . import func_blndr_api
+        importlib.reload(func_blndr_api)
+        func_blndr_api.blender_api_collapse_outliner()
 
         return {'FINISHED'}
 
@@ -457,10 +478,6 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
             box.prop(rbx_prefs, 'rbx_model_choice_at_origin')
             box.prop(rbx_prefs, 'rbx_model_choice_add_textures')
 
-        if category == "Places":
-            box.prop(rbx_prefs, 'rbx_place_choice_at_origin')
-            box.prop(rbx_prefs, 'rbx_place_choice_add_textures')
-
         # Generic Checkbox Loop
         if category in category_checkboxes:
             for prop_name in category_checkboxes[category]:
@@ -535,3 +552,123 @@ class RBX_OT_import_discovery_open_folder(bpy.types.Operator):
              self.report({'WARNING'}, f"No folder mapped for category: {category}")
 
         return {'FINISHED'}
+
+class RBX_OT_import_discovery_info_popup(bpy.types.Operator):
+    """Click Me"""
+    bl_idname = "object.rbx_import_discovery_info_popup"
+    bl_label = "Info"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=500)
+        
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="INFO.", icon='INFO')
+        layout.separator()
+        
+        # 1. Spawn at Origin
+        box = layout.box()
+        box.label(text="1. Spawn at Origin")
+        col = box.column(align=True)
+        col.label(text="When this option is enabled, objects will be moved to the Blender origin")
+        col.label(text="instead of being placed at their original locations.")
+        
+        # 2. Incorrect Item Placement
+        box = layout.box()
+        box.label(text="2. Incorrect Item Placement")
+        col = box.column(align=True)
+        col.label(text="Some items may not appear in their expected locations. This usually happens")
+        col.label(text="because the item's original placement was not set correctly by the creator.")
+        col.label(text="RBX Toolbox reads the object's original position data when importing.")
+        
+        # 3. Importing Items Separately
+        box = layout.box()
+        box.label(text="3. Importing Items Separately")
+        col = box.column(align=True)
+        col.label(text="If you import items individually (such as bundle items, cages, attachments, etc.),")
+        col.label(text="they may not be placed correctly. This occurs because RBX Toolbox moves the")
+        col.label(text="selection to the origin relative to the number of items selected.")
+        col.separator()
+        col.label(text="If you disable Spawn at Origin, the items will appear in their correct positions,")
+        col.label(text="but they may be located far from the Blender origin.")
+
+        # 4. Exclude from import
+        box = layout.box()
+        box.label(text="4. Exclude from import")
+        col = box.column(align=True)
+        col.label(text="If you want to exclude some items from group import (Download everything button)")
+        col.label(text="- deselect all checkboxes in the item options.")
+
+    def execute(self, context):
+        return {'FINISHED'}
+
+
+class RBX_OT_open_tmp_folder(bpy.types.Operator):
+    """Open Junk (tmp) Folder"""
+    bl_idname = "object.rbx_open_tmp_folder"
+    bl_label = "Open Junk (tmp) Folder"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        folder_path = os.path.join(addon_path, glob_vars.rbx_import_main_folder, "tmp_rbxm")
+        if not os.path.exists(folder_path):
+            try:
+                os.makedirs(folder_path)
+            except Exception as e:
+                self.report({'ERROR'}, f"Could not create folder: {e}")
+                return {'CANCELLED'}
+        try:
+            os.startfile(folder_path)
+            self.report({'INFO'}, f"Opened folder: {folder_path}")
+        except Exception as e:
+            self.report({'ERROR'}, f"Could not open folder: {e}")
+        return {'FINISHED'}
+
+
+class RBX_OT_import_model_summary(bpy.types.Operator):
+    """Import Summary Popup"""
+    bl_idname = "wm.rbx_import_model_summary"
+    bl_label = "Import Summary"
+    bl_options = {'REGISTER', 'INTERNAL'}
+    
+    imported_count: bpy.props.IntProperty(default=0) # type: ignore
+    failed_permission: bpy.props.StringProperty(default="") # type: ignore
+    failed_other: bpy.props.StringProperty(default="") # type: ignore
+    
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=300)
+        
+    def draw(self, context):
+        layout = self.layout
+        
+        box = layout.box()
+        box.label(text=f"Imported: {self.imported_count} objects")
+        
+        perm = [p for p in self.failed_permission.split(",") if p]
+        other = [o for o in self.failed_other.split(",") if o]
+        
+        if perm or other:
+            layout.separator()
+            box_failed = layout.box()
+            box_failed.alert = True
+            box_failed.label(text="Failed to import:", icon='ERROR')
+            
+            if perm:
+                col = box_failed.column(align=True)
+                col.label(text="Permission denied:")
+                for p in perm:
+                    col.label(text=p)
+                    
+            if other:
+                if perm:
+                    box_failed.separator()
+                col = box_failed.column(align=True)
+                col.label(text="Other error:")
+                for o in other:
+                    col.label(text=o)
+                    
+    def execute(self, context):
+        return {'FINISHED'}
+
+

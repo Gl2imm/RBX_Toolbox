@@ -3,6 +3,10 @@ import os
 from RBX_Toolbox import glob_vars
 import mathutils
 
+### Debug prints
+DEBUG = False
+dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
+
 
 ANIM_COLLECTION_NAME = "LC_Animation_Test"
 
@@ -567,4 +571,37 @@ class RBX_OT_LC_ANIM_V2_SPEED(bpy.types.Operator):
         scene.render.fps = max(1, int(base_fps * self.speed))
         _LC_Anim_V2_Globals.currentSpeed = round(self.speed, 2)
         self.report({'INFO'}, f"Speed set to {self.speed}x")
+        return {'FINISHED'}
+
+
+# ───────────── Info Popup ─────────────
+
+class RBX_OT_lc_anim_test_info_popup(bpy.types.Operator):
+    """Click Me"""
+    bl_idname = "object.rbx_lc_anim_test_info_popup"
+    bl_label = "Info"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=400)
+        
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="INFO.", icon='INFO')
+        layout.separator()
+        
+        box = layout.box()
+        col = box.column(align=True)
+        col.label(text="1. Test is only implemented for Blocky and Woman avatars.")
+        col.separator()
+        
+        col.label(text="2. If you need to test with custom animations:")
+        col.label(text="  - Spawn test rig")
+        col.label(text="  - In the import (Beta) import animation that you need")
+        col.label(text='  - Select the armature in the "LC_Animation_Test" folder')
+        col.label(text="  - Apply animation")
+        col.separator()
+        col.label(text="(The scrub function timings might not be accurate).", icon='ERROR')
+
+    def execute(self, context):
         return {'FINISHED'}

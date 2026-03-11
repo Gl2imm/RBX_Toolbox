@@ -6,7 +6,7 @@ from RBX_Toolbox import glob_vars
 
 from . import func_blndr_api # Ensure we have access to blender api helpers
 ### Debug prints
-DEBUG = True
+DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 
@@ -200,20 +200,29 @@ def import_bones(imported_meshes_data, mesh_reader, funct, rbx_at_origin, asset_
     # 1. Collect all unique bones from all meshes
     all_bones_data = {}
 
-    # Check mesh versions for armature compatibility
+    # Check mesh versions for armature compatibility and filter out old meshes
+    valid_meshes_data = []
     has_old_meshes = False
+    
     for mesh_info in imported_meshes_data:
         version_str = mesh_info.get("mesh_version", "4.00")
         try:
             version_float = float(version_str)
             if version_float < 4.00:
                 has_old_meshes = True
-                break
+                print(f"Skipping armature for mesh {mesh_info.get('mesh_name', 'Unknown')}: Version {version_str} < 4.00")
+                continue
         except ValueError:
             pass
             
+        valid_meshes_data.append(mesh_info)
+            
     if has_old_meshes:
         glob_vars.rbx_armature_warning_active = True
+        
+    if not valid_meshes_data:
+        print("No valid meshes with bone data found for armature generation.")
+        return
 
 
     #### Debug prints (Keep this disabled for normal use)  
@@ -229,7 +238,7 @@ def import_bones(imported_meshes_data, mesh_reader, funct, rbx_at_origin, asset_
     else:
         f = None
 
-    for mesh_info in imported_meshes_data:
+    for mesh_info in valid_meshes_data:
         mesh_data = mesh_info['mesh_data']
         mesh_name = mesh_info.get('mesh_name', 'UnknownMesh')
         
@@ -259,20 +268,7 @@ def import_bones(imported_meshes_data, mesh_reader, funct, rbx_at_origin, asset_
                         # Oriented World Matrix for Blender
                         oriented_world_bone_matrix = funct.blender_matrix_axis_conversion(world_bone_matrix)
                         
-                        # Spawn at origin logic
-                        actual_at_origin = mesh_info.get("actual_at_origin", False)
-                        part_cframe_pivot = mesh_info.get("part_cframe_pivot")
-                        
-                        if actual_at_origin and part_cframe_pivot:
-                            oriented_part_matrix = funct.blender_matrix_axis_conversion(part_blender_matrix)
-                            blender_matrix_pivot = funct.cframe_to_blender_matrix(part_cframe_pivot)
-                            raw_local_pivot = blender_matrix_pivot.translation
-                            rot_mat = oriented_part_matrix.to_3x3()
-                            rotated_pivot_vector = rot_mat @ raw_local_pivot
-                            pivot_world_pos = oriented_part_matrix.translation + rotated_pivot_vector
-                            
-                            oriented_world_bone_matrix.translation -= pivot_world_pos
-                        
+                        # Removed legacy individual origin math; it is now handled globally
                         bone_data["world_matrix"] = oriented_world_bone_matrix
                     else:
                         bone_data["world_matrix"] = None
@@ -307,10 +303,10 @@ def import_bones(imported_meshes_data, mesh_reader, funct, rbx_at_origin, asset_
             break
             
     if not target_info and imported_meshes_data:
-        target_info = imported_meshes_data[0]
+        target_info = valid_meshes_data[0]
         
     armature_offset = mathutils.Vector((0,0,0))
-    if target_info and not rbx_at_origin:
+    if target_info:
         # Re-derive world position instead of trusting matrix_world before dependency graph update
         part_cframe = target_info.get("cframe")
         part_cframe_pivot = target_info.get("part_cframe_pivot")
@@ -403,5 +399,9 @@ def import_bones(imported_meshes_data, mesh_reader, funct, rbx_at_origin, asset_
     # the inside of the Armature is 'centered' around 0. Moving the entire Armature Object forward now
     # correctly places the Origin visually where the mesh is, while sweeping the inner internal bones precisely 
     # to their exact original world-space positions.
-    if not rbx_at_origin:
-        arm_obj.matrix_world.translation = armature_offset
+    arm_obj.matrix_world.translation = armature_offset
+    
+    # Send Armature to the global tracker if Spawn at Origin is on
+    if rbx_at_origin:
+        if arm_obj not in glob_vars.rbx_spawn_tracker:
+            glob_vars.rbx_spawn_tracker.append(arm_obj)

@@ -93,7 +93,7 @@ from .functions.wear_r6_rig import BUTTON_WEAR
 from .functions.hair_buttons import BUTTON_HAIR
 from .functions.dmy_lc_buttons import RBX_BUTTON_LC
 
-from .func_import_v2.func_lc_animations import RBX_OT_LC_ANIM_V2, RBX_OT_LC_ANIM_V2_ADD_ANIM, RBX_OT_LC_ANIM_V2_PLAY, RBX_OT_LC_ANIM_V2_STOP, RBX_OT_LC_ANIM_V2_DELETE, RBX_OT_LC_ANIM_V2_SPEED
+from .func_import_v2.func_lc_animations import RBX_OT_LC_ANIM_V2, RBX_OT_LC_ANIM_V2_ADD_ANIM, RBX_OT_LC_ANIM_V2_PLAY, RBX_OT_LC_ANIM_V2_STOP, RBX_OT_LC_ANIM_V2_DELETE, RBX_OT_LC_ANIM_V2_SPEED, RBX_OT_lc_anim_test_info_popup
 from .functions.avatar_buttons import RBX_BUTTON_AVA
 from .functions.armature_buttons import BUTTON_BN
 from .functions.func_export import RBX_OPERATORS
@@ -106,7 +106,7 @@ from .functions.menu_pie import RBX_MT_MENU2_3
 from .functions.menu_pie import RBX_MT_MENU3
 from .functions.menu_pie import RBX_MT_MENU4
 from .functions.menu_ui import TOOLBOX_MENU, RBX_OT_terms_of_use
-from .func_import_v2.rbx_import_discovery import RBX_OT_import_discovery, RBX_OT_import_reset, RBX_OT_import_discovery_download, RBX_OT_import_discovery_options, RBX_OT_import_discovery_open_folder
+from .func_import_v2.rbx_import_discovery import RBX_OT_import_discovery, RBX_OT_import_reset, RBX_OT_import_discovery_download, RBX_OT_import_discovery_options, RBX_OT_import_discovery_open_folder, RBX_OT_open_tmp_folder, RBX_OT_import_model_summary, RBX_OT_import_discovery_info_popup
 from . import oauth
 import bpy
 from bpy.types import Scene
@@ -129,6 +129,9 @@ classes = (
     RBX_OT_import_discovery_download,
     RBX_OT_import_discovery_options,
     RBX_OT_import_discovery_open_folder,
+    RBX_OT_open_tmp_folder,
+    RBX_OT_import_model_summary,
+    RBX_OT_import_discovery_info_popup,
     BUTTON_CMR,
     BUTTON_DMMY,
     BUTTON_WEAR,
@@ -141,6 +144,7 @@ classes = (
     RBX_OT_LC_ANIM_V2_STOP,
     RBX_OT_LC_ANIM_V2_DELETE,
     RBX_OT_LC_ANIM_V2_SPEED,
+    RBX_OT_lc_anim_test_info_popup,
     RBX_BUTTON_AVA,
     BUTTON_BN,
     RBX_OPERATORS,

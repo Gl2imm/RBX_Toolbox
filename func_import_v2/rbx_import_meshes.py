@@ -5,7 +5,7 @@ from RBX_Toolbox import glob_vars
 from typing import TYPE_CHECKING, Any, Dict, List
 
 ### Debug prints
-DEBUG = True
+DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dict[str, Any], 
@@ -278,29 +278,9 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
             
             dprint(f"part_cframe_pivot: {part_cframe_pivot}")
             
-            # Check if Pivot is Identity
+            # The 'is_identity' origin hack was removed;
+            # Spawn at origin is now handled consistently by global tracker block.
             actual_at_origin = at_origin
-            if part_cframe_pivot:
-                pivot_comps = funct.cframe_get_components(part_cframe_pivot)
-                identity_comps = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-                is_identity = True
-                if len(pivot_comps) == 12:
-                    for a, b in zip(pivot_comps, identity_comps):
-                        if abs(a - b) > 0.0001: 
-                            is_identity = False
-                            break
-                            
-                # Special Case: Accessories
-                is_accessory = False
-                check_obj = mesh_part
-                if mesh_part.class_name == "SpecialMesh":
-                     check_obj = mesh_part.parent
-                
-                if check_obj and check_obj.parent and check_obj.parent.class_name == "Accessory":
-                    is_accessory = True
-
-                if is_identity and not is_accessory:
-                    actual_at_origin = False
 
             
             rbx_obj = None

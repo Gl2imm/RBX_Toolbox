@@ -3,7 +3,7 @@ from RBX_Toolbox import glob_vars
 
 
 ### Debug prints
-DEBUG = True
+DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 

@@ -23,6 +23,9 @@ class RBX_OPERATORS(bpy.types.Operator):
         if rbx_operator == 'exp_fbx_lc':
             bpy.ops.export_scene.fbx('INVOKE_DEFAULT', path_mode='COPY', embed_textures=True, use_selection=True, object_types={'ARMATURE', 'MESH', 'OTHER'}, add_leaf_bones=False, global_scale=0.01, bake_anim=False)            
             
+        if rbx_operator == 'exp_fbx_anim':
+            bpy.ops.export_scene.fbx('INVOKE_DEFAULT', use_selection=True, object_types={'ARMATURE'}, add_leaf_bones=False, global_scale=0.01, bake_anim=True, bake_anim_use_nla_strips=False, bake_anim_use_all_actions=False, bake_anim_step=1.0, bake_anim_simplify_factor=0.0)
+            
         if rbx_operator == 'set_unit': 
             bpy.context.scene.unit_settings.length_unit = 'CENTIMETERS'
             bpy.context.scene.unit_settings.scale_length = 0.01

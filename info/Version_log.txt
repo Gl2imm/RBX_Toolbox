@@ -2,6 +2,49 @@
                                                       Version History:
                                             ####################################
 
+v.7.0:
+    Major Update: Import (Beta) Menu
+	This menu is using direct RBXM reader and Mesh reader, so the data imported is actual meshes
+	and textures. I had added an info button on some of the new menus, so make sure you have a
+	look there before using them.
+    - New dedicated menu for advanced asset discovery and direct import from Roblox.
+    - Asset Discovery: Discover assets by ID or URL.
+    - Supported Asset Types:
+      - Models & Packages (some rotations are still wrong, i didnt figure out how to fix it yet)
+      - Bundles (Characters, Dynamic Heads, Shoes)
+      - Accessories (Hat, Hair, Face, Neck, Shoulder, Front, Back, Waist)
+      - Layered Clothing (T-Shirt, Shirt, Pants, Jacket, Sweater, Shorts, Shoes, Dress/Skirt)
+      - Dynamic Heads & Body Parts (Torso, Arms, Legs)
+      - Face Parts (Eyebrows, Eyelashes)
+      - Classics (Shirts, Pants)
+      - Gears
+      - Animations (bundles and individual animations)
+	  - Armatures (including linking to meshes as well as weights)
+    - Advanced Options: Toggle CFrame, Attributes, Weights, and Cages for specific imports.
+    - "Download Everything": Process and import all discovered assets in a single click.
+    - Improved progress tracking and error handling for downloads.
+    
+    LC Animation V2 Support
+    - High-quality animation testing with improved preset rigs (R15 Blocky and Woman).
+    - Built-in library of core animations: Idle, Walk, Run, Move, Swim, Climb, Fall, Jump.
+    - New Controls: Play, Pause, Speed adjustment (0.5x to 2.0x), and Timeline scrubbing (0-100%).
+    - Custom Animations: Support for importing and applying Marketplace animations to specific armatures.
+
+	Avatars tab
+	- Added FACS preset for quick add to head custom properties.
+	- Added default FACS animations preset that you can add to armature in one click
+
+	Quick functions
+	- Added animation export preset for quick export of animations.
+    
+    Improvements & Fixes
+	- Fixed avatar import in the Import From Roblox menu.
+    - Rewritten Asset Reader: Faster and more reliable parsing of rbxm/rbxmx files.
+    - Enhanced Coordinate System: Accurate Roblox-to-Blender conversion (orientation & scale).
+    - Fixed issues with flipped UVs and texture orientation on accessories.
+    - Fixed SurfaceAppearance application on imported models.
+    - Added Terms of Use agreement for advanced import tools.
+
 v.6.2:
     Added support to Import from Roblox for the following items
     Bundle items:

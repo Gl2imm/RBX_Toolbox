@@ -2,6 +2,10 @@ import requests
 from RBX_Toolbox import glob_vars
 import time
 
+### Debug prints
+DEBUG = False
+dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
+
 
 
 
@@ -56,7 +60,7 @@ def get_catalog_asset_data(rbx_asset_id, headers):
 		rbx_imp_error = f"Connection Error: {str(e)}"
 		return None, None, None, rbx_imp_error
 		
-	print(f"DEBUG ASSET DATA - Status: {response.status_code}, Body: {response.text}")
+	dprint(f"DEBUG ASSET DATA - Status: {response.status_code}, Body: {response.text}")
 	if response.status_code == 200:
 		data = response.json()
 		rbx_asset_name = data.get("name")
@@ -67,10 +71,19 @@ def get_catalog_asset_data(rbx_asset_id, headers):
 	else:
 		if response.status_code in [404, 400]:
 			# Fallback: Economy API (handles Store Models, Classic Clothes, etc.)
+			current_time = time.time()
+			reset_time = getattr(glob_vars, 'eco_rate_limit_reset', 0.0)
+			
+			if current_time < reset_time:
+				remaining = int(reset_time - current_time)
+				rbx_imp_error = f"Economy API rate limited (429)\nPlease wait {remaining}sec"
+				glob_vars.rbx_imp_error = rbx_imp_error
+				return None, None, None, rbx_imp_error
+
 			eco_url = f"https://economy.roblox.com/v2/assets/{rbx_asset_id}/details"
 			try:
 				eco_response = requests.get(eco_url)
-				print(f"DEBUG ECONOMY API - Status: {eco_response.status_code}, Body: {eco_response.text[:500]}")
+				dprint(f"DEBUG ECONOMY API - Status: {eco_response.status_code}, Body: {eco_response.text[:500]}")
 				if eco_response.status_code == 200:
 					eco_data = eco_response.json()
 					rbx_asset_name = eco_data.get("Name")
@@ -78,10 +91,40 @@ def get_catalog_asset_data(rbx_asset_id, headers):
 					creator_data = eco_data.get("Creator", {})
 					rbx_asset_creator = creator_data.get("Name")
 					return rbx_asset_name, rbx_asset_type_id, rbx_asset_creator, None
+				elif eco_response.status_code == 429:
+					import bpy
+					glob_vars.eco_rate_limit_reset = current_time + 15.0
+					rbx_imp_error = "Economy API rate limited (429)\nPlease wait 15sec"
+					glob_vars.rbx_imp_error = rbx_imp_error
+					
+					# Dynamically count down the error message in the UI
+					def update_countdown():
+						if not hasattr(glob_vars, 'eco_rate_limit_reset'): return None
+						rem = int(glob_vars.eco_rate_limit_reset - time.time())
+						if rem > 0:
+							glob_vars.rbx_imp_error = f"Economy API rate limited (429)\nPlease wait {rem}sec"
+							# Force UI Redraw
+							if getattr(bpy.context, 'screen', None):
+								for area in bpy.context.screen.areas:
+									area.tag_redraw()
+							return 1.0 # run again after 1 sec
+						else:
+							glob_vars.eco_rate_limit_reset = 0.0
+							if glob_vars.rbx_imp_error and "rate limited" in glob_vars.rbx_imp_error:
+								glob_vars.rbx_imp_error = None  # Clear cleanly when over
+							if getattr(bpy.context, 'screen', None):
+								for area in bpy.context.screen.areas:
+									area.tag_redraw()
+							return None
+					
+					if not bpy.app.timers.is_registered(update_countdown):
+						bpy.app.timers.register(update_countdown, first_interval=1.0)
+						
+					return None, None, None, rbx_imp_error
 				else:
-					print(f"DEBUG ECONOMY API failed with {eco_response.status_code}")
+					dprint(f"DEBUG ECONOMY API failed with {eco_response.status_code}")
 			except Exception as eco_e:
-				print(f"DEBUG ECONOMY API exception: {eco_e}")
+				dprint(f"DEBUG ECONOMY API exception: {eco_e}")
 			rbx_imp_error = f"{response.status_code}: Invalid Asset ID"
 		else:
 			rbx_imp_error = f"Error {response.status_code} fetching asset details"
@@ -126,7 +169,7 @@ def check_thumbnail_api_state(url, itm_type:str, max_retries=3, delay=1.0):
 				error = "Thumbnail API: Banned User - unable to get image"
 			return data, error
 
-		#print(f"Thumbnail API returning state: {state}. Retrying... Attempt {attempt+1} of {max_retries}")
+		#dprint(f"Thumbnail API returning state: {state}. Retrying... Attempt {attempt+1} of {max_retries}")
 		time.sleep(delay)
 
 	error = f"Thumbnail API did not return 'Completed' state after {max_retries} retries"

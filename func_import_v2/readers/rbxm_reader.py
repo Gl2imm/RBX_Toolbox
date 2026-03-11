@@ -1,13 +1,31 @@
 """
-rbxm_parser.py
---------------
-Parser for Roblox Binary Model Format (Version 0).
-Supports .rbxm and .rbxl files.
+RBXM Reader for Roblox Binary Model Files
+-----------------------------------------
 
-Based on the specification:
-  https://dom.rojo.space/binary
+Copyright (c) 2026
+https://www.roblox.com/users/1244794402/profile
+Papa_boss332
 
-Set DEBUG = True to write parsed output to rbxm_out.txt in the same directory.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, merge, publish, distribute, and/or sublicense the Software.
+
+Conditions:
+1. This notice and the attribution information below must remain intact in all
+   copies or substantial portions of the Software.
+2. The origin of this file must not be misrepresented.
+
+Attribution:
+Project Repository:
+https://github.com/Gl2imm/RBX_Toolbox
+
+This RBXM reader was created with the assistance of AI
+(Claude Opus 4.6 Thinking) and with reference to the documentation:
+https://dom.rojo.space/binary.html. Supports .rbxm and .rbxl files.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 """
 
 import struct
@@ -19,7 +37,9 @@ from typing import Any, Optional
 # ─────────────────────────────────────────────
 #  DEBUG FLAG — set True to write to rbxm_out.txt
 # ─────────────────────────────────────────────
+### Debug prints
 DEBUG = False
+dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 _debug_lines: list[str] = []
 
@@ -37,7 +57,7 @@ def _flush_debug(source_path: str) -> None:
     out_path = os.path.join(os.path.dirname(os.path.abspath(source_path)), "rbxm_out.txt")
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("\n".join(_debug_lines))
-    print(f"[DEBUG] Output written to: {out_path}")
+    dprint(f"[DEBUG] Output written to: {out_path}")
 
 
 # ─────────────────────────────────────────────
@@ -1658,18 +1678,18 @@ def _dump_tree(parsed: ParsedFile) -> None:
 def main() -> None:
     """Command-line entry point. Usage: python rbxm_parser.py <file.rbxm>"""
     if len(sys.argv) < 2:
-        print("Usage: python rbxm_parser.py <file.rbxm|file.rbxl>")
+        dprint("Usage: python rbxm_parser.py <file.rbxm|file.rbxl>")
         sys.exit(1)
 
     path = sys.argv[1]
     model = parse(path)
 
-    print(repr(model))
-    print(f"Metadata : {model.metadata}")
-    print()
+    dprint(repr(model))
+    dprint(f"Metadata : {model.metadata}")
+    dprint()
     for inst in model.all_instances:
         parent_name = inst.parent.name if inst.parent else "(root)"
-        print(f"  {inst!r}  parent={parent_name!r}  props={list(inst.properties.keys())}")
+        dprint(f"  {inst!r}  parent={parent_name!r}  props={list(inst.properties.keys())}")
 
 
 
@@ -1679,9 +1699,9 @@ def main() -> None:
 ks = model.FindFirstChildOfClass("CurveAnimation")
 
 for inst in ks.GetChildren():
-    print(inst.name, inst.class_name)
+    dprint(inst.name, inst.class_name)
     if inst.class_name == "AnimationRigData":
-        print(inst.properties)'''
+        dprint(inst.properties)'''
 
 
 
@@ -1689,12 +1709,12 @@ for inst in ks.GetChildren():
 
 
 '''if inst.class_name == "Folder":
-    print(inst.name, inst.class_name)
+    dprint(inst.name, inst.class_name)
     children = inst.GetChildren()
     for child in children:
-        print(f"  {child.name}  {child.class_name}")
+        dprint(f"  {child.name}  {child.class_name}")
         for grandchild in child.GetChildren():
-            print(f"    {grandchild.name}  {grandchild.class_name}")
+            dprint(f"    {grandchild.name}  {grandchild.class_name}")
     break'''
 
 
@@ -1708,10 +1728,10 @@ if __name__ == "__main__":
 """
 # ── iterate all instances ───────────────────────────────
 for inst in model.instances:
-    print(inst)                        # <Instance [1] Part "BasePlate">
-    print(inst.name)                   # "BasePlate"
-    print(inst.class_name)             # "Part"
-    print(inst.properties)             # {"Name": "BasePlate", "Size": (4,1,4), ...}
+    dprint(inst)                        # <Instance [1] Part "BasePlate">
+    dprint(inst.name)                   # "BasePlate"
+    dprint(inst.class_name)             # "Part"
+    dprint(inst.properties)             # {"Name": "BasePlate", "Size": (4,1,4), ...}
 
 # ── Roblox-style methods ────────────────────────────────
 inst.GetName()                         # "BasePlate"

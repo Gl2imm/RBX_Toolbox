@@ -11,7 +11,7 @@ importlib.reload(func_rbx_other)
 importlib.reload(func_blndr_api)
 
 ### Debug prints
-DEBUG = True
+DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 def find_texture_from_decals(node):

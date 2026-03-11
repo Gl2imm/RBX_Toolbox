@@ -3,6 +3,10 @@ import os
 from RBX_Toolbox import glob_vars
 from mathutils import Matrix, Vector
 
+### Debug prints
+DEBUG = False
+dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
+
 
 #################################
 ##### Blender API functions #####
@@ -50,9 +54,9 @@ def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cfram
         oriented_blender_matrix = funct.blender_matrix_axis_conversion(blender_matrix)
 
 
-        print(f"DEBUG_ORIGIN: Name={true_name}")
-        print(f"  CFrame (Roblox): {cframe}")
-        print(f"  PivotOffset (Roblox): {part_cframe_pivot}")
+        dprint(f"DEBUG_ORIGIN: Name={true_name}")
+        dprint(f"  CFrame (Roblox): {cframe}")
+        dprint(f"  PivotOffset (Roblox): {part_cframe_pivot}")
 		
         # Calculate Pivot Offset Vector (Raw Local Space)
         blender_matrix_pivot = funct.cframe_to_blender_matrix(part_cframe_pivot)
@@ -73,11 +77,11 @@ def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cfram
         # Apply the matrix to object (world transform)
         rbx_obj.matrix_world = oriented_blender_matrix
         
-        ### Spawn at origin
+        ### Spawn at origin tracker
         if actual_at_origin:
-            # Simply reset translation to 0,0,0
-            # If pivot logic worked, 0,0,0 is now the Pivot point in World Space.
-            rbx_obj.matrix_world.translation = (0.0, 0.0, 0.0)
+            from RBX_Toolbox import glob_vars
+            if rbx_obj not in glob_vars.rbx_spawn_tracker:
+                glob_vars.rbx_spawn_tracker.append(rbx_obj)
             
     return rbx_obj
 
@@ -118,9 +122,9 @@ def blender_api_add_attachments(mesh_part_attachment, mesh_part_attachment_cfram
 
     # Apply mesh matrix to attachment if spawn at origin
     if rbx_bndl_char_choice_at_origin:
-        # Reset Parent Translation to (0,0,0)
-        oriented_blender_matrix_parent.translation = (0.0, 0.0, 0.0)
-        mesh_part_attachment_obj.matrix_world.translation = (0.0, 0.0, 0.0)
+        from RBX_Toolbox import glob_vars
+        if mesh_part_attachment_obj not in glob_vars.rbx_spawn_tracker:
+            glob_vars.rbx_spawn_tracker.append(mesh_part_attachment_obj)
 
     # Calculate Attachment Offset relative to Pivot
     # Attachment World Matrix = Parent(at Pivot) @ Translation(-PivotOffset) @ AttachmentLocal
@@ -130,7 +134,8 @@ def blender_api_add_attachments(mesh_part_attachment, mesh_part_attachment_cfram
     
     # Get Attachment Local Matrix
     blender_matrix_att = funct.cframe_to_blender_matrix(mesh_part_attachment_cframe)
-    oriented_blender_matrix_att = funct.blender_matrix_axis_conversion(blender_matrix_att)
+    # oriented_blender_matrix_att = funct.blender_matrix_axis_conversion(blender_matrix_att)
+    oriented_blender_matrix_att = blender_matrix_att
     
     # Combine Matrices: Parent(at Pivot) @ Offset(to Center) @ Attachment(from Center)
     final_matrix = oriented_blender_matrix_parent @ offset_matrix @ oriented_blender_matrix_att
@@ -204,6 +209,29 @@ def blender_api_create_collection(name, parent_name=None):
 	
 	return coll
 
+
+
+def blender_api_collapse_outliner():
+    """Collapse all collections in the outliner for a clean view.
+    Uses a deferred timer so the UI has time to register new collections."""
+    
+    def _do_collapse():
+        try:
+            for area in bpy.context.screen.areas:
+                if area.type == 'OUTLINER':
+                    for region in area.regions:
+                        if region.type == 'WINDOW':
+                            with bpy.context.temp_override(window=bpy.context.window, area=area, region=region):
+                                bpy.ops.outliner.select_all(action='SELECT')
+                                for _ in range(10):
+                                    bpy.ops.outliner.show_one_level(open=False)
+                                bpy.ops.outliner.select_all(action='DESELECT')
+                            return None
+        except Exception as e:
+            dprint(f"Could not collapse outliner: {e}")
+        return None
+    
+    bpy.app.timers.register(_do_collapse, first_interval=0.1)
 
 
 def blender_api_assets_new_material(rbx_obj, mesh_part, rbx_textures, rbx_asset_name_clean, rbx_SurfaceAppearance):
@@ -303,12 +331,12 @@ def blender_api_transparent_textures():
 				alpha_node = alpha_link.from_node
 				links.remove(alpha_link)
 				nodes.remove(alpha_node)
-				#print(f"Removed transparency texture node in material: {mat.name}")
+				#dprint(f"Removed transparency texture node in material: {mat.name}")
 			else:
 				print(f"No alpha texture to remove in material: {mat.name}")
 
 			if not base_color_tex or base_color_tex.type != 'TEX_IMAGE':
-				#print(f"Material {mat.name}: Base color is not connected to an image texture.")
+				#dprint(f"Material {mat.name}: Base color is not connected to an image texture.")
 				continue
 
 			# Remove link from base color texture to BSDF base color
@@ -417,14 +445,14 @@ def _detect_armature_type(armature):
 		dot_z = abs(local_y.dot(Vec((0, 0, 1))))
 
 		if dot_y > 0.9:
-			print(f"[Animation] Armature type: STANDARD (bone '{ref_name}' Y-axis ≈ armature +Y)")
+			dprint(f"[Animation] Armature type: STANDARD (bone '{ref_name}' Y-axis ≈ armature +Y)")
 			return "standard"
 		elif dot_z > 0.9:
-			print(f"[Animation] Armature type: IMPORTED (bone '{ref_name}' Y-axis ≈ armature +Z)")
+			dprint(f"[Animation] Armature type: IMPORTED (bone '{ref_name}' Y-axis ≈ armature +Z)")
 			return "imported"
 
 	# Fallback: assume standard
-	print("[Animation] Armature type: STANDARD (fallback, no reference bone found)")
+	dprint("[Animation] Armature type: STANDARD (fallback, no reference bone found)")
 	return "standard"
 
 
@@ -644,7 +672,7 @@ def blender_api_apply_curve_animation(armature, anim_data, action_name=None, spe
 				if isinstance(t, (int, float)) and t == t and t > max_time:
 					max_time = t
 		length = max(max_time, 1.0 / FPS)  # At least one frame
-		print(f"[CurveAnim] Computed length from keyframes: {length:.4f}s")
+		dprint(f"[CurveAnim] Computed length from keyframes: {length:.4f}s")
 
 	# Cap frame_end to a safe int32 range
 	raw_frame_end = (length / max(speed, 0.001)) * FPS + 1
@@ -714,9 +742,9 @@ def blender_api_apply_curve_animation(armature, anim_data, action_name=None, spe
 				pose_bone.keyframe_insert(data_path="location", frame=frame)
 
 	if skipped:
-		print(f"[CurveAnim] Skipped {len(skipped)} tracks (no matching bone):")
+		dprint(f"[CurveAnim] Skipped {len(skipped)} tracks (no matching bone):")
 		for s in sorted(skipped):
-			print(f"  {s}")
+			dprint(f"  {s}")
 
-	print(f"[CurveAnim] Applied '{action.name}' to '{armature.name}' ({arm_type}) — Frames: 1 → {frame_end}")
+	dprint(f"[CurveAnim] Applied '{action.name}' to '{armature.name}' ({arm_type}) — Frames: 1 → {frame_end}")
 	return action

@@ -30,10 +30,20 @@ class RBX_BUTTON_AVA(bpy.types.Operator):
             for x in range(len(ava_list)):
                 if rbx_prefs.rbx_ava_enum == 'OP' + str(x+1):
                     ava_spwn = ava_list[x]   
-                                 
+            
+            colls_before = set(bpy.data.collections)
             bpy.ops.wm.append(directory = glob_vars.addon_path + glob_vars.rbx_blend_file + glob_vars.ap_collection, filename =ava_spwn)
             
+            # Clean up .000 suffixes from the newly spawned collection and its objects
+            new_colls = set(bpy.data.collections) - colls_before
+            for coll in new_colls:
+                if '.' in coll.name:
+                    coll.name = coll.name.split('.')[0]
+                for obj in coll.objects:
+                    if '.' in obj.name:
+                        obj.name = obj.name.split('.')[0]
             
+            bpy.context.view_layer.update()
             
         if rbx_ava == 'clear':
             selected = bpy.context.selected_objects
@@ -200,6 +210,125 @@ class RBX_BUTTON_AVA(bpy.types.Operator):
             bpy.context.view_layer.update()
             
             
+        if rbx_ava == 'add_facs_anim':
+            selected = bpy.context.selected_objects
+            
+            if len(selected) != 1 or selected[0].type != 'ARMATURE':
+                self.report({'ERROR'}, "Select exactly 1 Armature")
+                return {'FINISHED'}
+                
+            target_rig = selected[0]
+            colls_before = set(bpy.data.collections)
+            objs_before = set(bpy.data.objects)
+            
+            # Append the template armature
+            ava_spwn = 'Blocky_ava'
+            try:
+                bpy.ops.wm.append(directory = glob_vars.addon_path + glob_vars.rbx_blend_file + "/Collection/", filename = ava_spwn)
+            except Exception as e:
+                self.report({'ERROR'}, f"Failed to append: {e}")
+                return {'FINISHED'}
+                
+            new_objs = set(bpy.data.objects) - objs_before
+            
+            # Find the appended armature and its animation
+            template_rig = None
+            for obj in new_objs:
+                if obj.type == 'ARMATURE' and obj.animation_data and obj.animation_data.action:
+                    template_rig = obj
+                    break
+                    
+            if template_rig and template_rig.animation_data.action:
+                template_action = template_rig.animation_data.action
+                
+                # Check for missing bones
+                anim_bones = set()
+                for fc in template_action.fcurves:
+                    if fc.data_path.startswith("pose.bones"):
+                        try:
+                            # Safely extract bone name whether it uses single or double quotes
+                            bone_name = fc.data_path.split('[')[1].split(']')[0].strip('\'"')
+                            anim_bones.add(bone_name)
+                        except Exception:
+                            pass
+
+                # The template animation contains the full body, but FACS is only for the face.
+                # Ignore missing standard R15 body parts.
+                ignored_parts = {
+                    "LeftUpperArm", "LeftLowerArm", "LeftHand",
+                    "RightUpperArm", "RightLowerArm", "RightHand",
+                    "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+                    "RightUpperLeg", "RightLowerLeg", "RightFoot",
+                    "UpperTorso", "LowerTorso", "Head", "HumanoidRootPart"
+                }
+
+                missing_bones = set()
+                for b in anim_bones:
+                    if b not in target_rig.pose.bones and b not in ignored_parts:
+                        missing_bones.add(b)
+                
+                # We only count FACS bones.
+                facs_bones_expected = len([b for b in anim_bones if b not in ignored_parts])
+                
+                if len(missing_bones) > 0:
+                    # If ALL FACS bones in the animation are missing from the rig, the names are fundamentally wrong/different
+                    if len(missing_bones) == facs_bones_expected and facs_bones_expected > 0:
+                        glob_vars.rbx_facs_anim_error = "Bones in face armature have wrong names."
+                    else:
+                        # Only SOME FACS bones are missing
+                        glob_vars.rbx_facs_anim_error = "Some bones are missing in face armature."
+                    print(f"DEBUG FACS ANIMATION: Missing bones: {missing_bones}")
+                else:
+                    glob_vars.rbx_facs_anim_error = None
+                
+                # Create a fresh action to avoid inherited Action Slot binding issues in Blender 4.3+
+                new_action = bpy.data.actions.new(name="FACS_Animation")
+                
+                # Copy only bone poses and custom properties directly to fresh F-Curves
+                for fc in template_action.fcurves:
+                    if fc.data_path.startswith("pose.bones") or fc.data_path.startswith('["'):
+                        new_fc = new_action.fcurves.new(data_path=fc.data_path, index=fc.array_index)
+                        
+                        # Copy keyframes
+                        for kp in fc.keyframe_points:
+                            new_kp = new_fc.keyframe_points.insert(kp.co.x, kp.co.y, options={'FAST'})
+                            new_kp.interpolation = kp.interpolation
+                            new_kp.handle_left = kp.handle_left
+                            new_kp.handle_left_type = kp.handle_left_type
+                            new_kp.handle_right = kp.handle_right
+                            new_kp.handle_right_type = kp.handle_right_type
+                new_action.fcurves.update()
+
+                # Assign the action to the target rig
+                if not target_rig.animation_data:
+                    target_rig.animation_data_create()
+                else:
+                    # Clear any NLA tracks to ensure the active action plays instantly
+                    if target_rig.animation_data.nla_tracks:
+                        for track in list(target_rig.animation_data.nla_tracks):
+                            target_rig.animation_data.nla_tracks.remove(track)
+                            
+                target_rig.animation_data.action = new_action
+                
+                self.report({'INFO'}, "FACS Animation applied!")
+            else:
+                self.report({'ERROR'}, "Could not find animation data in template")
+                
+            # Clean up the appended items
+            bpy.ops.object.select_all(action='DESELECT')
+            for obj in new_objs:
+                bpy.data.objects.remove(obj, do_unlink=True)
+                
+            new_colls = set(bpy.data.collections) - colls_before
+            for coll in new_colls:
+                bpy.data.collections.remove(coll)
+                
+            # Reselect target
+            target_rig.select_set(True)
+            bpy.context.view_layer.objects.active = target_rig
+            bpy.context.view_layer.update()
+
+
         if rbx_ava == 'rename':
             objects = bpy.context.selected_objects
         

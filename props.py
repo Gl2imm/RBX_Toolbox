@@ -468,18 +468,6 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     ) # type: ignore
 
 
-    ### Place Import Properties ###
-    rbx_place_choice_at_origin : bpy.props.BoolProperty(
-    name="Spawn at Origin",
-    description="Move imported place to world origin (preserving part offsets)",
-    default = True
-    ) # type: ignore
-
-    rbx_place_choice_add_textures : bpy.props.BoolProperty(
-    name="Import Textures / Colors",
-    description="Apply part colors and material properties (roughness, metallic) to imported parts",
-    default = True
-    ) # type: ignore
 
 
     ### Import Character ###
@@ -760,6 +748,10 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     default = False
     ) # type: ignore
 
+    # Cache for dynamic EnumProperty items to prevent Blender GC from
+    # collecting the Python strings between draw calls (causes flickering).
+    _enum_items_cache = {}
+
     def get_items_callback(self, context, category):
         items = []
         
@@ -815,6 +807,11 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
             
         if not items:
             items.append(('NONE', "None", "No items found"))
+
+        # Cache the items list on the class so Python keeps a reference alive.
+        # Without this, Blender's GC can free the temporary strings between
+        # UI draw calls, causing enum labels to flicker/disappear.
+        PROPERTIES_RBX._enum_items_cache[category] = items
         return items
 
     rbx_enum_body_parts : bpy.props.EnumProperty(
@@ -871,11 +868,6 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
         items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Models")
     ) # type: ignore
 
-    rbx_enum_places : bpy.props.EnumProperty(
-        name = "Places",
-        description = "Discovered Places",
-        items = lambda self, context: PROPERTIES_RBX.get_items_callback(self, context, "Places")
-    ) # type: ignore
 
     ### Animations Properties ###
 
@@ -907,6 +899,7 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
             items.append((identifier, name, desc))
         if not items:
             items.append(('NONE', "No Sub-Animations", "Download animation first"))
+        PROPERTIES_RBX._enum_items_cache["anim_sub"] = items
         return items
 
     rbx_anim_sub_enum : bpy.props.EnumProperty(

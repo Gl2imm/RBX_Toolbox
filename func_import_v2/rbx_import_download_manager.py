@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 
 ### Debug prints
-DEBUG = True
+DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 def ensure_local_asset(asset_id, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=None):
@@ -124,7 +124,11 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         target_subfolder = "Classics"
         
     bundles_folder = os.path.join(addon_path, glob_vars.rbx_import_main_folder, target_subfolder)
-    rbx_tmp_rbxm_filepath = os.path.join(glob_vars.addon_path, glob_vars.rbx_import_main_folder, 'tmp_rbxm')
+    # Nest temp files under the main discovered item name folder
+    main_item_name = func_rbx_other.replace_restricted_char(
+        getattr(glob_vars, 'rbx_asset_name', None) or "Unknown"
+    )
+    rbx_tmp_rbxm_filepath = os.path.join(glob_vars.addon_path, glob_vars.rbx_import_main_folder, 'tmp_rbxm', main_item_name)
     
     if not os.path.exists(bundles_folder):
         os.makedirs(bundles_folder)
@@ -276,19 +280,13 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
                     
                     dprint(f"Processing bones for: {asset_name} ({asset_id})...")
                     
-                    # Create per-item subfolder in tmp_rbxm
-                    item_clean_name = func_rbx_other.replace_restricted_char(asset_name)
-                    item_tmp_path = os.path.join(rbx_tmp_rbxm_filepath, item_clean_name)
-                    if not os.path.exists(item_tmp_path):
-                        os.makedirs(item_tmp_path)
-                    
                     # Ensure Asset Local (Download if needed)
                     # Use appropriate format if known, else default
                     asset_format = None
                     if cat == "Dynamic Head": asset_format = "avatar_meshpart_head"
                     elif cat == "Layered Cloth": asset_format = "avatar_meshpart_accessory"
                     
-                    success = ensure_local_asset(asset_id, headers, item_tmp_path, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=asset_format)
+                    success = ensure_local_asset(asset_id, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=asset_format)
                     if not success: continue
 
                     # Process for Bones Only
@@ -302,7 +300,7 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
                     
                     mesh_results = rbx_import_meshes.process_mesh_asset(
                         asset_id, asset_name, headers, bone_prefs, 
-                        bundles_folder, item_tmp_path, 
+                        bundles_folder, rbx_tmp_rbxm_filepath, 
                         mesh_reader, funct, func_rbx_cloud_api, func_rbx_other, func_blndr_api,
                         parent_name=None,
                         skip_download=True, is_layered_clothing=(cat=="Layered Cloth"),
@@ -354,13 +352,6 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         asset_name = item['name']
         dprint(f"Processing Item: {asset_name} ({asset_id})")
         
-        # Create per-item subfolder in tmp_rbxm so each item's temp files
-        # are isolated (e.g. tmp_rbxm/Korblox_Deathspeaker/)
-        item_clean_name = func_rbx_other.replace_restricted_char(asset_name)
-        item_tmp_path = os.path.join(rbx_tmp_rbxm_filepath, item_clean_name)
-        if not os.path.exists(item_tmp_path):
-            os.makedirs(item_tmp_path)
-        
         # Centralized Download Step
         # Determine format based on category
         asset_format = None
@@ -369,7 +360,7 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         elif category_name == "Layered Cloth":
             asset_format = "avatar_meshpart_accessory" # Layered Cloth are accessories
             
-        success = ensure_local_asset(asset_id, headers, item_tmp_path, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=asset_format)
+        success = ensure_local_asset(asset_id, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=asset_format)
         if not success:
             dprint(f"Skipping {asset_name} due to download failure.")
             continue
@@ -377,10 +368,10 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         if category_name == "Classics":
             dprint(f"Processing Classic Textures for {asset_name}...")
             rbx_import_textures.classic_shirt_import(
-                asset_id, asset_name, bundles_folder, headers, item_tmp_path, func_rbx_cloud_api, func_rbx_other
+                asset_id, asset_name, bundles_folder, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other
             )
             rbx_import_textures.classic_pants_import(
-                asset_id, asset_name, bundles_folder, headers, item_tmp_path, func_rbx_cloud_api, func_rbx_other
+                asset_id, asset_name, bundles_folder, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other
             )
             continue
 
@@ -398,7 +389,7 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         if prefs['add_meshes']:
             mesh_results = rbx_import_meshes.process_mesh_asset(
                 asset_id, asset_name, headers, prefs, 
-                asset_own_folder, item_tmp_path, 
+                asset_own_folder, rbx_tmp_rbxm_filepath, 
                 mesh_reader, funct, func_rbx_cloud_api, func_rbx_other, func_blndr_api,
                 parent_name=parent_name,
                 skip_download=True, is_layered_clothing=is_layered_clothing, is_face_parts=is_face_parts
@@ -411,7 +402,7 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
              asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)
              rbx_import_cages.download_and_apply_cages(
                 asset_id, asset_name, asset_own_folder, headers, 
-                asset_clean_name, item_tmp_path, 
+                asset_clean_name, rbx_tmp_rbxm_filepath, 
                 prefs['at_origin'], prefs['add_ver_col'],
                 mesh_reader, funct, [],
                 func_rbx_cloud_api, func_rbx_other, func_blndr_api,
@@ -423,7 +414,7 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
              asset_clean_name = func_rbx_other.replace_restricted_char(asset_name)
              rbx_import_attachments.download_and_apply_attachments(
                 asset_id, asset_name, asset_own_folder, headers, 
-                asset_clean_name, item_tmp_path, 
+                asset_clean_name, rbx_tmp_rbxm_filepath, 
                 prefs['at_origin'], prefs['add_attachment'], prefs.get('add_motor6d_attachment', False),
                 mesh_reader, funct,
                 func_rbx_cloud_api, func_rbx_other, func_blndr_api,
@@ -437,20 +428,25 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
     #    importlib.reload(rbx_import_bones)
     #    rbx_import_bones.import_bones(all_imported_meshes, mesh_reader, funct, prefs.get('at_origin'))
 
-    # Cleanup per-item tmp folder if requested
+    # Move tracked objects to origin is now handled by execute_global_spawn_tracker() after all categories finish.
+
+    # Cleanup main item tmp folder if requested
     if prefs.get('clean_tmp_meshes', False):
         import shutil
-        for item in items_to_process:
-            clean_name = func_rbx_other.replace_restricted_char(item['name'])
-            item_folder = os.path.join(rbx_tmp_rbxm_filepath, clean_name)
-            if os.path.exists(item_folder):
-                try:
-                    shutil.rmtree(item_folder)
-                    dprint(f"Cleaned up item tmp folder: {item_folder}")
-                except Exception as e:
-                    dprint(f"Error cleaning up item tmp folder: {e}")
+        if os.path.exists(rbx_tmp_rbxm_filepath):
+            try:
+                shutil.rmtree(rbx_tmp_rbxm_filepath)
+                dprint(f"Cleaned up tmp folder: {rbx_tmp_rbxm_filepath}")
+            except Exception as e:
+                dprint(f"Error cleaning up tmp folder: {e}")
 
     dprint(f"Download Finished for {category_name}.")
+    
+    # Collapse Outliner
+    try:
+        func_blndr_api.blender_api_collapse_outliner()
+    except Exception as e:
+        dprint(f"Failed to collapse outliner: {e}")
 
 
 def download_animation(context, apply_index=-1):
@@ -525,8 +521,11 @@ def download_animation(context, apply_index=-1):
         dprint("No animation items to process.")
         return
     
-    # Setup tmp folder
-    rbx_tmp_rbxm_filepath = os.path.join(addon_path, glob_vars.rbx_import_main_folder, 'tmp_rbxm')
+    # Setup tmp folder — nest under the main discovered item name
+    main_item_name = func_rbx_other.replace_restricted_char(
+        getattr(glob_vars, 'rbx_asset_name', None) or "Unknown"
+    )
+    rbx_tmp_rbxm_filepath = os.path.join(addon_path, glob_vars.rbx_import_main_folder, 'tmp_rbxm', main_item_name)
     if not os.path.exists(rbx_tmp_rbxm_filepath):
         os.makedirs(rbx_tmp_rbxm_filepath)
     
@@ -538,17 +537,11 @@ def download_animation(context, apply_index=-1):
         asset_name = item['name']
         dprint(f"Downloading animation: {asset_name} (ID: {asset_id})")
         
-        # Create per-item subfolder in tmp_rbxm
-        item_clean_name = func_rbx_other.replace_restricted_char(asset_name)
-        item_tmp_path = os.path.join(rbx_tmp_rbxm_filepath, item_clean_name)
-        if not os.path.exists(item_tmp_path):
-            os.makedirs(item_tmp_path)
-        
         # Download
-        if not ensure_local_asset(asset_id, headers, item_tmp_path, func_rbx_cloud_api, func_rbx_other):
+        if not ensure_local_asset(asset_id, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other):
             continue
         
-        rbxm_file_path = os.path.join(item_tmp_path, str(asset_id) + ".rbxm")
+        rbxm_file_path = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
         
         try:
             model = rbxm_reader.parse(rbxm_file_path)
@@ -583,7 +576,7 @@ def download_animation(context, apply_index=-1):
                         # Download the actual animation data
                         anim_data_bytes, err = func_rbx_cloud_api.get_asset_data(anim_content_id, headers)
                         if not err and anim_data_bytes:
-                            anim_tmp_path = os.path.join(item_tmp_path, f"anim_{anim_content_id}.rbxm")
+                            anim_tmp_path = os.path.join(rbx_tmp_rbxm_filepath, f"anim_{anim_content_id}.rbxm")
                             with open(anim_tmp_path, "wb") as f:
                                 f.write(anim_data_bytes)
                             
@@ -693,43 +686,136 @@ def download_model(context, download_all=False):
     else:
         items_to_process = items
 
-    # Determine tmp path
-    rbx_tmp_rbxm_filepath = os.path.join(addon_path, glob_vars.rbx_import_main_folder, "tmp_rbxm")
+    # Determine tmp path — nest under the main discovered item name
+    main_item_name = func_rbx_other.replace_restricted_char(
+        getattr(glob_vars, 'rbx_asset_name', None) or "Unknown"
+    )
+    rbx_tmp_rbxm_filepath = os.path.join(addon_path, glob_vars.rbx_import_main_folder, "tmp_rbxm", main_item_name)
     if not os.path.exists(rbx_tmp_rbxm_filepath):
         os.makedirs(rbx_tmp_rbxm_filepath)
+
+    imported_count = 0
+    failed_permission = []
+    failed_other = []
 
     for item in items_to_process:
         asset_id = item['id']
         asset_name = item['name']
         dprint(f"Downloading Model: {asset_name} ({asset_id})")
 
-        # Per-item subfolder
-        item_clean_name = func_rbx_other.replace_restricted_char(asset_name)
-        item_tmp_path = os.path.join(rbx_tmp_rbxm_filepath, item_clean_name)
-        if not os.path.exists(item_tmp_path):
-            os.makedirs(item_tmp_path)
-
         # Download RBXM
         success = ensure_local_asset(
-            asset_id, headers, item_tmp_path,
+            asset_id, headers, rbx_tmp_rbxm_filepath,
             func_rbx_cloud_api, func_rbx_other
         )
         if not success:
             dprint(f"Failed to download model {asset_name}")
+            err = glob_vars.rbx_imp_error or ""
+            if "401" in err or "403" in err or "Access Denied" in err or "Permission" in err:
+                failed_permission.append(str(asset_id))
+            else:
+                failed_other.append(str(asset_id))
             continue
 
         # Import model
-        rbxm_path = os.path.join(item_tmp_path, str(asset_id) + ".rbxm")
+        rbxm_path = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
         if os.path.isfile(rbxm_path):
-            rbx_import_models.import_model(
+            root_col = rbx_import_models.import_model(
                 rbxm_file_path=rbxm_path,
                 model_name=asset_name,
                 at_origin=at_origin,
                 add_textures=add_textures,
                 func_rbx_other=func_rbx_other,
                 headers=headers,
-                tmp_path=item_tmp_path,
+                tmp_path=rbx_tmp_rbxm_filepath,
                 func_rbx_cloud_api=func_rbx_cloud_api
             )
+            if root_col is not None:
+                try:
+                    imported_count += len(root_col.all_objects)
+                except Exception as e:
+                    dprint(f"Could not count imported objects: {e}")
 
     dprint("Model download and import complete.")
+    
+    def show_summary():
+        try:
+            override_ctx = {}
+            for window in bpy.context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == 'VIEW_3D':
+                        for region in area.regions:
+                            if region.type == 'WINDOW':
+                                override_ctx['window'] = window
+                                override_ctx['screen'] = window.screen
+                                override_ctx['area'] = area
+                                override_ctx['region'] = region
+                                break
+                        break
+                if 'window' in override_ctx:
+                    break
+                    
+            if hasattr(bpy.context, "temp_override"):
+                with bpy.context.temp_override(**override_ctx):
+                    bpy.ops.wm.rbx_import_model_summary('INVOKE_DEFAULT', 
+                        imported_count=imported_count,
+                        failed_permission=",".join(failed_permission),
+                        failed_other=",".join(failed_other))
+            else:
+                bpy.ops.wm.rbx_import_model_summary(override_ctx, 'INVOKE_DEFAULT', 
+                    imported_count=imported_count,
+                    failed_permission=",".join(failed_permission),
+                    failed_other=",".join(failed_other))
+        except Exception as e:
+            dprint(f"Failed to show import summary: {e}")
+        return None
+
+    try:
+        bpy.app.timers.register(show_summary, first_interval=0.1)
+    except Exception as e:
+        dprint(f"Failed to register summary timer: {e}")
+
+
+def execute_global_spawn_tracker():
+    """
+    Moves all globally tracked imported objects to the origin iteratively 
+    so that relative offsets are preserved, and then clears the tracker.
+    Must be called at the very end of the import operator after all categories process.
+    """
+    if glob_vars.rbx_spawn_tracker:
+        dprint(f"Moving {len(glob_vars.rbx_spawn_tracker)} tracked objects to origin...")
+        bpy.ops.object.select_all(action='DESELECT')
+        
+        valid_objs = []
+        for obj in glob_vars.rbx_spawn_tracker:
+            try:
+                if obj.name in bpy.data.objects:
+                    obj.select_set(True)
+                    valid_objs.append(obj)
+            except ReferenceError:
+                pass
+                
+        if valid_objs:
+            bpy.context.view_layer.objects.active = valid_objs[0]
+            bpy.context.scene.cursor.location = (0, 0, 0)
+            
+            override_ctx = None
+            for window in bpy.context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == 'VIEW_3D':
+                        for region in area.regions:
+                            if region.type == 'WINDOW':
+                                override_ctx = {'window': window, 'screen': window.screen, 'area': area, 'region': region}
+                                break
+                        if override_ctx: break
+                if override_ctx: break
+            
+            if override_ctx:
+                with bpy.context.temp_override(**override_ctx):
+                    bpy.ops.view3d.snap_selected_to_cursor(use_offset=True)
+            else:
+                dprint("No 3D View found, cannot perform group snap to cursor.")
+                
+            bpy.ops.object.select_all(action='DESELECT')
+            
+        glob_vars.rbx_spawn_tracker.clear()

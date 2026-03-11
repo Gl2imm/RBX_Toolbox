@@ -514,7 +514,10 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     box.operator('object.rbx_terms_of_use', text="Terms of Use", icon='BOOKMARKS').action = "SHOW"
                 else:
                     box = layout.box()
-                    box.label(text = 'Enter ID or URL')
+                    
+                    row_title = box.row()
+                    row_title.label(text='Enter ID or URL')
+                    row_title.operator('object.rbx_import_discovery_info_popup', text="", icon='INFO')
                     
                     row = box.row()
                     row.enabled = not rbx_prefs.rbx_import_beta_active
@@ -530,7 +533,11 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     box_reset.operator('object.rbx_import_reset', text = "Reset")
                     
                     if glob_vars.rbx_imp_error:
-                        box_reset.label(text=glob_vars.rbx_imp_error, icon='ERROR')
+                        for idx, error_line in enumerate(glob_vars.rbx_imp_error.split('\n')):
+                            if idx == 0:
+                                box_reset.label(text=error_line, icon='ERROR')
+                            else:
+                                box_reset.label(text=error_line)
 
                     # Discovered Items UI
                     if hasattr(glob_vars, 'discovered_items_data') and glob_vars.discovered_items_data:
@@ -596,9 +603,8 @@ class TOOLBOX_MENU(bpy.types.Panel):
                                     else:
                                         if getattr(glob_vars, 'rbx_armature_warning_active', False):
                                             col_info = box.column(align=True)
-                                            col_info.label(text="Item meshes version is below 4.00", icon='ERROR')
-                                            col_info.label(text="and does not have Armature.")
-                                            col_info.label(text="Older mesh armatures are not yet implemented.")
+                                            col_info.label(text="Armatures for older meshes", icon='ERROR')
+                                            col_info.label(text="(below v4.00) are not supported.")
 
                                 # Define categories to display
                                 categories_to_draw = []
@@ -607,7 +613,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
                                 if glob_vars.discovered_items_data.get("Accessory"):
                                     categories_to_draw.append(("Accessory", 'MOD_CLOTH', "rbx_enum_accessory", "Download Accessories"))
                                 if glob_vars.discovered_items_data.get("Dynamic Head"):
-                                    categories_to_draw.append(("Dynamic Head", 'MONKEY', "rbx_enum_dynamic_head", "Download Dynamic Heads"))
+                                    categories_to_draw.append(("Dynamic Head", 'MONKEY', "rbx_enum_dynamic_head", "Download Dynamic Head"))
                                 if glob_vars.discovered_items_data.get("Layered Cloth"):
                                     categories_to_draw.append(("Layered Cloth", 'MOD_CLOTH', "rbx_enum_layered_cloth", "Download Layered Cloth"))
                                 if glob_vars.discovered_items_data.get("Face Parts"):
@@ -678,11 +684,8 @@ class TOOLBOX_MENU(bpy.types.Panel):
                                     box_dl_all.label(text="Select checkboxes in above menus")
                                     box_dl_all.operator('object.rbx_import_discovery_download', text="Download Everything").category = "ALL_CATEGORIES"
 
-
-
-
-
-
+                    box_tmp = layout.box()
+                    box_tmp.operator('object.rbx_open_tmp_folder', text="Open Junk (tmp) Folder", icon='FILE_FOLDER')
 
         ######### Bounds #########
         #if rbx_assets_set == 1:
@@ -1060,8 +1063,9 @@ class TOOLBOX_MENU(bpy.types.Panel):
 
             ###### LC ANIMATION TEST ######
             box = layout.box()
-            box.label(text = 'LC Animation Test')
-            box.label(text = '(Blocky & Woman only)')
+            row_title = box.row()
+            row_title.label(text='LC Animation Test')
+            row_title.operator('object.rbx_lc_anim_test_info_popup', text="", icon='INFO')
             box.label(text = '1. Select LC Armature')
             box.prop_search(scene, "rbx_lc_anim_armature", scene, "objects")
             box.label(text = '2. Select Rig to spawn')
@@ -1153,6 +1157,20 @@ class TOOLBOX_MENU(bpy.types.Panel):
             row_facs = box.row()
             row_facs.enabled = (len(bpy.context.selected_objects) == 1)
             row_facs.operator('object.rbx_button_ava', text="Add FACS Properties (Head Only)").rbx_ava = "add_facs" 
+            row_facs2 = box.row()
+            is_arma_selected = (len(bpy.context.selected_objects) == 1 and bpy.context.selected_objects[0].type == 'ARMATURE')
+            row_facs2.enabled = is_arma_selected
+            row_facs2.operator('object.rbx_button_ava', text="Add FACS Animation (Arma)").rbx_ava = "add_facs_anim" 
+            
+            if not is_arma_selected:
+                glob_vars.rbx_facs_anim_error = None
+            
+            if getattr(glob_vars, 'rbx_facs_anim_error', None):
+                import textwrap
+                err_text = glob_vars.rbx_facs_anim_error
+                wrapped = textwrap.wrap(err_text, width=40)
+                for i, line in enumerate(wrapped):
+                    box.label(text=line, icon='ERROR' if i == 0 else 'NONE')
             
             # Renamer:
             box = layout.box()
@@ -1252,13 +1270,13 @@ class TOOLBOX_MENU(bpy.types.Panel):
 
 
         ######### Armature #########
-        row = layout.row()
+        #row = layout.row()
         bn_icon = 'HANDLETYPE_AUTO_CLAMP_VEC'
-        icon = 'DOWNARROW_HLT' if context.scene.subpanel_bn else 'RIGHTARROW'
-        row.prop(context.scene, 'subpanel_bn', icon=icon, icon_only=True)
-        row.label(text='Animation (Advanced)', icon='OUTLINER_DATA_ARMATURE')
+        #icon = 'DOWNARROW_HLT' if context.scene.subpanel_bn else 'RIGHTARROW'
+        #row.prop(context.scene, 'subpanel_bn', icon=icon, icon_only=True)
+        #row.label(text='Animation (Advanced)', icon='OUTLINER_DATA_ARMATURE')
         # some data on the subpanel
-        if context.scene.subpanel_bn:
+        if False: #context.scene.subpanel_bn:
             box = layout.box()
             box.operator('object.url_handler', text = "How to Use", icon='HELP').rbx_link = "Guide_Armature"
             icon = 'DOWNARROW_HLT' if context.scene.subpanel_bn_st1 else 'RIGHTARROW'
@@ -1563,15 +1581,22 @@ class TOOLBOX_MENU(bpy.types.Panel):
             row = layout.row()
             box = layout.box()
             box.label(text='UGC Item Export:')
+            
+            is_valid_ugc = False
+            if len(context.selected_objects) == 1:
+                obj = context.selected_objects[0]
+                if obj.type == 'MESH':
+                    is_valid_ugc = True
+                    
             try:
-                if len(bpy.context.selected_objects) == 1: 
+                if is_valid_ugc: 
                     box.prop(rbx_prefs, 'rbx_of_orig', text = "Set Origin to Geometry") 
                     box.prop(rbx_prefs, 'rbx_of_trsf', text = "Apply All Transforms")  
                     box.operator('object.rbx_operators', text = "Export FBX", icon='EXPORT').rbx_operator = 'exp_fbx'
                 else:
-                    box.label(text='Select obj for FBX Export', icon='ERROR')
+                    box.label(text='Select 1 Mesh for FBX Export', icon='ERROR')
             except:
-                box.label(text='Select obj for FBX Export', icon='ERROR')                                          
+                box.label(text='Select 1 Mesh for FBX Export', icon='ERROR')                                          
 
 
             #### Export FBX LC ####
@@ -1590,6 +1615,25 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     box.label(text='Some items not selected', icon='ERROR')
             except:
                 box.label(text='Some items not selected', icon='ERROR')  
+            
+            
+            #### Export Animation ####
+            row = layout.row()
+            box = layout.box()
+            box.label(text='Animation Export:')
+            
+            is_valid_anim_rig = False
+            active_obj = context.active_object
+            if active_obj and active_obj.type == 'ARMATURE':
+                if active_obj.animation_data and active_obj.animation_data.action:
+                    is_valid_anim_rig = True
+            
+            row_op = box.row()
+            row_op.enabled = is_valid_anim_rig
+            row_op.operator('object.rbx_operators', text="Export Animation", icon='ACTION').rbx_operator = 'exp_fbx_anim'
+            
+            if not is_valid_anim_rig:
+                box.label(text='Select Armature with animation', icon='INFO')
             
             
             #### Export Avatar ####

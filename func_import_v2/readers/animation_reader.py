@@ -1,19 +1,43 @@
 """
-animation_reader.py
-───────────────────
-Converts a Roblox KeyframeSequence (parsed by rbxm_reader.py) into
-sparse per-bone keyframe data ready for the Blender animation script.
+Roblox Animation Reader
+-----------------------
 
-Usage:
-    from rbxm_reader import parse
-    from animation_reader import read_animation
+Copyright (c) 2026
+https://www.roblox.com/users/1244794402/profile
+Papa_boss332
 
-    model = parse("walk.rbxm")
-    ks    = model.FindFirstChildOfClass("KeyframeSequence")
-    data  = read_animation(ks)
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, merge, publish, distribute, and/or sublicense the Software.
+
+Conditions:
+1. This notice and the attribution information below must remain intact in all
+   copies or substantial portions of the Software.
+2. The origin of this file must not be misrepresented.
+
+Attribution:
+Project Repository:
+https://github.com/Gl2imm/RBX_Toolbox
+
+This animation reader was created by reverse engineering with the assistance
+of AI (Claude Opus 4.6 Thinking). Some structural reference and flow ideas
+were inspected from the BTRoblox project:
+https://github.com/AntiBoomz/BTRoblox/blob/master/js/rbx/Parser/AnimationParser.js
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 """
 
 import math
+
+
+# ─────────────────────────────────────────────
+#  DEBUG FLAG
+# ─────────────────────────────────────────────
+### Debug prints
+DEBUG = False
+dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 
 # ─────────────────────────────────────────────

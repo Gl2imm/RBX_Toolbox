@@ -5,7 +5,7 @@ from RBX_Toolbox import glob_vars
 from typing import TYPE_CHECKING, List, Any, Dict, Union
 
 ### Debug prints
-DEBUG = True
+DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 def download_and_apply_attachments(target: Union[int, Any], mesh_name: str, bundle_own_folder: str, headers: dict, 
@@ -206,21 +206,9 @@ def _process_single_attachment(mesh_part, mesh_name, bundle_own_folder, headers,
     if part_cframe_pivot is None:
         part_cframe_pivot = funct.cframe_identity()
 
-    # Check if pivot is identity
-    pivot_comps = funct.cframe_get_components(part_cframe_pivot)
-    identity_comps = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-    is_identity = True
-    if len(pivot_comps) == 12:
-        for a, b in zip(pivot_comps, identity_comps):
-            if abs(a - b) > 0.0001: 
-                is_identity = False
-                break
-    
-    # If pivot is identity, force at_origin to False
-    # UNLESS it is an Accessory, which we want to center even if identity
+    # The 'is_identity' origin hack was removed;
+    # Spawn at origin is now handled consistently by global tracker block.
     actual_at_origin = at_origin
-    if is_identity and not is_accessory:
-        actual_at_origin = False
 
         
     # Calculate main collection name if not available or passed

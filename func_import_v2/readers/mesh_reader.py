@@ -1,12 +1,47 @@
+"""
+Roblox Mesh Reader
+------------------
+
+Copyright (c) 2026
+https://www.roblox.com/users/1244794402/profile
+Papa_boss332
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, merge, publish, distribute, and/or sublicense the Software.
+
+Conditions:
+1. This notice and the attribution information below must remain intact in all
+   copies or substantial portions of the Software.
+2. The origin of this file must not be misrepresented.
+
+Attribution:
+Project Repository:
+https://github.com/Gl2imm/RBX_Toolbox
+
+This mesh reader was created with the assistance of AI
+(Claude Opus 4.6 Thinking) and with reference to the documentation:
+https://devforum.roblox.com/t/roblox-filemesh-format-specification/326114/51
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+"""
+
+
 import struct
 import pprint
-import os
+
 
 from . import draco_decoder
 
 # ============================================================
 # DEBUG CONTROLS
 # ============================================================
+### Debug prints
+DEBUG = False
+dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
+
 # Set to True to write parsed mesh data to a text file
 DEBUG_WRITE_OUTPUT = False
 # Path for the debug output text file
@@ -50,9 +85,9 @@ def parse(data):
                 # Build a safe copy that avoids circular bone->parent references
                 safe_result = _make_debug_safe(result)
                 pprint.pprint(safe_result, stream=debug_file, width=120)
-            print(f"Debug output written to: {DEBUG_OUTPUT_PATH}")
+            dprint(f"Debug output written to: {DEBUG_OUTPUT_PATH}")
         except Exception as err:
-            print(f"Failed to write debug output: {err}")
+            dprint(f"Failed to write debug output: {err}")
 
     return result
 
@@ -362,7 +397,12 @@ def parse_chunked(data, version):
                 draco_result = draco_decoder.decode_draco(bytes(draco_payload))
                 vertices = draco_result.get("vertices", [])
                 normals = draco_result.get("normals", [])
+                
+                # Draco decodes raw DirectX UVs, flip to OpenGL convention like everything else
                 uvs = draco_result.get("uvs", [])
+                if uvs:
+                    uvs = [u if i % 2 == 0 else 1.0 - u for i, u in enumerate(uvs)]
+                    
                 vertex_colors = draco_result.get("vertexColors", None)
                 faces = draco_result.get("faces", [])
                 tangents = []  # Draco payload does not include tangents
@@ -736,11 +776,6 @@ def _read_subsets_and_remap(data, offset, subset_count, skin_indices):
 #####################
 def write_obj_from_mesh_json(mesh, out_path, lod_index=0, object_name="mesh"):
     ver = mesh["version"]
-    if ver in ("1.00", "1.01", "2.00", "3.00", "3.01"):
-        flip_v=False
-    else:
-        flip_v=True
-     
     V = mesh["vertices"]                  # flat [x,y,z,...]
     N = mesh.get("normals")               # flat [nx,ny,nz,...]  (optional)
     UV = mesh.get("uvs")                  # flat [u,v,...]       (optional)
@@ -779,8 +814,6 @@ def write_obj_from_mesh_json(mesh, out_path, lod_index=0, object_name="mesh"):
         if UV:
             for i in range(0, len(UV), 2):
                 u, v = UV[i], UV[i+1]
-                if flip_v:  # not needed for v4+, only v1.00 quirk per spec
-                    v = 1.0 - v
                 f.write(f"vt {u:.6f} {v:.6f}\n")
 
         # normals (optional)

@@ -156,7 +156,7 @@ rbx_default_head_used = False
 rbx_anim_sub_items = []  # List of dicts with sub-animation info: [{"name": str, "anim_data": dict}, ...]
 discovered_items_data = {}
 rbx_armature_warning_active = False
-
+rbx_spawn_tracker = []
 
 
 

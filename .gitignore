@@ -3,6 +3,8 @@
 
 # AI / agent tools
 .agent/
+.agents/
+.claude/
 
 # Python cache
 __pycache__/
@@ -18,3 +20,5 @@ Thumbs.db
 *.log
 tmp/
 temp/
+RBX_Import/
+oauth/dependencies_public/

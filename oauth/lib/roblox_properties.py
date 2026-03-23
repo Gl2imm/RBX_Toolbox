@@ -98,7 +98,7 @@ class RbxProperties(PropertyGroup):
 
     is_installing_dependencies: BoolProperty()
     is_finished_installing_dependencies: BoolProperty(
-        default=install_dependencies.dependencies_public_directory.exists()
+        default=install_dependencies.deps_are_current()
     )
     needs_restart: BoolProperty()
     is_logged_in: BoolProperty()

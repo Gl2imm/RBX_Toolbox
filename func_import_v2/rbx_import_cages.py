@@ -303,18 +303,37 @@ def _process_single_cage(mesh_part, mesh_name, bundle_own_folder, headers,
                         ))
                     }
                 
-                cage_cframe_pivot = cage_part.get("ImportOrigin")
-                
-                dprint(f"Processing Cage: {name_suffix} ID: {cage_mesh_id}") 
-                
-                if cage_cframe is None: 
+                dprint(f"Processing Cage: {name_suffix} ID: {cage_mesh_id}")
+
+                if cage_cframe is None:
                     continue
 
-                # The 'is_identity' origin hack was removed;
-                # Spawn at origin is now handled consistently by global tracker block.
+                # Get mesh pivot (PivotOffset) - cage shares the same logical pivot
+                mesh_pivot = mesh_part.get("PivotOffset")
+                if mesh_pivot is None:
+                    mesh_pivot = funct.cframe_identity()
+
+                mesh_pivot_comps = funct.cframe_get_components(mesh_pivot)
+                identity_comps = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+                mesh_is_identity = True
+                if len(mesh_pivot_comps) == 12:
+                    for a, b in zip(mesh_pivot_comps, identity_comps):
+                        if abs(a - b) > 0.0001:
+                            mesh_is_identity = False
+                            break
+
+                is_accessory = False
+                check_obj = mesh_part
+                if mesh_part.class_name == "SpecialMesh":
+                    check_obj = mesh_part.parent
+                if check_obj and check_obj.parent and check_obj.parent.class_name == "Accessory":
+                    is_accessory = True
+
+                # If pivot is identity (for the Mesh), force at_origin to False (unless accessory)
                 actual_at_origin = at_origin
-                    
-                # The cage shares the exact same logical pivot as the mesh part it's wrapped around
+                if mesh_is_identity and not is_accessory:
+                    actual_at_origin = False
+
                 cage_cframe_pivot = mesh_pivot
 
                 

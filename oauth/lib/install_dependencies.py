@@ -33,6 +33,7 @@ import sys
 import subprocess
 import os
 import ensurepip
+import shutil
 from pathlib import Path
 import traceback
 import asyncio
@@ -42,6 +43,54 @@ project_root_dir = Path(__file__).parent.parent
 
 # Set the path to the dependencies_public directory
 dependencies_public_directory = project_root_dir / "dependencies_public"
+
+# File written inside the deps folder to record which addon version installed them
+_VERSION_STAMP = dependencies_public_directory / "_installed_version"
+
+
+def _get_addon_version():
+    """Returns the current addon version string, e.g. '7.2.0'."""
+    pkg_name = project_root_dir.parent.name  # e.g. 'RBX_Toolbox'
+    pkg = sys.modules.get(pkg_name)
+    if pkg and hasattr(pkg, "bl_info"):
+        return ".".join(str(x) for x in pkg.bl_info["version"])
+    return None
+
+
+def deps_are_current():
+    """
+    Returns True only if dependencies are installed AND match the current addon version.
+    If the folder exists but is stale (missing stamp or wrong version), it is deleted
+    so the user is prompted to reinstall.
+    """
+    if not dependencies_public_directory.exists():
+        return False
+
+    version = _get_addon_version()
+
+    # No version info available — fall back to existence check
+    if version is None:
+        return True
+
+    if not _VERSION_STAMP.exists():
+        print(
+            f"[RBX Toolbox] Dependency version stamp missing — "
+            f"clearing stale deps folder for clean reinstall."
+        )
+        shutil.rmtree(str(dependencies_public_directory), ignore_errors=True)
+        return False
+
+    installed = _VERSION_STAMP.read_text(encoding="utf-8").strip()
+    if installed != version:
+        print(
+            f"[RBX Toolbox] Dependency version mismatch "
+            f"(installed: {installed}, current: {version}) — "
+            f"clearing deps folder for clean reinstall."
+        )
+        shutil.rmtree(str(dependencies_public_directory), ignore_errors=True)
+        return False
+
+    return True
 
 
 class RBX_OT_install_dependencies(Operator):
@@ -60,10 +109,14 @@ class RBX_OT_install_dependencies(Operator):
             try:
                 rbx.is_installing_dependencies = False
                 task.result()
+                # Stamp the installed version so future update checks can detect staleness
+                version = _get_addon_version()
+                if version:
+                    _VERSION_STAMP.write_text(version, encoding="utf-8")
                 rbx.is_finished_installing_dependencies = True
                 rbx.needs_restart = True
             except Exception as exception:
-                dependencies_public_directory.rmdir()
+                shutil.rmtree(str(dependencies_public_directory), ignore_errors=True)
                 traceback.print_exception(exception)
 
         rbx.is_installing_dependencies = True

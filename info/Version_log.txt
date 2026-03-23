@@ -2,7 +2,19 @@
                                                       Version History:
                                             ####################################
 
-v.7.0:
+v.7.2:
+    Bug Fixes
+	- Fixed Cages was not importing in v.7.1
+    - Fixed cages importing crumpled at the centre instead of their correct locations.
+    - Fixed addon update via zip leaving old modules behind, causing the new version to not work. Addon now detects this and prompts a clean reinstall automatically.
+
+    Blender 5.1 Compatibility
+    - Fixed addon failing to install dependencies on Blender 5.1 (Python 3.13).
+    - Fixed login session not being remembered after Blender restart.
+    - Fixed Terms of Use prompt appearing every time Blender is opened even after accepting it.
+    - Fixed various errors on startup in Blender 5.1.
+
+v.7.1:
     Major Update: Import (Beta) Menu
 	This menu is using direct RBXM reader and Mesh reader, so the data imported is actual meshes
 	and textures. I had added an info button on some of the new menus, so make sure you have a

@@ -19,7 +19,7 @@ def replace_restricted_char(str: str = None):
     '''Replace restricted characters in string with underscores'''
     if str is None:
         return
-    restricted_chars = '\/*?:"<>|.,'
+    restricted_chars = '/*?:"<>|.,'
     replace_map = dict((ord(char), '_') for char in restricted_chars)
     new_str = str.translate(replace_map)
     return new_str

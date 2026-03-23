@@ -44,6 +44,7 @@ class RBX_OT_terms_of_use(bpy.types.Operator):
         if self.action == "ACCEPT":
             prefs = context.preferences.addons["RBX_Toolbox"].preferences
             prefs.accepted_terms_of_use = True
+            bpy.ops.wm.save_userpref()
             self.report({'INFO'}, "Terms of Use accepted.")
             return {'FINISHED'}
         elif self.action == "DECLINE":
@@ -84,6 +85,7 @@ class RBX_OT_terms_of_use(bpy.types.Operator):
         # "OK" button on the dialog acts as Accept
         prefs = context.preferences.addons["RBX_Toolbox"].preferences
         prefs.accepted_terms_of_use = True
+        bpy.ops.wm.save_userpref()
         self.report({'INFO'}, "Terms of Use accepted.")
         return {'FINISHED'}
 

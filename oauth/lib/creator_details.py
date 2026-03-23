@@ -76,10 +76,10 @@ def save_creator_details(window_manager, preferences):
         rbx = window_manager.rbx
         oauth2_client = RbxOAuth2Client(rbx)
 
-        print(f"Saving the following creator ID: {rbx.get('creator')}")
+        print(f"Saving the following creator ID: {rbx.creator}")
 
         # --- Save Simple Properties ---
-        add_on_preferences.creator = rbx.get("creator") or ""
+        add_on_preferences.creator = rbx.creator or ""
         add_on_preferences.is_logged_in = rbx.is_logged_in
 
         print(f"Saving is_logged_in: {add_on_preferences.is_logged_in}")
@@ -137,17 +137,17 @@ def load_creator_details(window_manager, preferences):
     try:
         add_on_preferences = get_add_on_preferences(preferences)
 
-        # --- Load All Properties without triggering update callbacks ---
+        # --- Load All Properties ---
         print("Loading simple properties.")
-        rbx["creator"] = add_on_preferences.get("creator", "")
-        rbx["is_logged_in"] = add_on_preferences.get("is_logged_in", False)
+        stored_creator_id = add_on_preferences.creator
+        rbx.is_logged_in = add_on_preferences.is_logged_in
 
         print(
-            f"Loaded simple properties: rbx.creator='{rbx['creator']}', rbx.is_logged_in={rbx['is_logged_in']}")
+            f"Loaded simple properties: creator='{stored_creator_id}', rbx.is_logged_in={rbx.is_logged_in}")
 
 
         print("Loading creators list from preferences.")
-        creators_json = add_on_preferences.get("saved_creators_json")
+        creators_json = add_on_preferences.saved_creators_json
         rbx.creators.clear()
 
         user_id_from_list = None
@@ -173,23 +173,20 @@ def load_creator_details(window_manager, preferences):
             if user_name:
                 oauth2_client.name = user_name
 
-        # --- FIX: VALIDATE AND INITIALIZE THE CREATOR PROPERTY ---
-        # This is the crucial new block you correctly identified was needed.
-        # After rebuilding the creator list, we check if the loaded rbx.creator value is valid.
+        # --- VALIDATE AND SET THE CREATOR PROPERTY ---
+        # Set rbx.creator only after rbx.creators is populated so the enum value is valid.
         if rbx.is_logged_in:
-            current_creator_id = rbx.get("creator")
-            if current_creator_id not in creator_ids_from_list:
+            if stored_creator_id in creator_ids_from_list:
+                rbx.creator = stored_creator_id
+                print(f"Successfully validated and set creator ID: {stored_creator_id}")
+            else:
                 print(
-                    f"Loaded creator ID '{current_creator_id}' is invalid or not found. Resetting to default.")
-                # If the stored creator is no longer valid or is empty, default to the user's ID.
+                    f"Loaded creator ID '{stored_creator_id}' is invalid or not found. Resetting to default.")
                 if user_id_from_list:
                     rbx.creator = user_id_from_list
                     print(f"Default creator set to User ID: {rbx.creator}")
                 else:
                     print("Warning: Could not find a User ID to set as default.")
-            else:
-                print(
-                    f"Successfully validated loaded creator ID: {current_creator_id}")
 
         if rbx.is_logged_in:
             print("Roblox login session loaded and validated.")

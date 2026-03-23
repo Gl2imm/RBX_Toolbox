@@ -150,8 +150,12 @@ class RBX_OT_install_dependencies(Operator):
 
         if stdout:
             print(f"INSTALLATION OUTPUT:\n{stdout.decode()}")
-        if stderr:
-            print(f"DEPENDENCY INSTALLATION ERROR:\n{stderr.decode()}")
+
+        if process.returncode != 0:
+            raise RuntimeError(
+                f"pip install failed (exit code {process.returncode}).\n"
+                f"{stderr.decode().strip()}"
+            )
 
     @classmethod
     def poll(cls, context):

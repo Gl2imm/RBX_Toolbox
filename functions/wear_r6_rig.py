@@ -134,7 +134,7 @@ class BUTTON_WEAR(bpy.types.Operator):
             return file, error
         
         def prop_filename(name):
-            forb_chars = dict((ord(char), None) for char in '\/*?:"<>|')
+            forb_chars = dict((ord(char), None) for char in '/*?:"<>|')
             new_name = name.translate(forb_chars)  
             return new_name   
             

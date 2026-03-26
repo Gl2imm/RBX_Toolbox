@@ -2,6 +2,11 @@
                                                       Version History:
                                             ####################################
 
+v.7.3:
+    Blender 5.1 Compatibility
+    - Fixed login failing due to a cryptography module error on Blender 5.1.
+    - Fixed dependencies not installing or updating correctly on Blender 5.1. This was caused by Python and module version differences between older Blender versions and 5.1, combined with Blender holding dependency files as active processes which prevented them from being properly replaced during an update. The addon now handles all of this automatically.
+
 v.7.2:
     Bug Fixes
 	- Fixed Cages was not importing in v.7.1
@@ -9,7 +14,6 @@ v.7.2:
     - Fixed addon update via zip leaving old modules behind, causing the new version to not work. Addon now detects this and prompts a clean reinstall automatically.
 
     Blender 5.1 Compatibility
-    - Fixed addon failing to install dependencies on Blender 5.1 (Python 3.13).
     - Fixed login session not being remembered after Blender restart.
     - Fixed Terms of Use prompt appearing every time Blender is opened even after accepting it.
     - Fixed various errors on startup in Blender 5.1.

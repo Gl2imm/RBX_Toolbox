@@ -20,11 +20,34 @@
 
 import asyncio
 import sys
+import shutil
+import os
+import stat
 from pathlib import Path
 from .lib.oauth2_client import RbxOAuth2Client
 from .lib import oauth2_client
 # Get the directory path of the current script
 add_on_directory = Path(__file__).parent
+
+# Wipe dependencies_public if a pending-wipe marker exists from a previous session.
+# This runs before sys.path is updated so no files in the folder are imported yet,
+# meaning Windows file locks are not an issue.
+_pending_wipe = add_on_directory / "_pending_dep_wipe"
+if _pending_wipe.exists():
+    def _force_remove(func, path, _exc):
+        # Handle read-only files/dirs on Windows by making them writable first
+        try:
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+        except Exception:
+            pass
+    shutil.rmtree(str(add_on_directory / "dependencies_public"), onerror=_force_remove)
+    # Always remove the marker — even if some empty dirs remain, a fresh pip install
+    # will work correctly and won't be blocked by leftover empty folders.
+    try:
+        _pending_wipe.unlink()
+    except Exception:
+        pass
 
 # Append the dependencies directories to the path so we can access the bundled python modules
 # If dependencies_public doesn't exist yet, the user is prompted to install them before using the plugin

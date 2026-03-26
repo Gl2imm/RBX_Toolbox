@@ -34,6 +34,7 @@ import subprocess
 import os
 import ensurepip
 import shutil
+import hashlib
 from pathlib import Path
 import traceback
 import asyncio
@@ -44,8 +45,25 @@ project_root_dir = Path(__file__).parent.parent
 # Set the path to the dependencies_public directory
 dependencies_public_directory = project_root_dir / "dependencies_public"
 
-# File written inside the deps folder to record which addon version installed them
+_requirements_file = project_root_dir / "requirements.txt"
+
+# Files written inside the deps folder to detect staleness
 _VERSION_STAMP = dependencies_public_directory / "_installed_version"
+_REQUIREMENTS_STAMP = dependencies_public_directory / "_installed_requirements_hash"
+_PYTHON_STAMP = dependencies_public_directory / "_installed_python_version"
+
+# Marker written next to (not inside) the deps folder.
+# On Windows, loaded .pyd/.pyc files are locked and can't be deleted mid-session.
+# This marker tells the next startup to wipe the folder before anything is imported.
+_PENDING_WIPE = project_root_dir / "_pending_dep_wipe"
+
+
+def _mark_pending_wipe():
+    """Write the pending-wipe marker so the next startup cleans the deps folder."""
+    try:
+        _PENDING_WIPE.touch()
+    except OSError:
+        pass
 
 
 def _get_addon_version():
@@ -57,37 +75,77 @@ def _get_addon_version():
     return None
 
 
+def _get_requirements_hash():
+    """Returns the SHA256 hash of requirements.txt, or None if not found."""
+    try:
+        return hashlib.sha256(_requirements_file.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def _get_python_version():
+    """Returns the current Python version string, e.g. '3.11' or '3.13'."""
+    return f"{sys.version_info.major}.{sys.version_info.minor}"
+
+
+def needs_restart_before_install():
+    """Returns True if a restart is required to wipe the stale deps folder before installing."""
+    return _PENDING_WIPE.exists()
+
+
 def deps_are_current():
     """
-    Returns True only if dependencies are installed AND match the current addon version.
-    If the folder exists but is stale (missing stamp or wrong version), it is deleted
-    so the user is prompted to reinstall.
+    Returns True only if dependencies are installed, match the current addon version,
+    were installed from the current requirements.txt, AND were built for the current
+    Python version. If stale, writes a pending-wipe marker so the next startup can
+    safely delete the folder before anything is imported (avoiding Windows file locks).
     """
     if not dependencies_public_directory.exists():
         return False
 
     version = _get_addon_version()
+    req_hash = _get_requirements_hash()
+    py_version = _get_python_version()
 
     # No version info available — fall back to existence check
     if version is None:
         return True
 
-    if not _VERSION_STAMP.exists():
-        print(
-            f"[RBX Toolbox] Dependency version stamp missing — "
-            f"clearing stale deps folder for clean reinstall."
+    stamps_exist = (
+        _VERSION_STAMP.exists()
+        and _REQUIREMENTS_STAMP.exists()
+        and _PYTHON_STAMP.exists()
+    )
+    if not stamps_exist:
+        # Check if the folder has real package content or is just leftover empty dirs.
+        # If empty (post-wipe), show the Install button directly — no restart needed.
+        has_packages = any(
+            p for p in dependencies_public_directory.iterdir()
+            if p.is_dir() and not p.name.startswith("_") and not p.name.endswith(".dist-info")
         )
-        shutil.rmtree(str(dependencies_public_directory), ignore_errors=True)
+        if has_packages:
+            print("[RBX Toolbox] Stale dependencies detected — restart required for clean reinstall.")
+            _mark_pending_wipe()
+        else:
+            print("[RBX Toolbox] Dependency folder is empty — ready to install.")
         return False
 
-    installed = _VERSION_STAMP.read_text(encoding="utf-8").strip()
-    if installed != version:
+    installed_version = _VERSION_STAMP.read_text(encoding="utf-8").strip()
+    installed_req_hash = _REQUIREMENTS_STAMP.read_text(encoding="utf-8").strip()
+    installed_py = _PYTHON_STAMP.read_text(encoding="utf-8").strip()
+
+    stale = (
+        installed_version != version
+        or (req_hash and installed_req_hash != req_hash)
+        or installed_py != py_version
+    )
+    if stale:
         print(
-            f"[RBX Toolbox] Dependency version mismatch "
-            f"(installed: {installed}, current: {version}) — "
-            f"clearing deps folder for clean reinstall."
+            f"[RBX Toolbox] Dependencies outdated "
+            f"(addon: {installed_version}->{version}, "
+            f"python: {installed_py}->{py_version}) — restart required for clean reinstall."
         )
-        shutil.rmtree(str(dependencies_public_directory), ignore_errors=True)
+        _mark_pending_wipe()
         return False
 
     return True
@@ -109,10 +167,15 @@ class RBX_OT_install_dependencies(Operator):
             try:
                 rbx.is_installing_dependencies = False
                 task.result()
-                # Stamp the installed version so future update checks can detect staleness
+                # Stamp version, requirements hash, and Python version for future staleness checks
                 version = _get_addon_version()
                 if version:
                     _VERSION_STAMP.write_text(version, encoding="utf-8")
+                req_hash = _get_requirements_hash()
+                if req_hash:
+                    _REQUIREMENTS_STAMP.write_text(req_hash, encoding="utf-8")
+                _PYTHON_STAMP.write_text(_get_python_version(), encoding="utf-8")
+                _PENDING_WIPE.unlink(missing_ok=True)
                 rbx.is_finished_installing_dependencies = True
                 rbx.needs_restart = True
             except Exception as exception:
@@ -124,6 +187,8 @@ class RBX_OT_install_dependencies(Operator):
         return {"FINISHED"}
 
     async def install_dependencies(self):
+        if dependencies_public_directory.exists():
+            shutil.rmtree(str(dependencies_public_directory), ignore_errors=True)
         dependencies_public_directory.mkdir(exist_ok=True)
 
         try:

@@ -19,7 +19,7 @@ import traceback
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (7, 3, 0),
+    "version": (7, 4, 0),
     "blender": (3, 6, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -48,7 +48,6 @@ all_modules_names = [
     "oauth",
     "functions.url_handler",
     "functions.hdri_sky",
-    "functions.rbx_import",
     "functions.ugc_bounds",
     "functions.cam_staging",
     "functions.dmy_buttons",
@@ -85,7 +84,6 @@ from .functions.url_handler import URL_HANDLER
 from .update import RBX_INSTALL_UPDATE
 from .update_aepbr import RBX_UPDATE_AEPBR
 from .functions.ugc_bounds import BUTTON_BNDS
-from .functions.rbx_import import OBJECT_OT_add_object
 from .functions.hdri_sky import RBX_BUTTON_HDRI
 from .functions.cam_staging import BUTTON_CMR
 from .functions.dmy_buttons import BUTTON_DMMY
@@ -123,7 +121,6 @@ classes = (
     RBX_UPDATE_AEPBR,
     BUTTON_BNDS,
     RBX_BUTTON_HDRI,
-    OBJECT_OT_add_object,
     RBX_OT_import_discovery,
     RBX_OT_import_reset,
     RBX_OT_import_discovery_download,

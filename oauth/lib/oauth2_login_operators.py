@@ -149,6 +149,9 @@ class RBX_OT_oauth2_logout(Operator):
                 task.result()
             except Exception as exception:
                 traceback.print_exception(exception)
+            finally:
+                from . import user_thumbnail
+                user_thumbnail.clear()
 
         from . import event_loop
         from .oauth2_client import RbxOAuth2Client

@@ -29,6 +29,40 @@ if "bpy" in locals():
 
 import bpy
 import ssl
+import socket
+
+
+def _make_fallback_resolver():
+    """
+    Returns a custom resolver for aiohttp 3.10+ that retries with IPv4-only on DNS failure.
+
+    aiohttp 3.10+ changed the default resolver to use socket.getaddrinfo() inside a
+    thread pool. On some Windows machines this thread-pool DNS call fails even though
+    the system DNS works fine. Retrying with AF_INET (IPv4 only) works around the issue.
+    Returns None on older aiohttp so the default connector behaviour is unchanged.
+    """
+    try:
+        import aiohttp.abc
+        from aiohttp.resolver import ThreadedResolver
+
+        class _FallbackResolver(aiohttp.abc.AbstractResolver):
+            def __init__(self):
+                self._inner = ThreadedResolver()
+
+            async def resolve(self, host, port=0, family=socket.AF_UNSPEC):
+                try:
+                    return await self._inner.resolve(host, port, family)
+                except OSError:
+                    # Retry IPv4-only — fixes thread-pool DNS failure on some Windows machines
+                    return await self._inner.resolve(host, port, socket.AF_INET)
+
+            async def close(self):
+                await self._inner.close()
+
+        return _FallbackResolver()
+    except (ImportError, AttributeError):
+        # aiohttp < 3.10 — ThreadedResolver doesn't exist, default behaviour is fine
+        return None
 
 
 def create_http_client():
@@ -37,6 +71,7 @@ def create_http_client():
     import aiohttp
 
     ssl_context = ssl.create_default_context(cafile=certifi.where())
-    connector = aiohttp.TCPConnector(ssl=ssl_context)
+    resolver = _make_fallback_resolver()
+    connector = aiohttp.TCPConnector(ssl=ssl_context, **({'resolver': resolver} if resolver else {}))
 
     return aiohttp.ClientSession(connector=connector)

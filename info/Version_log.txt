@@ -2,6 +2,17 @@
                                                       Version History:
                                             ####################################
 
+v.7.4:
+    Fixes
+    - Fixed DNS connectivity issues introduced in v7.3 caused by the updated aiohttp module failing on some systems.
+
+    Changes
+    - Removed legacy Roblox Import tab. The 3D Preview Thumbnail API it relied on has been restricted by Roblox, making the feature non-functional. Use the Import (Beta) tab instead.
+    - Avatar import may return in a future update, but requires a new approach due to the removed workflow.
+
+    Improvements
+    - Added avatar profile image to the login box.
+
 v.7.3:
     Blender 5.1 Compatibility
     - Fixed login failing due to a cryptography module error on Blender 5.1.

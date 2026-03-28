@@ -196,7 +196,18 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     box.row().operator(oauth2_login_operators.RBX_OT_oauth2_cancel_login.bl_idname)
             else:
                 # Logged In State: Creator Section
-                #creator_section_box = layout.box()
+
+                # Avatar thumbnail — schedule fetch once, display when ready
+                try:
+                    from oauth.lib import user_thumbnail
+                    _uid = glob_vars.get_login_info().get("user_id")
+                    if _uid:
+                        user_thumbnail.schedule_fetch(_uid)
+                    _icon_id = user_thumbnail.get_icon_id()
+                    if _icon_id:
+                        box.template_icon(_icon_id, scale=3.0)
+                except Exception:
+                    pass
 
                 top_row_creator = box.row(align=True)
                 try:
@@ -357,144 +368,6 @@ class TOOLBOX_MENU(bpy.types.Panel):
             box = layout.box()
             box.operator('object.button_cmr', text = "Add Roblox Baseplate", icon='IMPORT').cmr = 'bsplt_append' 
 
-
-
-
-
-        ######### Import Characters and Accessories #########
-        if rbx.is_logged_in:
-            row = layout.row()
-            icon = 'DOWNARROW_HLT' if context.scene.subpanel_imp_char else 'RIGHTARROW'
-            row.prop(context.scene, 'subpanel_imp_char', icon=icon, icon_only=True)
-            row.label(text='Import From Roblox', icon='IMPORT')
-            # some data on the subpanel
-            if context.scene.subpanel_imp_char:
-                box = layout.box()
-                box.label(text = 'Enter ID, URL or Username')
-                box.prop(rbx_prefs, 'rbx_username_entered', text ='')
-                box.operator('object.add_character', text = "Preview").rbx_char = "preview_avatar"
-                box.prop(rbx_prefs, 'rbx_split', text ='Separate Accessories')
-                split = box.split(factor = 0.5)
-                col = split.column(align = True)            
-                col.operator('object.add_character', text = "Import").rbx_char = "import"
-                split.operator('object.add_character', text = "Open Folder").rbx_char = "folder_character"
-                rbx_cur_usr = glob_vars.get_login_info()["user_name"]
-                box.operator('object.add_character', text = f"Import My avatar ({rbx_cur_usr})", icon = 'TRACKING_REFINE_BACKWARDS').rbx_char = "my_avatar"
-                
-                 
-
-                ### Set preview
-                try:
-                    rbx_avat_img_prev = bpy.data.images[glob_vars.rbx_user_name_clean + '.png']
-                except:
-                    box.separator()
-                    box.separator()
-                    box.separator()
-                    box.label(text = '')
-                    box.label(text = '')
-                    box.label(text = '')
-                    box.label(text = '')
-                    box.label(text = '')
-                    box.label(text = '')
-                else:
-                    rbx_avat_img_prev.preview_ensure()
-                    box.template_icon(rbx_avat_img_prev.preview.icon_id, scale=10.0)
-
-
-                if glob_vars.rbx_char_error:
-                    box.label(text = glob_vars.rbx_char_error, icon='ERROR')
-                    try:
-                        rbx_asset_img_prev = bpy.data.images[glob_vars.rbx_user_name_clean + '.png']
-                    except:
-                        pass 
-
-
-
-                ######### Import Accessory #########    
-                box = layout.box()
-                box.label(text = 'Accessory ID or URL')
-                box.prop(rbx_prefs, 'rbx_accessory_entered', text ='')
-                box.operator('object.add_character', text = "Check Item (must)").rbx_char = "preview_accessory"  
-                if glob_vars.rbx_supported_type_category == "Layered Cloth" or glob_vars.rbx_supported_type_category == "Shoes":
-                    box.prop(rbx_prefs, 'rbx_incl_cages', text =' Include Cages in Import (take longer)')    
-                split = box.split(factor = 0.5)
-                col = split.column(align = True) 
-                col.enabled = glob_vars.rbx_supported_type          
-                col.operator('object.add_character', text = "Import").rbx_char = "import_accessory"
-                split.operator('object.add_character', text = "Open Folder").rbx_char = "folder_accessory"
-
-                '''# --- Top conditional row: Include Cages checkbox ---
-                if glob_vars.rbx_supported_type_category == "Layered Cloth":
-                    box.prop(rbx_prefs, 'rbx_incl_cages', text=' Include Cages in Import')
-                # --- Second row: Check + Import buttons ---
-                split = box.split(factor=0.5)
-                col_left = split.column(align=True)
-                col_left.operator('object.add_character', text="Check Item").rbx_char = "preview_accessory"
-                col_right = split.column(align=True)
-                col_right.enabled = glob_vars.rbx_supported_type
-                col_right.operator('object.add_character', text="Import").rbx_char = "import_accessory"
-                # --- Third row: empty left, Open Folder button on right ---
-                split = box.split(factor=0.5)
-                col_left = split.column(align=True)
-                col_right = split.column(align=True)
-                col_right.operator('object.add_character', text="Open Folder").rbx_char = "folder_accessory"'''
-
-                try:
-                    rbx_asset_img_prev = bpy.data.images[glob_vars.rbx_asset_name_clean + '.png']
-                except:
-                    box.separator()
-                    box.separator()
-                    box.separator()
-                    box.label(text = '')
-                    box.label(text = '')
-                    box.label(text = '')
-                    box.label(text = '')
-                    box.label(text = '')
-                    box.label(text = '')
-                else:
-                    rbx_asset_img_prev.preview_ensure()
-                    box.template_icon(rbx_asset_img_prev.preview.icon_id, scale=10.0)
-                
-
-                box.label(text = f'Name: {glob_vars.rbx_asset_name if glob_vars.rbx_asset_name else ""}')
-                box.label(text = f'Creator: {glob_vars.rbx_asset_creator if glob_vars.rbx_asset_creator else ""}')
-                box.label(text = f'Type: {glob_vars.rbx_asset_type if glob_vars.rbx_asset_type else ""}')
-                box.label(text = f'Import: {"Supported" if glob_vars.rbx_supported_type else "Not Supported"}')
-
-                        
-                if glob_vars.rbx_asset_error:
-                    box.label(text = glob_vars.rbx_asset_error, icon='ERROR')
-                    try:
-                        rbx_asset_img_prev = bpy.data.images[glob_vars.rbx_asset_name_clean + '.png']
-                    except:
-                        pass 
-                
-                box = layout.box()
-                row = box.row()
-                icon = 'DISCLOSURE_TRI_DOWN' if context.scene.subpanel_supported else 'DISCLOSURE_TRI_RIGHT'
-                row.prop(context.scene, 'subpanel_supported', icon=icon, icon_only=True)
-                row.label(text='Supported Accessories:', icon='CHECKMARK')
-                # some data on the subpanel
-                if context.scene.subpanel_supported:
-                    row = box.row()
-                    #row.label(text='', icon='BLANK1')  # Small indent
-                    row.label(text='Avatar Accessories', icon='DOT')
-                    row = box.row()
-                    row.label(text='Layered Clothing', icon='DOT')
-                    row = box.row()
-                    row.label(text='Cages', icon='DOT')
-                    row = box.row()
-                    row.label(text='Gears', icon='DOT')
-                    row = box.row()
-                    row.label(text='Bundle Items:', icon='PACKAGE')
-                    row = box.row()
-                    row.label(text='Characters', icon='DOT')
-                    row = box.row()
-                    row.label(text='Body Parts (import whole bundle)', icon='DOT') 
-                    row = box.row()
-                    row.label(text='Dynamic Heads', icon='DOT') 
-                    row = box.row()
-                    row.label(text='Shoes', icon='DOT') 
 
 
 

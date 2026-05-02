@@ -2,6 +2,27 @@
                                                       Version History:
                                             ####################################
 
+v.7.5:
+    New Feature: Animation Upload
+    - You can now upload animations directly to Roblox from the Upload to Roblox tab.
+    - New upload mode selector: switch between Mesh and Animation upload.
+    - Set a custom name and description for the animation before uploading.
+    - Option to upload as a new or update an existing one (does not work for animations).
+
+    New Feature: Check Emote
+    - New "Check Emote" button in the animation upload section.
+    - Scans your animation for speed violations and lists any bones that will likely exceed Roblox's 30 studs/s limit.
+    - Shows the frame number and estimated speed for each violation.
+
+    New Feature: Safe Zone Sphere
+    - New "Show Safe Zone" checkbox in the animation upload section.
+    - Spawns a 5-stud wireframe sphere centered on the HumanoidRootPart bone.
+    - Anything falls outside of this sphere will fail Roblox validation
+
+    Fixes
+    - Fixed Emote animations (asset type 61) not importing from the Import tab.
+    - Fixed the addon panel crashing if the OAuth module failed to load on startup.
+
 v.7.4:
     Fixes
     - Fixed DNS connectivity issues introduced in v7.3 caused by the updated aiohttp module failing on some systems.

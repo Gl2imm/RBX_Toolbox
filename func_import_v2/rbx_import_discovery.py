@@ -70,7 +70,12 @@ class RBX_OT_import_discovery(bpy.types.Operator):
             asyncio.set_event_loop(loop)
 
         # We might need token for some operations, keeping it consistent with other importers
-        access_token = loop.run_until_complete(func_rbx_other.renew_token(context))
+        try:
+            access_token = loop.run_until_complete(func_rbx_other.renew_token(context))
+        except Exception as _auth_exc:
+            context.scene.rbx_prefs.rbx_import_beta_active = False
+            self.report({'ERROR'}, str(_auth_exc))
+            return {'CANCELLED'}
         headers = {
             "Authorization": f"Bearer {access_token}"
         }
@@ -150,11 +155,13 @@ class RBX_OT_import_discovery(bpy.types.Operator):
                                 # do NOT show the Animation UI. Only show Animations if it is explicitly an Animation Bundle (Type 2)
                                 # or if it's a standalone Animation asset.
                                 if category == "Animations":
-                                    # Bundle Type 2 is 'Bundle - Animations'. 
-                                    # Asset Type 24 is Animation. 
-                                    # Bundle type 1 is 'Body Parts', 3 is 'Shoe', etc.
-                                    # If the top level search was for a bundle but NOT an animation bundle, skip getting its animations.
-                                    if rbx_asset_type_id is not None and rbx_asset_type_id != 2 and rbx_asset_type_id != "Animation":
+                                    # Skip animations that are embedded in non-animation bundles (e.g. character bundles contain
+                                    # default walk/run animations we don't want to surface). But always include them when the
+                                    # top-level request is itself an animation asset or an animation bundle (type 2).
+                                    anim_types = glob_vars.supported_assets_v2.get("Animations", [])
+                                    is_top_anim = rbx_asset_type_id in anim_types
+                                    is_anim_bundle = rbx_asset_type_id == 2
+                                    if not is_top_anim and not is_anim_bundle:
                                         break # Skip adding to Animations category
                                 
                                 glob_vars.discovered_items_data[category].append({

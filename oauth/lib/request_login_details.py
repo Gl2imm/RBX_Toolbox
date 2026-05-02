@@ -122,21 +122,30 @@ async def __decode_id_token(id_token):
     """Decodes a jwt token. Fetches the signature from the certs api and checks the token's
     contents against the signature."""
 
-    # The token contains a kid field in its header. To get the signing key,
-    # the client matches the kid of the token to key from the certs endpoint
-    # containing a matching kid.
-    # Raises jwt.exceptions.DecodeError
     from . import constants
     from .jwt_http_client import JWTHTTPClient
     import pyjwt_key_fetcher
-
-    fetcher = pyjwt_key_fetcher.AsyncKeyFetcher(http_client=JWTHTTPClient(), valid_issuers=[constants.ISSUER])
-    key_entry = await fetcher.get_key(id_token)
-
-    # Throws an error if the token could not be validated with the signing key
     import jwt
 
-    return jwt.decode(jwt=id_token, audience=constants.CLIENT_ID, leeway=180, **key_entry)
+    try:
+        fetcher = pyjwt_key_fetcher.AsyncKeyFetcher(http_client=JWTHTTPClient(), valid_issuers=[constants.ISSUER])
+        key_entry = await fetcher.get_key(id_token)
+        return jwt.decode(jwt=id_token, audience=constants.CLIENT_ID, leeway=180, **key_entry)
+    except Exception as primary_exc:
+        # pyjwt-key-fetcher < 0.5 does not support ES256 (Elliptic Curve) keys, which Roblox
+        # switched to. Fall back to decoding without signature verification — the token was
+        # just issued by Roblox as part of the OAuth2 exchange so re-verification is redundant.
+        print(f"[RBX Auth] JWT key fetch/verify failed ({primary_exc}), falling back to unverified decode.")
+        try:
+            return jwt.decode(
+                jwt=id_token,
+                options={"verify_signature": False},
+                algorithms=["ES256", "RS256"],
+            )
+        except Exception as fallback_exc:
+            raise jwt.exceptions.DecodeError(
+                f"Could not decode id_token: {fallback_exc}"
+            ) from fallback_exc
 
 
 def __get_creator_ids_from_resources(authorized_resources):

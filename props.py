@@ -741,6 +741,48 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
         ) # type: ignore
 
 
+    ### Upload Options ###
+    rbx_upload_as_new: bpy.props.BoolProperty(
+        name="Upload as New",
+        description="Always create a new asset instead of updating the existing one (ignores stored Package ID)",
+        default=False,
+    ) # type: ignore
+
+    rbx_upload_anim_as_new: bpy.props.BoolProperty(
+        name="Upload as New",
+        description="Always create a new asset instead of updating the existing one (ignores stored Animation ID)",
+        default=True,
+    ) # type: ignore
+
+
+    ### Upload Mode ###
+    rbx_upload_mode: bpy.props.EnumProperty(
+        name="Upload Mode",
+        description="Select what to upload",
+        default='MESH',
+        items=[
+            ('MESH', "Upload Meshes", "Upload selected mesh objects to Roblox"),
+            ('ANIMATION', "Upload Animation", "Upload animation from selected armature to Roblox"),
+        ]
+    ) # type: ignore
+
+
+    ### Upload Animation Fields ###
+    rbx_upload_anim_name: bpy.props.StringProperty(
+        name="Animation Name",
+        description="Name for the uploaded animation (leave empty to use action name)",
+        default="",
+        maxlen=100,
+    ) # type: ignore
+
+    rbx_upload_anim_desc: bpy.props.StringProperty(
+        name="Description",
+        description="Description for the uploaded animation (optional)",
+        default="",
+        maxlen=250,
+    ) # type: ignore
+
+
     ### Import Beta (Discovery) ###
     rbx_import_beta_active : bpy.props.BoolProperty(
     name="Import Beta Active",

@@ -22,6 +22,7 @@
 
 DEFAULT_EXPORT_SCALE = 0.01  # Blender Meters are 100:1 to Studio Studs
 RBX_PACKAGE_ID_PROPERTY_NAME = "Roblox Package ID"
+RBX_ANIMATION_ID_PROPERTY_NAME = "Roblox Animation ID"
 ASSET_DESCRIPTION = "Uploaded from RBX Toolbox"
 ERROR_MESSAGES = {
     "UPLOAD_TIMED_OUT": "Upload Timed Out",

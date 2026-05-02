@@ -68,6 +68,10 @@ if "bpy" in locals():
         importlib.reload(oauth2_login_operators) # type: ignore
     if "RBX_OT_upload" in locals():
         importlib.reload(RBX_OT_upload) # type: ignore
+    if "RBX_OT_upload_animation" in locals():
+        importlib.reload(RBX_OT_upload_animation) # type: ignore
+    if "RBX_OT_check_animation_emote" in locals():
+        importlib.reload(RBX_OT_check_animation_emote) # type: ignore
     if "RbxOAuth2Client" in locals():
         importlib.reload(oauth2_client)
     if "get_selected_objects" in locals():
@@ -121,6 +125,8 @@ def get_classes():
     )
     from .lib.install_dependencies import RBX_OT_install_dependencies
     from .lib.upload_operator import RBX_OT_upload
+    from .lib.upload_animation_operator import RBX_OT_upload_animation, RBX_OT_copy_to_clipboard
+    from .lib.check_animation_operator import RBX_OT_check_animation_emote
 
     return (
         event_loop.RBX_OT_event_loop,
@@ -130,6 +136,9 @@ def get_classes():
         oauth2_login_operators.RBX_OT_oauth2_cancel_login,
         oauth2_login_operators.RBX_OT_oauth2_logout,
         RBX_OT_upload,
+        RBX_OT_upload_animation,
+        RBX_OT_copy_to_clipboard,
+        RBX_OT_check_animation_emote,
         roblox_properties.RbxStatusProperties,
         roblox_properties.RbxProperties,
 

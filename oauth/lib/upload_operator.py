@@ -121,11 +121,17 @@ class RBX_OT_upload(Operator):
         rbx = context.window_manager.rbx
         rbx.num_objects_uploading = len(selected_objects)
 
+        import RBX_Toolbox.glob_vars as glob_vars
+        glob_vars.rbx_last_mesh_upload_url = None
+        glob_vars.rbx_last_mesh_upload_id = None
+
         # Because we are starting a new upload operation, we need to clear out the statuses of the
         # previous one from the UI
         from . import status_indicators
 
         status_indicators.clear_statuses(context.window_manager)
+
+        force_new = context.scene.rbx_prefs.rbx_upload_as_new
 
         for selected_object in selected_objects:
             self.upload(
@@ -135,12 +141,13 @@ class RBX_OT_upload(Operator):
                 context.view_layer,
                 context.preferences,
                 selected_object,
+                force_new=force_new,
             )
 
         return {"FINISHED"}
 
     @classmethod
-    def upload(cls, window_manager, area, scene, view_layer, preferences, target_object):
+    def upload(cls, window_manager, area, scene, view_layer, preferences, target_object, force_new=False):
         """Exports the given object to a FBX file, and uploads it to Roblox"""
 
         # FBX exporting occurs on the main thread so we are not scheduling it to be run
@@ -168,7 +175,7 @@ class RBX_OT_upload(Operator):
             # Because this method is running on the main thread, we need to execute the upload process in a separate coroutine
             from .str_to_int import str_to_int
 
-            package_id = str_to_int(target_object.get(constants.RBX_PACKAGE_ID_PROPERTY_NAME))
+            package_id = NO_ASSET_ID if force_new else str_to_int(target_object.get(constants.RBX_PACKAGE_ID_PROPERTY_NAME))
 
             coroutine = cls.upload_task(window_manager, area, target_object, exported_file_path, package_id)
 
@@ -264,6 +271,10 @@ class RBX_OT_upload(Operator):
                     f"Uploaded version {operation.response.revision_id}",
                     "CHECKMARK",
                 )
+
+                import RBX_Toolbox.glob_vars as glob_vars
+                glob_vars.rbx_last_mesh_upload_url = f"https://www.roblox.com/library/{operation.response.asset_id}"
+                glob_vars.rbx_last_mesh_upload_id = str(operation.response.asset_id)
             else:  # No error, no response, but is done. We don't expect this to happen
                 status_indicators.set_status(
                     window_manager, area, target_object, constants.ERROR_MESSAGES["INVALID_RESPONSE"], "ERROR"

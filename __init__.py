@@ -19,8 +19,8 @@ import traceback
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (7, 4, 0),
-    "blender": (3, 6, 0),
+    "version": (7, 5, 0),
+    "blender": (4, 1, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
     "warning": "Subscribe to NYTV :)",
@@ -195,6 +195,13 @@ def register():
         subtype='PERCENTAGE',
         update=_update_frame_scrub
     )
+    from .oauth.lib.check_animation_operator import _update_safe_zone
+    Scene.rbx_show_safe_zone = bpy.props.BoolProperty(
+        name="Show Safe Zone",
+        description="Show or hide the 5-stud safe zone sphere (follows HumanoidRootPart)",
+        default=False,
+        update=_update_safe_zone,
+    )
     Scene.subpanel_ava = BoolProperty(default=False)
     Scene.subpanel_cams = BoolProperty(default=False)
     Scene.subpanel_bn = BoolProperty(default=False)
@@ -235,6 +242,7 @@ def unregister():
     del Scene.subpanel_lc
     del Scene.rbx_lc_anim_armature
     del Scene.rbx_lc_anim_scrub
+    del Scene.rbx_show_safe_zone
     del Scene.subpanel_ava
     del Scene.subpanel_cams
     del Scene.subpanel_bn

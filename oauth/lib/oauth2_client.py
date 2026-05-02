@@ -268,7 +268,23 @@ class RbxOAuth2Client:
         if (not self.rbx.is_logged_in) or RbxOAuth2Client.token_data.get("refresh_after") < time():
             # Raises ClientResponseError, ClientError, or JSONDecodeError
             async with self.__set_is_processing_login():
-                new_token_data = await self.__refresh_tokens(refresh_token)
+                try:
+                    new_token_data = await self.__refresh_tokens(refresh_token)
+                except Exception as exc:
+                    import aiohttp
+                    if isinstance(exc, aiohttp.ClientResponseError) and exc.status == 400:
+                        # Token revoked or invalidated by Roblox — force a clean logout so the
+                        # user sees the login button again instead of an unhandled HTTP error.
+                        RbxOAuth2Client.token_data = {}
+                        self.rbx.is_logged_in = False
+                        from . import creator_details
+                        creator_details.save_creator_details(
+                            bpy.context.window_manager, bpy.context.preferences)
+                        print(f"[RBX Auth] Token revoked/invalid ({exc.message}). Logged out.")
+                        raise NotLoggedInError(
+                            f"Session expired: {exc.message}. Please log in again."
+                        ) from exc
+                    raise
 
                 # Raises ClientResponseError, ClientError, JSONDecodeError, AttributeError, ValueError, or jwt.exceptions.DecodeError
                 from .request_login_details import request_login_details

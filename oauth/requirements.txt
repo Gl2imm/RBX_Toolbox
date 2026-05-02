@@ -8,5 +8,5 @@ aiohttp >= 3.10.0
 aiolimiter ~= 1.0.0
 pyjwt[crypto] ~= 2.6.0
 cryptography >= 42.0.0
-pyjwt-key-fetcher ~= 0.4.0
+pyjwt-key-fetcher >= 0.4.0
 

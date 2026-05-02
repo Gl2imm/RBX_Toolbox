@@ -160,6 +160,11 @@ rbx_spawn_tracker = []
 
 
 
+rbx_last_anim_upload_url = None
+rbx_last_anim_upload_id = None
+rbx_last_mesh_upload_url = None
+rbx_last_mesh_upload_id = None
+
 bn_selection = None
 bn_error = None
 msh_selection = None

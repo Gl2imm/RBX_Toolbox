@@ -144,7 +144,10 @@ class TOOLBOX_MENU(bpy.types.Panel):
         row = layout.row()
         row.label(text = "Roblox Authorization", icon= "USER")
         box = layout.box()
-        rbx = context.window_manager.rbx
+        rbx = getattr(context.window_manager, 'rbx', None)
+        if rbx is None:
+            box.row().label(text="OAuth module failed to load. Check Blender console for errors.", icon="ERROR")
+            return
         rbx_installed_dependencies = False
 
         # 2. Dependency Installation
@@ -1302,29 +1305,80 @@ class TOOLBOX_MENU(bpy.types.Panel):
             icon = 'DOWNARROW_HLT' if context.scene.subpanel_upload else 'RIGHTARROW'
             row.prop(context.scene, 'subpanel_upload', icon=icon, icon_only=True)
             row.label(text='Upload to Roblox', icon='COLLAPSEMENU')
-            # some data on the subpanel
             if context.scene.subpanel_upload:
+                from oauth.lib.upload_operator import RBX_OT_upload  # Local import
+                from oauth.lib.upload_animation_operator import RBX_OT_upload_animation  # Local import
+                from oauth.lib import status_indicators  # Local import
+                from RBX_Toolbox import glob_vars as _gv
+
                 upload_section_box = layout.box()
-                upload_section_box.prop(rbx, "creator")  # Creator dropdown
-                # Logged In State & Not Processing Login/Logout: Upload Section
-                if not rbx.is_processing_login_or_logout:
-                    from oauth.lib.upload_operator import RBX_OT_upload  # Local import
-                    upload_section_box.row().operator(RBX_OT_upload.bl_idname)
-                else:
+                upload_section_box.prop(rbx, "creator")
+                upload_section_box.prop(rbx_prefs, "rbx_upload_mode", text="")
+                upload_section_box.separator()
+
+                if rbx.is_processing_login_or_logout:
                     upload_section_box.label(text="Refreshing Login. Please wait", icon='ERROR')
 
-                from oauth.lib.get_selected_objects import get_selected_objects  # Local import
-                selected_text = ", ".join(
-                    obj.name for obj in get_selected_objects(context))
-                if selected_text:
-                    upload_section_box.row().label(text="Selected Objects:", icon="RESTRICT_SELECT_OFF")
-                    selected_objects_display_box = upload_section_box.box()  # Sub-box for the list
-                    selected_objects_display_box.label(text=selected_text)
+                elif rbx_prefs.rbx_upload_mode == 'MESH':
+                    upload_section_box.prop(rbx_prefs, "rbx_upload_as_new")
+                    upload_section_box.row().operator(RBX_OT_upload.bl_idname)
 
-                from oauth.lib import status_indicators  # Local import
-                # Pass the layout of the upload_section_box for drawing statuses
-                status_indicators.draw_statuses(
-                    context.window_manager, upload_section_box)
+                    from oauth.lib.get_selected_objects import get_selected_objects  # Local import
+                    selected_text = ", ".join(obj.name for obj in get_selected_objects(context))
+                    if selected_text:
+                        upload_section_box.row().label(text="Selected Objects:", icon="RESTRICT_SELECT_OFF")
+                        upload_section_box.box().label(text=selected_text)
+
+                    status_indicators.draw_statuses(context.window_manager, upload_section_box)
+
+                    if _gv.rbx_last_mesh_upload_url:
+                        upload_section_box.separator()
+                        link_op = upload_section_box.operator("wm.url_open", text="View on Roblox", icon='URL')
+                        link_op.url = _gv.rbx_last_mesh_upload_url
+                        copy_op = upload_section_box.operator("rbx.copy_to_clipboard", text="Copy ID to Clipboard", icon='COPYDOWN')
+                        copy_op.text = _gv.rbx_last_mesh_upload_id or ""
+
+                else:  # ANIMATION
+                    selected = context.selected_objects
+                    is_armature_selected = len(selected) == 1 and selected[0].type == "ARMATURE"
+
+                    upload_section_box.prop(rbx_prefs, "rbx_upload_anim_as_new")
+                    upload_section_box.prop(rbx_prefs, "rbx_upload_anim_name", text="Name")
+                    if not rbx_prefs.rbx_upload_anim_name and is_armature_selected:
+                        arm = selected[0]
+                        if arm.animation_data and arm.animation_data.action:
+                            upload_section_box.label(text=f"Will use: {arm.animation_data.action.name}", icon='ACTION')
+                    upload_section_box.prop(rbx_prefs, "rbx_upload_anim_desc", text="Description (optional)")
+
+
+                    safe_zone_row = upload_section_box.row()
+                    safe_zone_row.enabled = is_armature_selected
+                    safe_zone_row.prop(scene, "rbx_show_safe_zone", text="Show Safe Zone")
+
+                    
+                    check_row = upload_section_box.row()
+                    has_action = is_armature_selected and bool(
+                        selected[0].animation_data and selected[0].animation_data.action
+                    )
+                    check_row.enabled = has_action
+                    check_row.operator("rbx.check_animation_emote", icon='DRIVER_DISTANCE')
+
+                
+                    anim_row = upload_section_box.row()
+                    anim_row.enabled = is_armature_selected and rbx.num_objects_uploading == 0
+                    anim_row.operator(RBX_OT_upload_animation.bl_idname)
+
+                    if not is_armature_selected:
+                        upload_section_box.label(text="Select an armature to upload animation", icon='INFO')
+
+                    status_indicators.draw_statuses(context.window_manager, upload_section_box)
+
+                    if _gv.rbx_last_anim_upload_url:
+                        upload_section_box.separator()
+                        link_op = upload_section_box.operator("wm.url_open", text="View on Roblox", icon='URL')
+                        link_op.url = _gv.rbx_last_anim_upload_url
+                        copy_op = upload_section_box.operator("rbx.copy_to_clipboard", text="Copy ID to Clipboard", icon='COPYDOWN')
+                        copy_op.text = _gv.rbx_last_anim_upload_id or ""
 
                         
 

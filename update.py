@@ -165,12 +165,14 @@ class RBX_INSTALL_UPDATE(bpy.types.Operator):
 
         try:
             print("Simulate installing")
+            # Folders to preserve across updates (user-generated caches / downloads)
+            preserved_dirs = {"rig_aepbr", glob_vars.rbx_import_main_folder}
             #Delete old add-on files (except update.zip)
             for filename in os.listdir(addon_path):
                 file_path = os.path.join(addon_path, filename)
                 if os.path.isfile(file_path) and filename != "update.zip":
                     os.remove(file_path)
-                elif os.path.isdir(file_path) and filename != "rig_aepbr":
+                elif os.path.isdir(file_path) and filename not in preserved_dirs:
                     shutil.rmtree(file_path)
 
             # Extract ZIP

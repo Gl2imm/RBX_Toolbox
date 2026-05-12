@@ -86,16 +86,17 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
 
         if acc_mesh_part:
              # User Request: "the item added to blender should have same name as it shown in discovery, not handle."
-             mesh_parts_to_process.append((acc_mesh_part, asset_name))
+             # Use sanitized name — raw asset_name may contain filesystem-restricted chars (e.g. '/') that break OBJ/texture writes.
+             mesh_parts_to_process.append((acc_mesh_part, asset_clean_name))
         else:
              part_obj = acc_obj.FindFirstChild("Handle")
              if not part_obj:
                   part_obj = acc_obj.FindFirstChildOfClass("Part")
-             
+
              if part_obj:
                   special_mesh = part_obj.FindFirstChildOfClass("SpecialMesh")
                   if special_mesh:
-                       mesh_parts_to_process.append((special_mesh, asset_name))
+                       mesh_parts_to_process.append((special_mesh, asset_clean_name))
                   else:
                        dprint("Accessory found but no SpecialMesh inside Part.")
              else:
@@ -329,7 +330,13 @@ def process_mesh_asset(asset_id: int, asset_name: str, headers: dict, prefs: Dic
                 })
 
         except Exception as e:
-            dprint(f"    Error processing mesh data for {mesh_name}: {e}")
+            error_msg = f"Error processing mesh data for {mesh_name}: {e}"
+            dprint(f"    {error_msg}")
+            glob_vars.rbx_imp_error = error_msg
+            try:
+                bpy.context.workspace.status_text_set(error_msg)
+            except Exception:
+                pass
             continue
 
     # Cleanup (per asset)

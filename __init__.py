@@ -19,7 +19,7 @@ import traceback
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (7, 5, 0),
+    "version": (7, 6, 0),
     "blender": (4, 1, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",

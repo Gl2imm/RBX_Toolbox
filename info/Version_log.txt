@@ -2,6 +2,12 @@
                                                       Version History:
                                             ####################################
 
+v.7.6:
+    Fixes
+    - Fixed Accessory import silently producing an empty folder when the asset name contained a
+      forward slash or other filesystem-restricted character (e.g. "Cute face w/ hairs").
+      Names are now sanitized before they reach the filesystem.
+
 v.7.5:
     New Feature: Animation Upload
     - You can now upload animations directly to Roblox from the Upload to Roblox tab.

@@ -152,6 +152,8 @@ class RBX_OT_oauth2_logout(Operator):
             finally:
                 from . import user_thumbnail
                 user_thumbnail.clear()
+                from . import supporter_status
+                supporter_status.clear()
 
         from . import event_loop
         from .oauth2_client import RbxOAuth2Client

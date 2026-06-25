@@ -38,6 +38,9 @@ import hashlib
 from pathlib import Path
 import traceback
 import asyncio
+import time
+import math
+import threading
 
 # Get the project root directory path
 project_root_dir = Path(__file__).parent.parent
@@ -151,6 +154,55 @@ def deps_are_current():
     return True
 
 
+# Install state shared between the worker thread (writes) and the modal operator
+# (reads, on the main thread).
+_install_start = 0.0
+_install_done = False
+_install_error = None
+
+
+def _run_pip_install():
+    """Runs pip in a background thread so the main thread stays free to animate the
+    progress bar and repaint the panel (mirrors the update-download operator). The
+    previous asyncio event-loop approach was stepped on the main thread, which
+    saturated it during pip's heavy phase and froze the bar / blocked redraws."""
+    global _install_done, _install_error
+    # suppress the brief console window pip would otherwise flash on Windows
+    no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    try:
+        if dependencies_public_directory.exists():
+            shutil.rmtree(str(dependencies_public_directory), ignore_errors=True)
+        dependencies_public_directory.mkdir(exist_ok=True)
+
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "--version"], check=True,
+                           creationflags=no_window)
+        except subprocess.CalledProcessError:
+            ensurepip.bootstrap()
+            os.environ.pop("PIP_REQ_TRACKER", None)
+
+        proc = subprocess.run(
+            [
+                sys.executable, "-m", "pip", "install",
+                "-r", str(project_root_dir / "requirements.txt"),
+                "--target", str(dependencies_public_directory),
+            ],
+            capture_output=True,
+            creationflags=no_window,
+        )
+        if proc.stdout:
+            print(f"INSTALLATION OUTPUT:\n{proc.stdout.decode(errors='replace')}")
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"pip install failed (exit code {proc.returncode}).\n"
+                f"{proc.stderr.decode(errors='replace').strip()}"
+            )
+    except Exception as exception:
+        _install_error = exception
+    finally:
+        _install_done = True
+
+
 class RBX_OT_install_dependencies(Operator):
     """Operator for installing public dependencies for the add-on"""
 
@@ -158,69 +210,71 @@ class RBX_OT_install_dependencies(Operator):
     bl_label = "Install Dependencies"
     bl_description = "Installs add-on dependencies in the background"
 
-    def execute(self, context):
-        from . import event_loop
+    _timer = None
 
+    def execute(self, context):
+        global _install_start, _install_done, _install_error
         rbx = context.window_manager.rbx
 
-        def on_install_finished(task):
-            try:
-                rbx.is_installing_dependencies = False
-                task.result()
-                # Stamp version, requirements hash, and Python version for future staleness checks
-                version = _get_addon_version()
-                if version:
-                    _VERSION_STAMP.write_text(version, encoding="utf-8")
-                req_hash = _get_requirements_hash()
-                if req_hash:
-                    _REQUIREMENTS_STAMP.write_text(req_hash, encoding="utf-8")
-                _PYTHON_STAMP.write_text(_get_python_version(), encoding="utf-8")
-                _PENDING_WIPE.unlink(missing_ok=True)
-                rbx.is_finished_installing_dependencies = True
-                rbx.needs_restart = True
-            except Exception as exception:
-                shutil.rmtree(str(dependencies_public_directory), ignore_errors=True)
-                traceback.print_exception(exception)
-
         rbx.is_installing_dependencies = True
-        event_loop.submit(self.install_dependencies(), on_install_finished)
-        return {"FINISHED"}
+        rbx.dep_install_progress = 0.0
+        _install_start = time.monotonic()
+        _install_done = False
+        _install_error = None
 
-    async def install_dependencies(self):
-        if dependencies_public_directory.exists():
+        # pip runs in a background thread; a modal timer animates the bar + redraws
+        self._thread = threading.Thread(target=_run_pip_install, daemon=True)
+        self._thread.start()
+        context.window_manager.modal_handler_add(self)
+        self._timer = context.window_manager.event_timer_add(0.1, window=context.window)
+        return {"RUNNING_MODAL"}
+
+    def modal(self, context, event):
+        if event.type != "TIMER":
+            return {"PASS_THROUGH"}
+
+        rbx = context.window_manager.rbx
+        # ease the bar toward ~95% (time-based, ~94% near 15s) and repaint the panel
+        elapsed = max(0.0, time.monotonic() - _install_start)
+        target = 95.0 * (1.0 - math.exp(-elapsed / 3.5))
+        rbx.dep_install_progress = min(95.0, max(rbx.dep_install_progress, target))
+        for area in context.screen.areas:
+            if area.type == 'VIEW_3D':
+                area.tag_redraw()
+
+        if _install_done:
+            return self._finish(context)
+        return {"PASS_THROUGH"}
+
+    def _finish(self, context):
+        rbx = context.window_manager.rbx
+        if self._timer is not None:
+            context.window_manager.event_timer_remove(self._timer)
+            self._timer = None
+        rbx.is_installing_dependencies = False
+        rbx.dep_install_progress = 0.0
+
+        if _install_error is None:
+            # Stamp version, requirements hash and Python version for staleness checks
+            version = _get_addon_version()
+            if version:
+                _VERSION_STAMP.write_text(version, encoding="utf-8")
+            req_hash = _get_requirements_hash()
+            if req_hash:
+                _REQUIREMENTS_STAMP.write_text(req_hash, encoding="utf-8")
+            _PYTHON_STAMP.write_text(_get_python_version(), encoding="utf-8")
+            _PENDING_WIPE.unlink(missing_ok=True)
+            rbx.is_finished_installing_dependencies = True
+            rbx.needs_restart = True
+        else:
             shutil.rmtree(str(dependencies_public_directory), ignore_errors=True)
-        dependencies_public_directory.mkdir(exist_ok=True)
+            traceback.print_exception(_install_error)
+            self.report({'ERROR'}, f"Dependency install failed: {_install_error}")
 
-        try:
-            subprocess.run([sys.executable, "-m", "pip", "--version"], check=True)
-        except subprocess.CalledProcessError:
-            ensurepip.bootstrap()
-            os.environ.pop("PIP_REQ_TRACKER", None)
-
-        process = await asyncio.create_subprocess_exec(
-            sys.executable,
-            "-m",
-            "pip",
-            "install",
-            "-r",
-            str(project_root_dir / "requirements.txt"),
-            "--target",
-            str(dependencies_public_directory),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-
-        # Wait for the installation process to complete
-        stdout, stderr = await process.communicate()
-
-        if stdout:
-            print(f"INSTALLATION OUTPUT:\n{stdout.decode()}")
-
-        if process.returncode != 0:
-            raise RuntimeError(
-                f"pip install failed (exit code {process.returncode}).\n"
-                f"{stderr.decode().strip()}"
-            )
+        # repaint the finished state immediately (no mouse move required)
+        for area in context.screen.areas:
+            area.tag_redraw()
+        return {"FINISHED"}
 
     @classmethod
     def poll(cls, context):

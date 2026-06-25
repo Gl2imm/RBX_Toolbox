@@ -35,8 +35,11 @@ def _fetch_in_thread(user_id):
         except ImportError:
             ssl_ctx = ssl.create_default_context()
 
+        # avatar-bust gives a reliable head-and-shoulders portrait. (avatar-headshot
+        # honours the user's profile-picture thumbnail customization, which for some
+        # avatars is a zoomed-out full-body pose rather than a face.)
         url = (
-            f"https://thumbnails.roblox.com/v1/users/avatar-headshot"
+            f"https://thumbnails.roblox.com/v1/users/avatar-bust"
             f"?userIds={user_id}&size=150x150&format=Png&isCircular=false"
         )
         dprint(f"[AVATAR] GET {url}")

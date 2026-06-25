@@ -19,7 +19,7 @@ import traceback
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (7, 6, 0),
+    "version": (7, 7, 0),
     "blender": (4, 1, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -53,6 +53,7 @@ all_modules_names = [
     "functions.dmy_buttons",
     "functions.wear_r6_rig",
     "functions.hair_buttons",
+    "functions.ugc_templates",
     "functions.dmy_lc_buttons",
 
     "functions.avatar_buttons",
@@ -89,6 +90,7 @@ from .functions.cam_staging import BUTTON_CMR
 from .functions.dmy_buttons import BUTTON_DMMY
 from .functions.wear_r6_rig import BUTTON_WEAR
 from .functions.hair_buttons import BUTTON_HAIR
+from .functions.ugc_templates import RBX_OT_ugc_template, fluff_update
 from .functions.dmy_lc_buttons import RBX_BUTTON_LC
 
 from .func_import_v2.func_lc_animations import RBX_OT_LC_ANIM_V2, RBX_OT_LC_ANIM_V2_ADD_ANIM, RBX_OT_LC_ANIM_V2_PLAY, RBX_OT_LC_ANIM_V2_STOP, RBX_OT_LC_ANIM_V2_DELETE, RBX_OT_LC_ANIM_V2_SPEED, RBX_OT_lc_anim_test_info_popup
@@ -133,6 +135,7 @@ classes = (
     BUTTON_DMMY,
     BUTTON_WEAR,
     BUTTON_HAIR,
+    RBX_OT_ugc_template,
     RBX_BUTTON_LC,
 
     RBX_OT_LC_ANIM_V2,
@@ -170,6 +173,7 @@ def register():
         bpy.utils.register_class(c)
 
     bpy.types.Scene.rbx_prefs = bpy.props.PointerProperty(type=PROPERTIES_RBX)
+    Scene.show_auth_box = BoolProperty(default=True)
     Scene.subpanel_readme = BoolProperty(default=False)
     Scene.subpanel_bounds = BoolProperty(default=False)
     Scene.subpanel_hdri = BoolProperty(default=False)
@@ -179,6 +183,11 @@ def register():
     Scene.subpanel_dummy = BoolProperty(default=False)
     Scene.subpanel_rigs = BoolProperty(default=False)
     Scene.subpanel_hair = BoolProperty(default=False)
+    Scene.subpanel_ugc = BoolProperty(default=False)
+    Scene.subpanel_chain = BoolProperty(default=False)
+    Scene.subpanel_fur = BoolProperty(default=False)
+    bpy.types.Object.rbx_fluff = bpy.props.FloatProperty(
+        name="Rotate (fluff)", subtype='ANGLE', update=fluff_update)
     Scene.subpanel_lc = BoolProperty(default=False)
     Scene.rbx_lc_anim_armature = bpy.props.PointerProperty(
         type=bpy.types.Object,
@@ -230,6 +239,7 @@ def unregister():
         bpy.utils.unregister_class(c)
         
     del bpy.types.Scene.rbx_prefs
+    del Scene.show_auth_box
     del Scene.subpanel_readme
     del Scene.subpanel_bounds
     del Scene.subpanel_hdri
@@ -239,6 +249,10 @@ def unregister():
     del Scene.subpanel_dummy
     del Scene.subpanel_rigs
     del Scene.subpanel_hair
+    del Scene.subpanel_ugc
+    del Scene.subpanel_chain
+    del Scene.subpanel_fur
+    del bpy.types.Object.rbx_fluff
     del Scene.subpanel_lc
     del Scene.rbx_lc_anim_armature
     del Scene.rbx_lc_anim_scrub

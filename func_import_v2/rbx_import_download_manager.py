@@ -346,6 +346,19 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
             'clean_tmp_meshes': rbx_prefs.rbx_bndl_char_choice_clean_tmp_meshes
         }
 
+    # Resolve the per-asset output folder name ONCE so every item of a bundle
+    # shares the same folder. Only de-duplicate the generic "Unnamed" fallback:
+    # real, named assets keep reusing (overwriting) their existing folder on
+    # re-import, while two differently-named unnamed assets get Unnamed,
+    # Unnamed_01, ... instead of clobbering one another.
+    parent_name = glob_vars.rbx_asset_name
+    if parent_name:
+        shared_folder_name = func_rbx_other.replace_restricted_char(parent_name)
+        if shared_folder_name == "Unnamed":
+            shared_folder_name = func_rbx_other.unique_dir_name(bundles_folder, "Unnamed")
+    else:
+        shared_folder_name = None  # Fall back to per-item naming below.
+
     # Process Loop
     for item in items_to_process:
         asset_id = item['id']
@@ -379,9 +392,14 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         is_layered_clothing = (category_name == "Layered Cloth")
         is_face_parts = (category_name == "Face Parts")
         
-        # Calculate strict target folder for this asset
-        parent_name = glob_vars.rbx_asset_name
-        target_folder_name = func_rbx_other.replace_restricted_char(parent_name) if parent_name else func_rbx_other.replace_restricted_char(asset_name)
+        # Calculate strict target folder for this asset (resolved once above for
+        # the parent; only the parentless fallback names per item).
+        if shared_folder_name is not None:
+            target_folder_name = shared_folder_name
+        else:
+            target_folder_name = func_rbx_other.replace_restricted_char(asset_name)
+            if target_folder_name == "Unnamed":
+                target_folder_name = func_rbx_other.unique_dir_name(bundles_folder, "Unnamed")
         asset_own_folder = os.path.join(bundles_folder, target_folder_name)
         if not os.path.exists(asset_own_folder):
             os.makedirs(asset_own_folder)

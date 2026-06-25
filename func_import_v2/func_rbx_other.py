@@ -1,4 +1,5 @@
 import os
+import re
 from RBX_Toolbox import glob_vars
 
 
@@ -25,15 +26,44 @@ def resolve_content_uri(value):
 	return str(value)
 
 
-## Remove restricted characters from string ##
+## Sanitize a name for use as a filesystem path component / Blender datablock name ##
 def replace_restricted_char(str: str = None):
-	'''Replace restricted characters in string with underscores'''
+	'''Sanitize a name so it is safe as a path component or Blender datablock name.
+
+	Keeps only ASCII letters, digits and underscores. Every other character —
+	spaces, punctuation, symbols (e.g. ♡) and non-ASCII letters — is replaced
+	with "_"; consecutive replacements collapse into a single "_" and any
+	leading/trailing "_" are trimmed for clean names. Surrounding whitespace is
+	stripped first so Windows can't silently drop a trailing space/dot from a
+	path component (which previously caused a created-dir vs file-open mismatch
+	-> FileNotFoundError).'''
 	if str is None:
 		return
-	restricted_chars = '\/*?:"<>|.,'
-	replace_map = dict((ord(char), '_') for char in restricted_chars)
-	new_str = str.translate(replace_map)
-	return new_str
+	# Replace every run of disallowed chars with one "_", then trim edge "_".
+	new_str = re.sub(r'[^A-Za-z0-9_]+', '_', str.strip()).strip('_')
+	# Guard against names that sanitize to nothing (e.g. fully non-ASCII).
+	return new_str or "Unnamed"
+
+
+## Pick a folder name that does not collide with existing folders ##
+def unique_dir_name(parent_dir, base="Unnamed"):
+	'''Return a folder name unique within `parent_dir`.
+
+	If `parent_dir/base` is free, returns `base`; otherwise returns the next
+	free `base_NN` ("Unnamed", "Unnamed_01", "Unnamed_02", ...). Used for the
+	generic `replace_restricted_char` fallback so two differently-named assets
+	that both sanitize to the same name don't overwrite each other's folder.
+
+	Resolve this ONCE per asset (not per sanitize call); `replace_restricted_char`
+	itself stays deterministic so dir-creation and file writes share one path.'''
+	if not base:
+		base = "Unnamed"
+	candidate = base
+	i = 1
+	while os.path.exists(os.path.join(parent_dir, candidate)):
+		candidate = f"{base}_{i:02d}"
+		i += 1
+	return candidate
 
 
 ## Remove rbxassetid:// part

@@ -14,15 +14,23 @@ import json
 DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
-## Remove restricted characters from string ##
+## Sanitize a name for use as a filesystem path component / Blender datablock name ##
 def replace_restricted_char(str: str = None):
-    '''Replace restricted characters in string with underscores'''
+    '''Sanitize a name so it is safe as a path component or Blender datablock name.
+
+    Keeps only ASCII letters, digits and underscores. Every other character —
+    spaces, punctuation, symbols (e.g. ♡) and non-ASCII letters — is replaced
+    with "_"; consecutive replacements collapse into a single "_" and any
+    leading/trailing "_" are trimmed for clean names. Surrounding whitespace is
+    stripped first so Windows can't silently drop a trailing space/dot from a
+    path component (which previously caused a created-dir vs file-open mismatch
+    -> FileNotFoundError).'''
     if str is None:
         return
-    restricted_chars = '\/*?:"<>|.,'
-    replace_map = dict((ord(char), '_') for char in restricted_chars)
-    new_str = str.translate(replace_map)
-    return new_str
+    # Replace every run of disallowed chars with one "_", then trim edge "_".
+    new_str = re.sub(r'[^A-Za-z0-9_]+', '_', str.strip()).strip('_')
+    # Guard against names that sanitize to nothing (e.g. fully non-ASCII).
+    return new_str or "Unnamed"
 
 
 # This asynchronous method is invoked as a separate coroutine from the main thread

@@ -100,6 +100,123 @@ class TOOLBOX_MENU(bpy.types.Panel):
     bl_category = "RBX Tools"
 
 
+    def draw_roblox_auth(self, context, layout, rbx):
+        box = layout.box()
+        rbx_installed_dependencies = False
+
+        # 2. Dependency Installation
+        from oauth.lib import install_dependencies  # Local import
+        if not rbx.is_finished_installing_dependencies:
+            box.row().label(
+                text=f"This plugin requires installation of",
+                icon="INFO",
+            )
+            box.row().label(
+                text=f"dependencies the first time it is run.",
+            )
+            if rbx.is_installing_dependencies:
+                box.row().prop(rbx, "dep_install_progress", text="Installing...", slider=True)
+                box.row().label(text="Please keep Blender open", icon="INFO")
+                box.row().label(text="until it finishes.", icon="BLANK1")
+            else:
+                box.row().operator(
+                    install_dependencies.RBX_OT_install_dependencies.bl_idname,
+                    text="Install Dependencies",
+                )
+            #return
+        else:
+            rbx_installed_dependencies = True
+
+        if rbx.needs_restart:
+            box.row().label(text="Installation complete!", icon="CHECKMARK")
+            box.alert = True  # 🔴 Makes the button red
+            box.operator("wm.install_update", text="Restart Blender").restart_only = True
+            #layout.row().label(text="Restart Blender to continue.")
+            #return
+
+        if rbx_installed_dependencies == True and not rbx.needs_restart:
+            # 3. Load Creator Details (if not done)
+            # Blender does not provide an API for us to hook into to read the creator details when
+            # the plugin loads. Instead, we will fetch this information on the first draw of the
+            # main panel
+            if not rbx.has_called_load_creator:
+                from oauth.lib import creator_details  # Local import
+                creator_details.load_creator_details(
+                    context.window_manager, context.preferences)
+
+            # 4. Main UI Content: Login or Creator/Upload sections
+            if not rbx.is_logged_in:
+                # Login UI Section
+                from oauth.lib import oauth2_login_operators  # Local import
+
+                button_text_login = "Logging in..." if rbx.is_processing_login_or_logout else "Log in"
+                box.row().operator(
+                    oauth2_login_operators.RBX_OT_oauth2_login.bl_idname, text=button_text_login)
+
+                # This cancel button renders for logins requiring the browser, but not for automatic logins via refreshing a remembered token
+                if bpy.ops.rbx.oauth2_cancel_login.poll():  # poll() is a classmethod of the operator
+                    box.row().operator(oauth2_login_operators.RBX_OT_oauth2_cancel_login.bl_idname)
+            else:
+                # Logged In State: Creator Section
+
+                _uid = None
+                try:
+                    _uid = glob_vars.get_login_info().get("user_id")
+                except Exception:
+                    pass
+
+                # Schedule the supporter game-pass check (displayed in its own box below)
+                try:
+                    from oauth.lib import supporter_status
+                    if _uid:
+                        supporter_status.schedule_fetch(_uid)
+                except Exception:
+                    pass
+
+                # Avatar thumbnail — schedule fetch once, display when ready
+                try:
+                    from oauth.lib import user_thumbnail
+                    if _uid:
+                        user_thumbnail.schedule_fetch(_uid)
+                    _icon_id = user_thumbnail.get_icon_id()
+                    if _icon_id:
+                        # Scale the avatar to ~51% of the panel width.
+                        # template_icon size ~= scale * (20 * ui_scale) px.
+                        icon_scale = 3.0
+                        try:
+                            ui_scale = context.preferences.system.ui_scale
+                            region_width = context.region.width
+                            if region_width:
+                                icon_scale = max(3.0, min(100.0, (region_width - 20) / (20.0 * ui_scale) * 0.506))
+                        except Exception:
+                            pass
+                        avatar_row = box.row()
+                        avatar_row.alignment = 'CENTER'
+                        avatar_row.template_icon(_icon_id, scale=icon_scale)
+                        box.separator(type='LINE')
+                except Exception:
+                    pass
+
+                top_row_creator = box.row(align=True)
+                top_row_creator.alignment = 'CENTER'
+                try:
+                    from oauth.lib.oauth2_client import RbxOAuth2Client  # Local import
+                    oauth2_client = RbxOAuth2Client(rbx)  # rbx is already defined
+                    top_row_creator.label(text=f"Hello, {rbx.name}!")
+                except Exception as exception:
+                    self.report(
+                        {"ERROR"}, f"Failed to display user name: {str(exception)}\n{traceback.format_exc()}")
+                    top_row_creator.label(
+                        text="Hello, User (Error)", icon="ERROR")  # Fallback
+
+                from oauth.lib import oauth2_login_operators  # Local import
+                button_text_logout = "Working..." if rbx.is_processing_login_or_logout else "Log out"
+                logout_row = box.row()
+                logout_row.alignment = 'RIGHT'
+                logout_row.operator(
+                    oauth2_login_operators.RBX_OT_oauth2_logout.bl_idname, text=button_text_logout)
+
+
     def draw(self, context):
         layout = self.layout
         scene = context.scene
@@ -143,90 +260,31 @@ class TOOLBOX_MENU(bpy.types.Panel):
         ######## oAuth Login ########
         row = layout.row()
         row.label(text = "Roblox Authorization", icon= "USER")
-        box = layout.box()
+        eye_icon = 'HIDE_OFF' if context.scene.show_auth_box else 'HIDE_ON'
+        eye_sub = row.row()
+        eye_sub.alignment = 'RIGHT'
+        eye_sub.prop(context.scene, 'show_auth_box', icon=eye_icon, icon_only=True, emboss=False)
+
         rbx = getattr(context.window_manager, 'rbx', None)
         if rbx is None:
-            box.row().label(text="OAuth module failed to load. Check Blender console for errors.", icon="ERROR")
+            layout.box().row().label(text="OAuth module failed to load. Check Blender console for errors.", icon="ERROR")
             return
-        rbx_installed_dependencies = False
 
-        # 2. Dependency Installation
-        from oauth.lib import install_dependencies  # Local import
-        if not rbx.is_finished_installing_dependencies:
-            box.row().label(
-                text=f"This plugin requires installation of",
-                icon="INFO",
-            )
-            box.row().label(
-                text=f"dependencies the first time it is run.",
-            )
-            box.row().operator(
-                install_dependencies.RBX_OT_install_dependencies.bl_idname,
-                text="Installing..." if rbx.is_installing_dependencies else "Install Dependencies",
-            )
-            #return
-        else:
-            rbx_installed_dependencies = True
+        if context.scene.show_auth_box:
+            self.draw_roblox_auth(context, layout, rbx)
 
-        if rbx.needs_restart:
-            box.row().label(text="Installation complete!", icon="CHECKMARK")
-            box.alert = True  # 🔴 Makes the button red
-            box.operator("wm.install_update", text="Restart Blender").restart_only = True
-            #layout.row().label(text="Restart Blender to continue.")
-            #return
-
-        if rbx_installed_dependencies == True and not rbx.needs_restart:
-            # 3. Load Creator Details (if not done)
-            # Blender does not provide an API for us to hook into to read the creator details when
-            # the plugin loads. Instead, we will fetch this information on the first draw of the
-            # main panel
-            if not rbx.has_called_load_creator:
-                from oauth.lib import creator_details  # Local import
-                creator_details.load_creator_details(
-                    context.window_manager, context.preferences)
-
-            # 4. Main UI Content: Login or Creator/Upload sections
-            if not rbx.is_logged_in:
-                # Login UI Section
-                from oauth.lib import oauth2_login_operators  # Local import
-
-                button_text_login = "Logging in..." if rbx.is_processing_login_or_logout else "Log in"
-                box.row().operator(
-                    oauth2_login_operators.RBX_OT_oauth2_login.bl_idname, text=button_text_login)
-
-                # This cancel button renders for logins requiring the browser, but not for automatic logins via refreshing a remembered token
-                if bpy.ops.rbx.oauth2_cancel_login.poll():  # poll() is a classmethod of the operator
-                    box.row().operator(oauth2_login_operators.RBX_OT_oauth2_cancel_login.bl_idname)
-            else:
-                # Logged In State: Creator Section
-
-                # Avatar thumbnail — schedule fetch once, display when ready
-                try:
-                    from oauth.lib import user_thumbnail
-                    _uid = glob_vars.get_login_info().get("user_id")
-                    if _uid:
-                        user_thumbnail.schedule_fetch(_uid)
-                    _icon_id = user_thumbnail.get_icon_id()
-                    if _icon_id:
-                        box.template_icon(_icon_id, scale=3.0)
-                except Exception:
-                    pass
-
-                top_row_creator = box.row(align=True)
-                try:
-                    from oauth.lib.oauth2_client import RbxOAuth2Client  # Local import
-                    oauth2_client = RbxOAuth2Client(rbx)  # rbx is already defined
-                    top_row_creator.label(text=f"Hello, {rbx.name}!")
-                except Exception as exception:
-                    self.report(
-                        {"ERROR"}, f"Failed to display user name: {str(exception)}\n{traceback.format_exc()}")
-                    top_row_creator.label(
-                        text="Hello, User (Error)", icon="ERROR")  # Fallback
-
-                from oauth.lib import oauth2_login_operators  # Local import
-                button_text_logout = "Working..." if rbx.is_processing_login_or_logout else "Log out"
-                top_row_creator.operator(
-                    oauth2_login_operators.RBX_OT_oauth2_logout.bl_idname, text=button_text_logout)
+            # Supporter tier — its own box below the avatar details, only when a tip game pass is owned
+            try:
+                from oauth.lib import supporter_status
+                _tier = supporter_status.get_tier()
+                if rbx.is_logged_in and _tier:
+                    sup_box = layout.box()
+                    sup_head = sup_box.row()
+                    sup_head.alignment = 'CENTER'
+                    sup_head.label(text="RBXToolbox Supporter", icon="FUND")
+                    sup_box.label(text=f"Tier: {_tier}")
+            except Exception:
+                pass
 
 
 
@@ -710,7 +768,13 @@ class TOOLBOX_MENU(bpy.types.Panel):
             box.label(text = '')
             box.label(text = 'Wear Character (Select Armature)')
             box.label(text = 'Currently Only R6 Rig is supported')
-            box.operator('object.button_wear', text = "Modify Character").rbx_cloth = 'mod'
+            if rbx.is_logged_in:
+                box.operator('object.button_wear', text = "Modify Character").rbx_cloth = 'mod'
+            else:
+                row_mod = box.row()
+                row_mod.enabled = False  # Greys out / disables the button
+                row_mod.operator('object.button_wear', text = "Modify Character").rbx_cloth = 'mod'
+                box.label(text = "Log in to Roblox (above) to use this", icon='INFO')
             
             cloth_panel = False
             try:
@@ -730,7 +794,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 pass 
             if cloth_panel == True:
                 box = layout.box()
-                box.label(text = '- - - - - - - - - - - HEAD - - - - - - - - - - -')
+                box.label(text = '- - - - HEAD - - - -')
                 #box.label(text = 'Head')
                 rbx_cloth_head = bpy.data.materials[f"R6 Head_{rbx_object.name}"].node_tree.nodes['R6 Cloth']
                 cloth_head = rbx_cloth_head.inputs['Skin Tone']
@@ -751,7 +815,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 
                 
                 box = layout.box()
-                box.label(text = '- - - - - - - - - - - SHIRT - - - - - - - - - - -')
+                box.label(text = '- - - - SHIRT - - - -')
                 #box.label(text = 'Shirt')
                 rbx_cloth_shirt = bpy.data.materials[f"R6 Shirt_{rbx_object.name}"].node_tree.nodes['R6 Cloth']
                 cloth_shirt = rbx_cloth_shirt.inputs['Skin Tone']
@@ -772,7 +836,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 
                 
                 box = layout.box()
-                box.label(text = '- - - - - - - - - - - TORSO - - - - - - - - - -')
+                box.label(text = '- - - - TORSO - - - -')
                 #box.label(text = 'Torso')
                 rbx_cloth_torso = bpy.data.materials[f"R6 Torso_{rbx_object.name}"].node_tree.nodes['R6 Cloth']
                 cloth_torso = rbx_cloth_torso.inputs['Skin Tone']
@@ -792,7 +856,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 
                 
                 box = layout.box()
-                box.label(text = '- - - - - - - - - - - PANTS - - - - - - - - - - -')
+                box.label(text = '- - - - PANTS - - - -')
                 #box.label(text = 'Pants')
                 rbx_cloth_pants = bpy.data.materials[f"R6 Pants_{rbx_object.name}"].node_tree.nodes['R6 Cloth']
                 cloth_pants = rbx_cloth_pants.inputs['Skin Tone']
@@ -817,91 +881,160 @@ class TOOLBOX_MENU(bpy.types.Panel):
 
 
 
-        ######### Hairs #########
-        row = layout.row()     
-        icon = 'DOWNARROW_HLT' if context.scene.subpanel_hair else 'RIGHTARROW'
-        row.prop(context.scene, 'subpanel_hair', icon=icon, icon_only=True)
-        row.label(text='Hairs', icon='OUTLINER_OB_FORCE_FIELD')
-        # some data on the subpanel
-        if context.scene.subpanel_hair:
-            box = layout.box()
-            box.label(text = 'Dummie Heads Only')
-            box.prop(rbx_prefs, 'rbx_dum_hd_enum', text ='')
-            split = box.split(factor = 0.5)
-            col = split.column(align = True)            
-            col.label(text = "")            
-            split.operator('object.button_hair', text = "Spawn").rbx_hair = 'Dummy_head' 
-            
-            box.separator()
-            split = box.split(factor = 0.7)
-            col = split.column(align = True)
-            col.label(text='Starter Hair Template:')
-            split.operator('object.button_hair', text = "Add").rbx_hair = 'hair_template'
-            
-            box = layout.box() 
-            box.label(text = 'Bake Hair Texture')
-            box.operator('object.button_hair', text = "Add Hair Shader").rbx_hair = 'hair_shader'
+        ######### UGC Templates #########
+        row = layout.row()
+        icon = 'DOWNARROW_HLT' if context.scene.subpanel_ugc else 'RIGHTARROW'
+        row.prop(context.scene, 'subpanel_ugc', icon=icon, icon_only=True)
+        row.label(text='UGC templates', icon='ASSET_MANAGER')
+        if context.scene.subpanel_ugc:
 
+            ugc_box = layout.box()
 
-            try:
-                rbx_hair_color = bpy.data.objects['Hair Color']
-            except:
-                pass
-            else:
-                rbx_hair_cntrl = rbx_hair_color.active_material.node_tree.nodes['Hair shader v.2.0']
-                box.label(text='** Hair Color Controls: **')
-                hrs_0 = rbx_hair_cntrl.inputs['Hair Color']
-                hrs_1 = rbx_hair_cntrl.inputs['Hair Strands']
-                hrs_2 = rbx_hair_cntrl.inputs['Strands Color']
-                hrs_3 = rbx_hair_cntrl.inputs['Highlight Color']
-                hrs_4 = rbx_hair_cntrl.inputs['Highlight Scale']
-                hrs_5 = rbx_hair_cntrl.inputs['Top Position']
-                hrs_6 = rbx_hair_cntrl.inputs['Bottom Position']
-                hrs_7 = rbx_hair_cntrl.inputs['Bumps']
-                
+            ######### Hairs #########
+            row = ugc_box.row()     
+            icon = 'DOWNARROW_HLT' if context.scene.subpanel_hair else 'RIGHTARROW'
+            row.prop(context.scene, 'subpanel_hair', icon=icon, icon_only=True)
+            row.label(text='Hairs', icon='OUTLINER_OB_FORCE_FIELD')
+            # some data on the subpanel
+            if context.scene.subpanel_hair:
+                box = ugc_box.box()
+                box.label(text = 'Dummie Heads Only')
+                box.prop(rbx_prefs, 'rbx_dum_hd_enum', text ='')
                 split = box.split(factor = 0.5)
-                col = split.column(align = True)
-                col.label(text='Hair Color:')
-                split.prop(hrs_0, "default_value", text = "")
-                split = box.split(factor = 0.5)
-                col = split.column(align = True)
-                col.label(text='Hair Strands:')
-                split.prop(hrs_1, "default_value", text = "")
-                split = box.split(factor = 0.5)
-                col = split.column(align = True)
-                col.label(text='Strands Color:')
-                split.prop(hrs_2, "default_value", text = "")
-                split = box.split(factor = 0.5)
-                col = split.column(align = True)
-                col.label(text='Highlight Color:')
-                split.prop(hrs_3, "default_value", text = "")
-                split = box.split(factor = 0.5)
-                col = split.column(align = True)
-                col.label(text='Highlight Scale:')
-                split.prop(hrs_4, "default_value", text = "")
-                split = box.split(factor = 0.5)
-                col = split.column(align = True)
-                col.label(text='Top Position:')
-                split.prop(hrs_5, "default_value", text = "")
-                split = box.split(factor = 0.5)
-                col = split.column(align = True)
-                col.label(text='Bottom Position:')
-                split.prop(hrs_6, "default_value", text = "")
-                split = box.split(factor = 0.5)
-                col = split.column(align = True)
-                col.label(text='Bumps:')
-                split.prop(hrs_7, "default_value", text = "")
+                col = split.column(align = True)            
+                col.label(text = "")            
+                split.operator('object.button_hair', text = "Spawn").rbx_hair = 'Dummy_head' 
             
                 box.separator()
-                split = box.split(factor = 0.3)
+                split = box.split(factor = 0.7)
                 col = split.column(align = True)
-                col.label(text='')
-                split.operator('object.button_hair', text = "Bake Texture").rbx_hair = 'hair_bake'
+                col.label(text='Starter Hair Template:')
+                split.operator('object.button_hair', text = "Add").rbx_hair = 'hair_template'
+            
+                box = ugc_box.box() 
+                box.label(text = 'Bake Hair Texture')
+                box.operator('object.button_hair', text = "Add Hair Shader").rbx_hair = 'hair_shader'
 
-                box.operator('object.button_hair', text = "View Image").rbx_hair = 'hair_save'
+
+                try:
+                    rbx_hair_color = bpy.data.objects['Hair Color']
+                except:
+                    pass
+                else:
+                    rbx_hair_cntrl = rbx_hair_color.active_material.node_tree.nodes['Hair shader v.2.0']
+                    box.label(text='** Hair Color Controls: **')
+                    hrs_0 = rbx_hair_cntrl.inputs['Hair Color']
+                    hrs_1 = rbx_hair_cntrl.inputs['Hair Strands']
+                    hrs_2 = rbx_hair_cntrl.inputs['Strands Color']
+                    hrs_3 = rbx_hair_cntrl.inputs['Highlight Color']
+                    hrs_4 = rbx_hair_cntrl.inputs['Highlight Scale']
+                    hrs_5 = rbx_hair_cntrl.inputs['Top Position']
+                    hrs_6 = rbx_hair_cntrl.inputs['Bottom Position']
+                    hrs_7 = rbx_hair_cntrl.inputs['Bumps']
+                
+                    split = box.split(factor = 0.5)
+                    col = split.column(align = True)
+                    col.label(text='Hair Color:')
+                    split.prop(hrs_0, "default_value", text = "")
+                    split = box.split(factor = 0.5)
+                    col = split.column(align = True)
+                    col.label(text='Hair Strands:')
+                    split.prop(hrs_1, "default_value", text = "")
+                    split = box.split(factor = 0.5)
+                    col = split.column(align = True)
+                    col.label(text='Strands Color:')
+                    split.prop(hrs_2, "default_value", text = "")
+                    split = box.split(factor = 0.5)
+                    col = split.column(align = True)
+                    col.label(text='Highlight Color:')
+                    split.prop(hrs_3, "default_value", text = "")
+                    split = box.split(factor = 0.5)
+                    col = split.column(align = True)
+                    col.label(text='Highlight Scale:')
+                    split.prop(hrs_4, "default_value", text = "")
+                    split = box.split(factor = 0.5)
+                    col = split.column(align = True)
+                    col.label(text='Top Position:')
+                    split.prop(hrs_5, "default_value", text = "")
+                    split = box.split(factor = 0.5)
+                    col = split.column(align = True)
+                    col.label(text='Bottom Position:')
+                    split.prop(hrs_6, "default_value", text = "")
+                    split = box.split(factor = 0.5)
+                    col = split.column(align = True)
+                    col.label(text='Bumps:')
+                    split.prop(hrs_7, "default_value", text = "")
+            
+                    box.separator()
+                    split = box.split(factor = 0.3)
+                    col = split.column(align = True)
+                    col.label(text='')
+                    split.operator('object.button_hair', text = "Bake Texture").rbx_hair = 'hair_bake'
+
+                    box.operator('object.button_hair', text = "View Image").rbx_hair = 'hair_save'
 
 
 
+
+
+            #### Chain ####
+            row = ugc_box.row()
+            icon = 'DOWNARROW_HLT' if context.scene.subpanel_chain else 'RIGHTARROW'
+            row.prop(context.scene, 'subpanel_chain', icon=icon, icon_only=True)
+            row.label(text='Chain', icon='LINKED')
+            if context.scene.subpanel_chain:
+                box = ugc_box.box()
+                box.operator('object.rbx_ugc_template', text="Spawn Chain Template", icon='ADD').action = 'chain'
+                box.separator()
+                box.label(text="1. Adjust chain")
+                box.label(text="2. Apply modifiers")
+                box.label(text="3. Add texture")
+
+            #### Fur ####
+            row = ugc_box.row()
+            icon = 'DOWNARROW_HLT' if context.scene.subpanel_fur else 'RIGHTARROW'
+            row.prop(context.scene, 'subpanel_fur', icon=icon, icon_only=True)
+            row.label(text='Fur', icon='MOD_PARTICLES')
+            if context.scene.subpanel_fur:
+                box = ugc_box.box()
+                _active = context.active_object
+                _has_mesh = _active is not None and _active.type == 'MESH' and _active.select_get()
+                apply_row = box.row()
+                apply_row.enabled = _has_mesh
+                apply_row.operator('object.rbx_ugc_template', text="Apply Fur to Mesh", icon='MOD_PARTICLES').action = 'apply_fur'
+
+                _fur_ps = _active.particle_systems.get("RBX Fur") if _has_mesh else None
+                if _fur_ps is not None and _fur_ps.settings is not None:
+                    _s = _fur_ps.settings
+                    box.separator()
+                    split = box.split(factor=0.5)
+                    split.column().label(text="Total Fur:")
+                    split.prop(_s, "count", text="")
+                    split = box.split(factor=0.5)
+                    split.column().label(text="Fur/face:")
+                    split.prop(_s, "userjit", text="")
+                    split = box.split(factor=0.5)
+                    split.column().label(text="Scale:")
+                    split.prop(_s, "particle_size", text="")
+                    split = box.split(factor=0.5)
+                    split.column().label(text="Rotate:")
+                    split.prop(_s, "phase_factor", text="")
+                    _tmpl = _s.instance_object
+                    if _tmpl is not None:
+                        split = box.split(factor=0.5)
+                        split.column().label(text="Rotate (fluff):")
+                        split.prop(_tmpl, "rbx_fluff", text="")
+                    box.separator()
+                    box.operator('object.rbx_ugc_template', text="Convert Fur to meshes").action = 'convert_fur'
+                    box.operator('object.rbx_ugc_template', text="Convert Fur to meshes (combined)").action = 'convert_fur_combined'
+
+                box.separator()
+                box.label(text="1. Apply fur to mesh")
+                box.label(text="2. adjust values")
+                box.label(text="3. Convert to mesh")
+                box.separator()
+                split = box.split(factor=0.5)
+                split.operator('object.rbx_ugc_template', text="Fur Sample", icon='HIDE_OFF').action = 'fur_sample'
 
 
         ######### Layered Cloth Dummies #########
@@ -1609,7 +1742,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
         row = layout.row()  
         row.operator('object.url_handler', text = "Discord Support Server", icon='URL').rbx_link = "discord"
         row = layout.row() 
-        row.operator('object.url_handler', text = "Buy me a Coffee! ;)", icon='URL').rbx_link = "buy coffee"
+        row.operator('object.url_handler', text = "Keep RBX Toolbox free \U0001F49B", icon='URL').rbx_link = "buy coffee"
 
         row = layout.row()
         icon = 'DOWNARROW_HLT' if context.scene.subpanel_support else 'RIGHTARROW'
@@ -1634,5 +1767,9 @@ class TOOLBOX_MENU(bpy.types.Panel):
             col_sup = split_sup.column(align = True)       
             col_sup.label(text="", icon="LAYERGROUP_COLOR_07")
             split_sup.operator("object.url_handler", text = "Epic (1000 Bobuc)").rbx_link = 'tips 1000'
-        
+            split_sup = box.split(factor = 0.2)
+            col_sup = split_sup.column(align = True)
+            col_sup.label(text="", icon="LAYERGROUP_COLOR_08")
+            split_sup.operator("object.url_handler", text = "Mythic (10000 Bobuc)").rbx_link = 'tips 10000'
+
     

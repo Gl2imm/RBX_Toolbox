@@ -16,7 +16,7 @@ If you have additional effects, templates, dummies, etc., [please share them in 
 - [NYTV Gaming Support/Suggestions Discord](https://discord.gg/gFa4mY7)
 - [NYTV_YT Twitter](https://twitter.com/NYTV_YT) 
 - [NYTV UGC Roblox Group](https://www.roblox.com/groups/7902286/NYTV-UGC)
-- [Buy Me a Coffee ☕](https://donate.stripe.com/fZe5op0W1fjg2nC002)
+- [Keep RBX Toolbox free 💛](https://gl2imm.github.io/RBX_Toolbox/donate.html)
 
 ---
 
@@ -118,7 +118,7 @@ _This section for the people who had supported RBX Toolbox at various stages of 
 - **Implementation of the OAuthorization in Roblox Toolbox:**<br>
   _Kickstarter page to initialize the development_ - [Roblox Toolbox (Blender Addon)](https://www.kickstarter.com/projects/gl2imm/roblox-toolbox-blender-addon)
   - **Sponsors:**
-      - [Valk](https://x.com/valkenheim__)
+      - [Valk](https://x.com/valkenheim)
       - [UptownRose](https://x.com/UptownRoseYT)
       - There are 2 more persons who contribute into this develepment, but did not give me approval yet to post their names here (pls do contact me, i will post)
   - **Developers:**

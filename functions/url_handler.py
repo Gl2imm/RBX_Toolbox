@@ -35,7 +35,7 @@ class URL_HANDLER(bpy.types.Operator):
             webbrowser.open_new("https://twitter.com/Zeblyno")
             
         if rbx_link == "buy coffee":
-            webbrowser.open_new("https://donate.stripe.com/fZe5op0W1fjg2nC002") 
+            webbrowser.open_new("https://gl2imm.github.io/RBX_Toolbox/donate.html")
 
         if rbx_link == "tips 10":
             webbrowser.open_new("https://www.roblox.com/game-pass/1292957634/RBX-Toolbox-Tips-Supporter")   
@@ -47,7 +47,10 @@ class URL_HANDLER(bpy.types.Operator):
             webbrowser.open_new("https://www.roblox.com/game-pass/132688311/RBX-Toolbox-Tips-Legend") 
 
         if rbx_link == "tips 1000":
-            webbrowser.open_new("https://www.roblox.com/game-pass/1292117937/RBX-Toolbox-Tips-Epic")                                              
+            webbrowser.open_new("https://www.roblox.com/game-pass/1292117937/RBX-Toolbox-Tips-Epic")
+
+        if rbx_link == "tips 10000":
+            webbrowser.open_new("https://www.roblox.com/game-pass/1893442485/RBX-Toolbox-Tips-Mythic")
 
         for x in range(len(rbx_guides)):
             if rbx_link == rbx_guides[x]:

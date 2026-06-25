@@ -33,6 +33,7 @@ from bpy.props import (
     BoolProperty,
     CollectionProperty,
     IntProperty,
+    FloatProperty,
     PointerProperty,
     EnumProperty,
 )
@@ -97,6 +98,9 @@ class RbxProperties(PropertyGroup):
     from . import creator_details, install_dependencies
 
     is_installing_dependencies: BoolProperty()
+    dep_install_progress: FloatProperty(
+        name="Install Progress", subtype="PERCENTAGE", min=0, max=100, precision=0
+    )
     is_finished_installing_dependencies: BoolProperty(
         default=install_dependencies.deps_are_current()
     )

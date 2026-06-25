@@ -2,6 +2,32 @@
                                                       Version History:
                                             ####################################
 
+v.7.7:
+    Added
+    - New UGC Templates menu, which contains starter packs for new UGC creators. They can also be
+      used to quickly spawn a completed preset.
+      - Hairs
+      - Chain 
+      - Fur 
+    Fixes
+    - R6 wear feature - the classic shirt and pants were not importing. This happened because newer
+      items are restricted to authorized users only. This feature is now fixed and requires Roblox
+      authorization.
+    - Fixed some items failing to import, showing a "No such file or directory" error in the panel
+      while nothing appeared in the console. This happened when the item's name ended with a space
+      or used special / non-English characters (e.g. "♡ cute cat burger hood ").
+      Item names are now cleaned up properly before saving, so folders are created reliably.
+      Items with no usable name are saved as "Unnamed", and repeated ones become "Unnamed_01",
+      "Unnamed_02", and so on instead of overwriting each other.
+    - Fixed Studio error "Handle is Skinned to joint HumanoidRootPart", which only affected the Blocky
+      template for layered clothing. If you have existing models with this error - open the model in
+      Blender, expand the Armature object - find "HumanoidRootBone" and rename it to "HumanoidRootNode".
+    - Added a progress bar when installing dependencies for oAuth authorization, as some users quit
+      Blender before the process completes, making oAuth unusable.
+
+    Note: Dependencies installation process completely rewritten. Please feedback in discord if you
+          face installation issues. 
+
 v.7.6:
     Fixes
     - Fixed Accessory import silently producing an empty folder when the asset name contained a

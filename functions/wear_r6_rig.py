@@ -177,21 +177,25 @@ class BUTTON_WEAR(bpy.types.Operator):
          ##### Accessory Import ##### 
         if rbx_cloth == 'shirt':
             ##### Convert accessory input #####
-            rbx_shirt, rbx_shirt_netw_error = get_id(rbx_shirt) 
-            
+            rbx_shirt, rbx_shirt_netw_error = get_id(rbx_shirt)
+
+            ### Get authorized session (Roblox OAuth) ###
+            if rbx_shirt_netw_error == None:
+                auth_headers, rbx_shirt_netw_error = self.get_auth_headers(context)
+
             ### Get shirt Info ###
-            if rbx_shirt_netw_error == None:        
+            if rbx_shirt_netw_error == None:
                 rbx_shirt_name, rbx_shirt_type, rbx_shirt_creator, rbx_shirt_netw_error = asyncio.run(self.get_acc_info(rbx_shirt))
-                
-            ### Get shirt asset ID ###
-            if rbx_shirt_netw_error == None:        
-                shirt_data, rbx_shirt_netw_error = asyncio.run(self.get_id_data(rbx_shirt, rbx_cloth))
-                shirt_data = str(shirt_data).split("<url>http://www.roblox.com/asset/?id=")[1]
-                rbx_shirt = shirt_data.split("</url>")[0] #Actual item ID
-                
+
+            ### Get shirt asset ID (parse classic Shirt for its ShirtTemplate texture) ###
+            if rbx_shirt_netw_error == None:
+                shirt_asset, rbx_shirt_netw_error = self.get_auth_asset_data(rbx_shirt, auth_headers)
+            if rbx_shirt_netw_error == None:
+                rbx_shirt, rbx_shirt_netw_error = self.get_classic_texture_id(shirt_asset, rbx_cloth) #Actual item ID
+
             ### Get shirt Data ###
-            if rbx_shirt_netw_error == None:        
-                shirt_data, rbx_shirt_netw_error = asyncio.run(self.get_id_data(rbx_shirt, rbx_cloth))
+            if rbx_shirt_netw_error == None:
+                shirt_data, rbx_shirt_netw_error = self.get_auth_asset_data(rbx_shirt, auth_headers)
             
             ### Make folder if dont have ###
             if rbx_shirt_netw_error == None: 
@@ -216,21 +220,25 @@ class BUTTON_WEAR(bpy.types.Operator):
         ##### Accessory Import ##### 
         if rbx_cloth == 'pants':
             ##### Convert accessory input #####
-            rbx_pants, rbx_pants_netw_error = get_id(rbx_pants) 
-            
+            rbx_pants, rbx_pants_netw_error = get_id(rbx_pants)
+
+            ### Get authorized session (Roblox OAuth) ###
+            if rbx_pants_netw_error == None:
+                auth_headers, rbx_pants_netw_error = self.get_auth_headers(context)
+
             ### Get pants Info ###
-            if rbx_pants_netw_error == None:        
+            if rbx_pants_netw_error == None:
                 rbx_pants_name, rbx_pants_type, rbx_pants_creator, rbx_pants_netw_error = asyncio.run(self.get_acc_info(rbx_pants))
-                
-            ### Get pants asset ID ###
-            if rbx_pants_netw_error == None:        
-                pants_data, rbx_pants_netw_error = asyncio.run(self.get_id_data(rbx_pants, rbx_cloth))
-                pants_data = str(pants_data).split("<url>http://www.roblox.com/asset/?id=")[1]
-                rbx_pants = pants_data.split("</url>")[0] #Actual item ID
-                
+
+            ### Get pants asset ID (parse classic Pants for its PantsTemplate texture) ###
+            if rbx_pants_netw_error == None:
+                pants_asset, rbx_pants_netw_error = self.get_auth_asset_data(rbx_pants, auth_headers)
+            if rbx_pants_netw_error == None:
+                rbx_pants, rbx_pants_netw_error = self.get_classic_texture_id(pants_asset, rbx_cloth) #Actual item ID
+
             ### Get pants Data ###
-            if rbx_pants_netw_error == None:        
-                pants_data, rbx_pants_netw_error = asyncio.run(self.get_id_data(rbx_pants, rbx_cloth))
+            if rbx_pants_netw_error == None:
+                pants_data, rbx_pants_netw_error = self.get_auth_asset_data(rbx_pants, auth_headers)
             
             ### Make folder if dont have ###
             if rbx_pants_netw_error == None: 
@@ -304,13 +312,64 @@ class BUTTON_WEAR(bpy.types.Operator):
             netw_error = f"{data.status_code}: Error getting IMG Data"
         return image_data, netw_error
  
-    ### Get items Data by ID ###
-    async def get_id_data(self, id, type):
-        url = f"https://assetdelivery.roblox.com/v1/asset?id={id}" 
-        data = requests.get(url)
-        if data.status_code == 200:
-            data = data.content
-            netw_error = None
-        else:
-            netw_error = f"{data.status_code}: Error getting {type} Data"
-        return data, netw_error       
+    ### Build authorized request headers (Roblox OAuth Bearer token) ###
+    def get_auth_headers(self, context):
+        """Refreshes the Roblox OAuth token and returns ({"Authorization": ...}, error).
+        Returns (None, error) when the user is not logged in or the refresh fails."""
+        from RBX_Toolbox.func_import_v2 import func_rbx_other
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        try:
+            access_token = loop.run_until_complete(func_rbx_other.renew_token(context))
+        except Exception:
+            return None, "Roblox login required. Please log in above."
+        return {"Authorization": f"Bearer {access_token}"}, None
+
+    ### Get item Data by ID via the authorized Cloud asset-delivery API ###
+    def get_auth_asset_data(self, id, headers):
+        """Downloads asset bytes using the authenticated session. Returns (data, error)."""
+        from RBX_Toolbox.func_import_v2 import func_rbx_cloud_api
+        return func_rbx_cloud_api.get_asset_data(id, headers)
+
+    ### Resolve the texture asset ID from a classic Shirt/Pants asset ###
+    def get_classic_texture_id(self, asset_bytes, type):
+        """Parses a classic Shirt/Pants asset (XML or binary rbxm) and returns
+        (texture_id, error). Never raises - returns a friendly error on bad data."""
+        from RBX_Toolbox.func_import_v2 import func_rbx_other
+        from RBX_Toolbox.func_import_v2.readers import rbxm_reader
+
+        tex_id = None
+        error = None
+        if not asset_bytes:
+            return None, f"Error: Empty {type} data"
+
+        class_name = "Shirt" if type == "shirt" else "Pants"
+        prop_name = "ShirtTemplate" if type == "shirt" else "PantsTemplate"
+
+        tmp_dir = os.path.join(glob_vars.addon_path, 'Imported_Clothes', 'tmp')
+        if not os.path.exists(tmp_dir):
+            os.makedirs(tmp_dir)
+        tmp_file = os.path.join(tmp_dir, f"classic_{type}.rbxm")
+        try:
+            with open(tmp_file, "wb") as f:
+                f.write(asset_bytes)
+            model = rbxm_reader.parse(tmp_file)
+            node = model.FindFirstChildOfClass(class_name)
+            if node is None:
+                matches = model.FindAll(class_name)
+                node = matches[0] if matches else None
+            if node is None:
+                error = f"Error: Not a classic {type}"
+            else:
+                template_raw = node.get(prop_name)
+                template_id_val = func_rbx_other.resolve_content_uri(template_raw)
+                if template_id_val:
+                    tex_id = func_rbx_other.strip_rbxassetid(template_id_val)
+                else:
+                    error = f"Error: No texture found in {type}"
+        except Exception:
+            error = f"Error reading {type} data"
+        return tex_id, error

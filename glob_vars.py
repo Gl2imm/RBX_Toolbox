@@ -27,12 +27,22 @@ update_test = False # Set to True to test out update process without uploading n
 rbx_update_test_down_link = "https://github.com/Gl2imm/RBX_Toolbox/releases/download/v.6.1/RBX_Toolbox_v.6.1.zip"
 need_restart_blender = False
 
+## Addon identity ##
+# The key Blender files our preferences under. This module sits at the addon
+# root, so __package__ IS the addon package name — which is whatever the folder
+# is actually called ("RBX_Toolbox", "RBX_Toolbox-main" from a GitHub zip, or
+# "bl_ext.<repo>.RBX_Toolbox" if installed as an extension). Never hardcode it,
+# and never take __package__.split('.')[0] — under the extensions system that
+# yields "bl_ext", not the addon.
+ADDON_ID = __package__
+
+
 ## Client Info ##
 def get_addon_preferences():
     """Safely retrieves the addon's preferences object."""
     try:
-        # The addon name must match the bl_idname in the preferences class
-        return bpy.context.preferences.addons["RBX_Toolbox"].preferences
+        # ADDON_ID must match the bl_idname in the preferences class
+        return bpy.context.preferences.addons[ADDON_ID].preferences
     except (AttributeError, KeyError):
         print("Warning: Could not access RBX_Toolbox preferences.")
         return None

@@ -1,6 +1,6 @@
 import bpy
 import os
-from RBX_Toolbox import glob_vars
+from .. import glob_vars
 from mathutils import Matrix, Vector
 
 ### Debug prints
@@ -79,7 +79,7 @@ def blender_api_add_meshes_as_obj(bundle_own_folder, mesh_part, mesh_data, cfram
         
         ### Spawn at origin tracker
         if actual_at_origin:
-            from RBX_Toolbox import glob_vars
+            from .. import glob_vars
             if rbx_obj not in glob_vars.rbx_spawn_tracker:
                 glob_vars.rbx_spawn_tracker.append(rbx_obj)
             
@@ -122,7 +122,7 @@ def blender_api_add_attachments(mesh_part_attachment, mesh_part_attachment_cfram
 
     # Apply mesh matrix to attachment if spawn at origin
     if rbx_bndl_char_choice_at_origin:
-        from RBX_Toolbox import glob_vars
+        from .. import glob_vars
         if mesh_part_attachment_obj not in glob_vars.rbx_spawn_tracker:
             glob_vars.rbx_spawn_tracker.append(mesh_part_attachment_obj)
 

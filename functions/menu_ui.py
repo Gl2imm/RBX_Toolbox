@@ -3,16 +3,16 @@ import bpy
 import os
 import glob
 import bmesh
-from RBX_Toolbox import glob_vars
-from glob_vars import addon_path
+from .. import glob_vars
+from ..glob_vars import addon_path
 from . import menu_pie
-from RBX_Toolbox import update
-from RBX_Toolbox import update_aepbr
-from RBX_Toolbox import props
+from .. import update
+from .. import update_aepbr
+from .. import props
 
 
 
-from RBX_Toolbox import addon_version, addon_label
+from .. import addon_version, addon_label
 #clean public lib, pycache and imports folder
 #set debug to false
 
@@ -42,7 +42,7 @@ class RBX_OT_terms_of_use(bpy.types.Operator):
 
     def invoke(self, context, event):
         if self.action == "ACCEPT":
-            prefs = context.preferences.addons["RBX_Toolbox"].preferences
+            prefs = context.preferences.addons[glob_vars.ADDON_ID].preferences
             prefs.accepted_terms_of_use = True
             bpy.ops.wm.save_userpref()
             self.report({'INFO'}, "Terms of Use accepted.")
@@ -83,7 +83,7 @@ class RBX_OT_terms_of_use(bpy.types.Operator):
 
     def execute(self, context):
         # "OK" button on the dialog acts as Accept
-        prefs = context.preferences.addons["RBX_Toolbox"].preferences
+        prefs = context.preferences.addons[glob_vars.ADDON_ID].preferences
         prefs.accepted_terms_of_use = True
         bpy.ops.wm.save_userpref()
         self.report({'INFO'}, "Terms of Use accepted.")
@@ -105,7 +105,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
         rbx_installed_dependencies = False
 
         # 2. Dependency Installation
-        from oauth.lib import install_dependencies  # Local import
+        from ..oauth.lib import install_dependencies  # Local import
         if not rbx.is_finished_installing_dependencies:
             box.row().label(
                 text=f"This plugin requires installation of",
@@ -140,14 +140,14 @@ class TOOLBOX_MENU(bpy.types.Panel):
             # the plugin loads. Instead, we will fetch this information on the first draw of the
             # main panel
             if not rbx.has_called_load_creator:
-                from oauth.lib import creator_details  # Local import
+                from ..oauth.lib import creator_details  # Local import
                 creator_details.load_creator_details(
                     context.window_manager, context.preferences)
 
             # 4. Main UI Content: Login or Creator/Upload sections
             if not rbx.is_logged_in:
                 # Login UI Section
-                from oauth.lib import oauth2_login_operators  # Local import
+                from ..oauth.lib import oauth2_login_operators  # Local import
 
                 button_text_login = "Logging in..." if rbx.is_processing_login_or_logout else "Log in"
                 box.row().operator(
@@ -167,7 +167,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
 
                 # Schedule the supporter game-pass check (displayed in its own box below)
                 try:
-                    from oauth.lib import supporter_status
+                    from ..oauth.lib import supporter_status
                     if _uid:
                         supporter_status.schedule_fetch(_uid)
                 except Exception:
@@ -175,7 +175,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
 
                 # Avatar thumbnail — schedule fetch once, display when ready
                 try:
-                    from oauth.lib import user_thumbnail
+                    from ..oauth.lib import user_thumbnail
                     if _uid:
                         user_thumbnail.schedule_fetch(_uid)
                     _icon_id = user_thumbnail.get_icon_id()
@@ -200,7 +200,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 top_row_creator = box.row(align=True)
                 top_row_creator.alignment = 'CENTER'
                 try:
-                    from oauth.lib.oauth2_client import RbxOAuth2Client  # Local import
+                    from ..oauth.lib.oauth2_client import RbxOAuth2Client  # Local import
                     oauth2_client = RbxOAuth2Client(rbx)  # rbx is already defined
                     top_row_creator.label(text=f"Hello, {rbx.name}!")
                 except Exception as exception:
@@ -209,7 +209,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     top_row_creator.label(
                         text="Hello, User (Error)", icon="ERROR")  # Fallback
 
-                from oauth.lib import oauth2_login_operators  # Local import
+                from ..oauth.lib import oauth2_login_operators  # Local import
                 button_text_logout = "Working..." if rbx.is_processing_login_or_logout else "Log out"
                 logout_row = box.row()
                 logout_row.alignment = 'RIGHT'
@@ -275,7 +275,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
 
             # Supporter tier — its own box below the avatar details, only when a tip game pass is owned
             try:
-                from oauth.lib import supporter_status
+                from ..oauth.lib import supporter_status
                 _tier = supporter_status.get_tier()
                 if rbx.is_logged_in and _tier:
                     sup_box = layout.box()
@@ -433,24 +433,36 @@ class TOOLBOX_MENU(bpy.types.Panel):
 
 
 
-        ######### Import (Beta) #########
+        ######### Import from Roblox #########
         if rbx.is_logged_in:
             row = layout.row()
             icon = 'DOWNARROW_HLT' if context.scene.subpanel_imp_beta else 'RIGHTARROW'
             row.prop(context.scene, 'subpanel_imp_beta', icon=icon, icon_only=True)
-            row.label(text='Import (Beta)', icon='IMPORT')
+            row.label(text='Import from Roblox', icon='IMPORT')
             # some data on the subpanel
             if context.scene.subpanel_imp_beta:
-                # Terms of Use gate: must accept before using Import (Beta)
-                addon_prefs = context.preferences.addons["RBX_Toolbox"].preferences
+                # Terms of Use gate: must accept before using Import from Roblox
+                addon_prefs = context.preferences.addons[glob_vars.ADDON_ID].preferences
                 if not addon_prefs.accepted_terms_of_use:
                     box = layout.box()
                     box.label(text="Please accept the Terms of Use", icon='INFO')
-                    box.label(text="before using Import (Beta).")
+                    box.label(text="before using Import from Roblox.")
                     box.operator('object.rbx_terms_of_use', text="Terms of Use", icon='BOOKMARKS').action = "SHOW"
                 else:
+                    # ---- Import My Avatar (separate box above the ID/URL box) ----
+                    ava_box = layout.box()
+                    ava_box.enabled = not rbx_prefs.rbx_import_beta_active
+                    ava_box.label(text='Import My Avatar', icon='USER')
+                    try:
+                        _cur_usr = glob_vars.get_login_info().get("user_name")
+                    except Exception:
+                        _cur_usr = None
+                    _ava_btn_text = f"Import My Avatar ({_cur_usr})" if _cur_usr else "Import My Avatar"
+                    ava_box.operator('object.rbx_import_user_avatar', text=_ava_btn_text, icon='TRACKING_REFINE_BACKWARDS')
+                    ava_box.prop(rbx_prefs, 'rbx_avatar_separate_by_material', text='Separate by Material')
+
                     box = layout.box()
-                    
+
                     row_title = box.row()
                     row_title.label(text='Enter ID or URL')
                     row_title.operator('object.rbx_import_discovery_info_popup', text="", icon='INFO')
@@ -503,7 +515,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
                                     pass
                                 
                                 # Import the configuration
-                                from RBX_Toolbox.func_import_v2 import rbx_import_discovery as discovery_config
+                                from ..func_import_v2 import rbx_import_discovery as discovery_config
 
                                 # Helper to draw a category box
                                 def draw_discovery_category(layout, category_name, icon, enum_prop, download_operator_text):
@@ -1106,7 +1118,10 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 box.separator()
                 # Play/Pause toggle + Delete Rig
                 row = box.row()
-                play_icon = 'PAUSE' if _is_rig_spawned() and __import__('RBX_Toolbox.func_import_v2.func_lc_animations', fromlist=['_LC_Anim_V2_Globals'])._LC_Anim_V2_Globals.animationIsPlaying else 'PLAY'
+                # Imported here (not at module level) to keep this lazy, as it was
+                # when this used __import__.
+                from ..func_import_v2 import func_lc_animations as _lc_anim_mod
+                play_icon = 'PAUSE' if _is_rig_spawned() and _lc_anim_mod._LC_Anim_V2_Globals.animationIsPlaying else 'PLAY'
                 row.operator('object.rbx_lc_anim_v2_play', text="Play / Pause", icon=play_icon)
                 row.operator('object.rbx_lc_anim_v2_delete', text="Delete Rig", icon='TRASH')
 
@@ -1439,10 +1454,10 @@ class TOOLBOX_MENU(bpy.types.Panel):
             row.prop(context.scene, 'subpanel_upload', icon=icon, icon_only=True)
             row.label(text='Upload to Roblox', icon='COLLAPSEMENU')
             if context.scene.subpanel_upload:
-                from oauth.lib.upload_operator import RBX_OT_upload  # Local import
-                from oauth.lib.upload_animation_operator import RBX_OT_upload_animation  # Local import
-                from oauth.lib import status_indicators  # Local import
-                from RBX_Toolbox import glob_vars as _gv
+                from ..oauth.lib.upload_operator import RBX_OT_upload  # Local import
+                from ..oauth.lib.upload_animation_operator import RBX_OT_upload_animation  # Local import
+                from ..oauth.lib import status_indicators  # Local import
+                from .. import glob_vars as _gv
 
                 upload_section_box = layout.box()
                 upload_section_box.prop(rbx, "creator")
@@ -1456,7 +1471,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
                     upload_section_box.prop(rbx_prefs, "rbx_upload_as_new")
                     upload_section_box.row().operator(RBX_OT_upload.bl_idname)
 
-                    from oauth.lib.get_selected_objects import get_selected_objects  # Local import
+                    from ..oauth.lib.get_selected_objects import get_selected_objects  # Local import
                     selected_text = ", ".join(obj.name for obj in get_selected_objects(context))
                     if selected_text:
                         upload_section_box.row().label(text="Selected Objects:", icon="RESTRICT_SELECT_OFF")

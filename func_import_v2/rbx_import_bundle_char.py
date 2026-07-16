@@ -7,8 +7,8 @@ import requests
 import json
 import mathutils
 import importlib
-from RBX_Toolbox import glob_vars
-from glob_vars import addon_path
+from .. import glob_vars
+from ..glob_vars import addon_path
 
 
 
@@ -76,7 +76,7 @@ def strip_rbxassetid(asset_str):
 # This asynchronous method is invoked as a separate coroutine from the main thread
 async def renew_token(context):
 	"""Refreshes Auth Token"""
-	from oauth.lib.oauth2_client import RbxOAuth2Client
+	from ..oauth.lib.oauth2_client import RbxOAuth2Client
 	window_manager = context.window_manager
 	rbx = window_manager.rbx
 	oauth2_client = RbxOAuth2Client(rbx)

@@ -1,5 +1,5 @@
 import requests
-from RBX_Toolbox import glob_vars
+from .. import glob_vars
 import time
 
 ### Debug prints

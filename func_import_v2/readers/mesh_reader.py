@@ -319,8 +319,11 @@ def parse_bin(data, version):
         _read_subsets_and_remap(data, offset, subset_count, skin_indices)
         offset += subset_count * 72
 
-    # --- Skip FACS data (v5 only) ---
+    # --- Read FACS data (v5 only) — capture the raw block for facs_reader ---
+    # (Previously skipped. Parsing is done lazily by readers/facs_reader.py.)
+    facs_raw = None
     if facs_data_size > 0:
+        facs_raw = bytes(data[offset:offset + facs_data_size])
         offset += facs_data_size
 
     # --- Build result dictionary ---
@@ -339,6 +342,9 @@ def parse_bin(data, version):
         result["skinIndices"] = skin_indices
         result["skinWeights"] = skin_weights
         result["bones"] = bones
+
+    if facs_raw:
+        result["facsRaw"] = facs_raw
 
     return result
 
@@ -374,6 +380,7 @@ def parse_chunked(data, version):
     skin_indices = []
     skin_weights = []
     bones = []
+    facs_raw = None
 
     # --- Read chunks until not enough bytes remain for a chunk header ---
     while offset + 16 <= len(data):
@@ -415,8 +422,14 @@ def parse_chunked(data, version):
             if chunk_ver == 1:
                 skin_indices, skin_weights, bones = _parse_skinning_chunk(chunk_data)
 
+        elif chunk_type == "FACS":
+            # FileMesh_FACS_v1 = { uint facsDataSize; FileMeshFacsData }.
+            # Strip the leading size so facs_reader gets the FacsData directly.
+            if chunk_ver == 1 and len(chunk_data) > 4:
+                facs_raw = bytes(chunk_data[4:])
+
         else:
-            # Unknown or unneeded chunk (FACS, HSRAVIS, etc.) — skip
+            # Unknown or unneeded chunk (HSRAVIS, etc.) — skip
             pass
 
     # Default LODs if none were found
@@ -439,6 +452,9 @@ def parse_chunked(data, version):
         result["skinIndices"] = skin_indices
         result["skinWeights"] = skin_weights
         result["bones"] = bones
+
+    if facs_raw:
+        result["facsRaw"] = facs_raw
 
     return result
 

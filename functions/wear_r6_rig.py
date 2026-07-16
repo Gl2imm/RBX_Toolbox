@@ -3,7 +3,7 @@ import os
 import asyncio
 import requests
 
-from RBX_Toolbox import glob_vars
+from .. import glob_vars
 
 
 
@@ -316,7 +316,7 @@ class BUTTON_WEAR(bpy.types.Operator):
     def get_auth_headers(self, context):
         """Refreshes the Roblox OAuth token and returns ({"Authorization": ...}, error).
         Returns (None, error) when the user is not logged in or the refresh fails."""
-        from RBX_Toolbox.func_import_v2 import func_rbx_other
+        from ..func_import_v2 import func_rbx_other
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
@@ -331,15 +331,15 @@ class BUTTON_WEAR(bpy.types.Operator):
     ### Get item Data by ID via the authorized Cloud asset-delivery API ###
     def get_auth_asset_data(self, id, headers):
         """Downloads asset bytes using the authenticated session. Returns (data, error)."""
-        from RBX_Toolbox.func_import_v2 import func_rbx_cloud_api
+        from ..func_import_v2 import func_rbx_cloud_api
         return func_rbx_cloud_api.get_asset_data(id, headers)
 
     ### Resolve the texture asset ID from a classic Shirt/Pants asset ###
     def get_classic_texture_id(self, asset_bytes, type):
         """Parses a classic Shirt/Pants asset (XML or binary rbxm) and returns
         (texture_id, error). Never raises - returns a friendly error on bad data."""
-        from RBX_Toolbox.func_import_v2 import func_rbx_other
-        from RBX_Toolbox.func_import_v2.readers import rbxm_reader
+        from ..func_import_v2 import func_rbx_other
+        from ..func_import_v2.readers import rbxm_reader
 
         tex_id = None
         error = None

@@ -2,9 +2,10 @@
 import bpy
 import mathutils
 import os
-from RBX_Toolbox import glob_vars
+from .. import glob_vars
 
 from . import func_blndr_api # Ensure we have access to blender api helpers
+from . import func_rbx_other
 ### Debug prints
 DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
@@ -196,7 +197,11 @@ def import_bones(imported_meshes_data, mesh_reader, funct, rbx_at_origin, asset_
     imported_meshes_data: List of dicts {'object': obj, 'mesh_data': data, 'mesh_name': name}
     asset_name: Name of the asset (used for collection and object naming)
     """
-    
+
+    # Sanitize the same way the mesh/cage/attachment importers do, so the armature
+    # lands in the asset collection they created instead of a spaced-name twin.
+    asset_name = func_rbx_other.replace_restricted_char(asset_name) or "R15_Character"
+
     # 1. Collect all unique bones from all meshes
     all_bones_data = {}
 
@@ -405,3 +410,39 @@ def import_bones(imported_meshes_data, mesh_reader, funct, rbx_at_origin, asset_
     if rbx_at_origin:
         if arm_obj not in glob_vars.rbx_spawn_tracker:
             glob_vars.rbx_spawn_tracker.append(arm_obj)
+
+    # --- FACS facial animation (Dynamic Heads) -----------------------------
+    # If enabled and any imported mesh carried a FACS block, build a preview
+    # animation of the head's own expressions onto this armature. Fully guarded
+    # so a failure never breaks the normal armature import.
+    try:
+        add_facs = getattr(bpy.context.scene.rbx_prefs, "rbx_dyn_heads_choice_add_facs", False)
+        if add_facs:
+            facs_raw = None
+            for mi in imported_meshes_data:
+                md = mi.get("mesh_data", {}) or {}
+                if md.get("facsRaw"):
+                    facs_raw = md["facsRaw"]
+                    break
+            if facs_raw:
+                import importlib
+                from .readers import facs_reader
+                importlib.reload(facs_reader)
+                facs = facs_reader.parse_facs(facs_raw)
+                if facs:
+                    # Pass each face bone's Roblox joint rest frame (already in
+                    # Blender axes) so the builder can correct for Blender's
+                    # auto-computed bone roll.
+                    bone_mats = {n: bd["world_matrix"]
+                                 for n, bd in all_bones_data.items()
+                                 if bd.get("world_matrix")}
+                    action, info = facs_reader.build_facs_animation(
+                        arm_obj, facs, bone_world_matrices=bone_mats,
+                        action_name=f"FACS_{asset_name}")
+                    dprint(f"import_bones FACS: {info}")
+                else:
+                    dprint("import_bones FACS: parse returned None")
+            else:
+                dprint("import_bones FACS: enabled but no FACS data in meshes")
+    except Exception as e:
+        dprint(f"import_bones FACS step failed: {e}")

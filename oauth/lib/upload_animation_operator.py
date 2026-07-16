@@ -84,7 +84,7 @@ class RBX_OT_upload_animation(Operator):
         rbx.num_objects_uploading = 1
 
         from . import status_indicators
-        import RBX_Toolbox.glob_vars as glob_vars
+        from ... import glob_vars as glob_vars
 
         status_indicators.clear_statuses(context.window_manager)
         glob_vars.rbx_last_anim_upload_url = None  # clear previous link
@@ -236,7 +236,7 @@ class RBX_OT_upload_animation(Operator):
         from . import status_indicators
         import openapi_client
         import asyncio
-        import RBX_Toolbox.glob_vars as glob_vars
+        from ... import glob_vars as glob_vars
 
         try:
             operation = task.result()

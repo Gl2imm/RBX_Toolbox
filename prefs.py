@@ -15,9 +15,8 @@ print("**********************************************")
 # OPERATOR
 ########################################
 class RBXToolsPreferences(bpy.types.AddonPreferences):
+    # Must be the addon's package name, whatever the install folder is called.
     bl_idname = __package__
-
-    bl_idname = "RBX_Toolbox"
 
 
 

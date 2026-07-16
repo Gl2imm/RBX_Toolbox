@@ -62,5 +62,6 @@ SCOPES = [
     "profile",
     "asset:read",
     "asset:write",
-    "legacy-asset:manage"
+    "legacy-asset:manage",
+    "thumbnail:read"
 ]

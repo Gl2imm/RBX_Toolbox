@@ -2,8 +2,8 @@ import bpy
 import os
 import importlib
 import asyncio
-from RBX_Toolbox import glob_vars
-from glob_vars import addon_path
+from .. import glob_vars
+from ..glob_vars import addon_path
 from typing import TYPE_CHECKING
 
 

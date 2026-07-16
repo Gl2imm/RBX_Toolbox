@@ -1,8 +1,75 @@
 import bpy
-from RBX_Toolbox import glob_vars
+from .. import glob_vars
 
 rbx_anim_error = None
 unhide_store = []
+
+
+# ---------------------------------------------------------------------------
+# Action F-Curve helpers (Blender 4.5+).
+# Blender 4.4 introduced "slotted" actions (layers -> strips -> channelbags ->
+# fcurves) and Blender 5.0 removed the legacy `Action.fcurves` accessor. These
+# helpers walk/edit F-Curves the same way whether the action is slotted (all
+# supported 4.5+ builds) or, as a fallback, exposes the legacy attribute.
+# ---------------------------------------------------------------------------
+
+def _iter_action_fcurves(action):
+    """Yield every F-Curve of an action, slotted or legacy."""
+    if action is None:
+        return
+    layers = getattr(action, "layers", None)
+    if layers is not None and len(layers) > 0:
+        for layer in layers:
+            for strip in layer.strips:
+                if getattr(strip, "type", None) != 'KEYFRAME':
+                    continue
+                cbags = getattr(strip, "channelbags", None)
+                if not cbags:
+                    continue
+                for cbag in cbags:
+                    for fc in cbag.fcurves:
+                        yield fc
+        return
+    legacy = getattr(action, "fcurves", None)
+    if legacy is not None:
+        for fc in legacy:
+            yield fc
+
+
+def _remove_action_fcurve(action, fc):
+    """Remove a single F-Curve from an action, slotted or legacy."""
+    layers = getattr(action, "layers", None)
+    if layers is not None and len(layers) > 0:
+        for layer in layers:
+            for strip in layer.strips:
+                cbags = getattr(strip, "channelbags", None)
+                if not cbags:
+                    continue
+                for cbag in cbags:
+                    try:
+                        cbag.fcurves.remove(fc)
+                        return
+                    except (RuntimeError, ReferenceError):
+                        continue  # belongs to a different channelbag
+        return
+    legacy = getattr(action, "fcurves", None)
+    if legacy is not None:
+        try:
+            legacy.remove(fc)
+        except Exception:
+            pass
+
+
+def _prune_object_level_fcurves(action):
+    """Keep only pose-bone and custom-property curves; drop object-level
+    transforms (location/rotation/scale of the armature object itself) so the
+    FACS animation doesn't move the target rig around."""
+    to_remove = [
+        fc for fc in _iter_action_fcurves(action)
+        if not (fc.data_path.startswith("pose.bones") or fc.data_path.startswith('["'))
+    ]
+    for fc in to_remove:
+        _remove_action_fcurve(action, fc)
 
 
 
@@ -211,122 +278,150 @@ class RBX_BUTTON_AVA(bpy.types.Operator):
             
             
         if rbx_ava == 'add_facs_anim':
-            selected = bpy.context.selected_objects
-            
+            selected = context.selected_objects
+
             if len(selected) != 1 or selected[0].type != 'ARMATURE':
                 self.report({'ERROR'}, "Select exactly 1 Armature")
                 return {'FINISHED'}
-                
+
             target_rig = selected[0]
-            colls_before = set(bpy.data.collections)
             objs_before = set(bpy.data.objects)
-            
-            # Append the template armature
+            colls_before = set(bpy.data.collections)
+            acts_before = set(bpy.data.actions)
+
+            # Append the template armature (carries the FACS preview animation)
             ava_spwn = 'Blocky_ava'
             try:
                 bpy.ops.wm.append(directory = glob_vars.addon_path + glob_vars.rbx_blend_file + "/Collection/", filename = ava_spwn)
             except Exception as e:
-                self.report({'ERROR'}, f"Failed to append: {e}")
+                self.report({'ERROR'}, f"Failed to append template: {e}")
                 return {'FINISHED'}
-                
-            new_objs = set(bpy.data.objects) - objs_before
-            
-            # Find the appended armature and its animation
-            template_rig = None
-            for obj in new_objs:
-                if obj.type == 'ARMATURE' and obj.animation_data and obj.animation_data.action:
-                    template_rig = obj
-                    break
-                    
-            if template_rig and template_rig.animation_data.action:
+
+            # Snapshot exactly what the append brought in so we can always remove it,
+            # even on an error. (new_action, created later, is NOT in these sets.)
+            appended_objs = set(bpy.data.objects) - objs_before
+            appended_colls = set(bpy.data.collections) - colls_before
+            appended_acts = set(bpy.data.actions) - acts_before
+
+            def _cleanup_appended():
+                try:
+                    bpy.ops.object.select_all(action='DESELECT')
+                except Exception:
+                    pass
+                for o in list(appended_objs):
+                    try:
+                        bpy.data.objects.remove(o, do_unlink=True)
+                    except Exception:
+                        pass
+                for c in list(appended_colls):
+                    try:
+                        bpy.data.collections.remove(c)
+                    except Exception:
+                        pass
+                for a in list(appended_acts):
+                    try:
+                        bpy.data.actions.remove(a)
+                    except Exception:
+                        pass
+
+            def _reselect_target():
+                try:
+                    target_rig.select_set(True)
+                    context.view_layer.objects.active = target_rig
+                except Exception:
+                    pass
+
+            try:
+                # Find the appended armature that carries the FACS animation
+                template_rig = None
+                for obj in appended_objs:
+                    if obj.type == 'ARMATURE' and obj.animation_data and obj.animation_data.action:
+                        template_rig = obj
+                        break
+
+                if not (template_rig and template_rig.animation_data.action):
+                    _cleanup_appended()
+                    _reselect_target()
+                    self.report({'ERROR'}, "Could not find FACS animation in template")
+                    return {'FINISHED'}
+
                 template_action = template_rig.animation_data.action
-                
-                # Check for missing bones
+
+                # Which bones does the template animation drive?
                 anim_bones = set()
-                for fc in template_action.fcurves:
+                for fc in _iter_action_fcurves(template_action):
                     if fc.data_path.startswith("pose.bones"):
                         try:
-                            # Safely extract bone name whether it uses single or double quotes
+                            # Bone name, whether single- or double-quoted
                             bone_name = fc.data_path.split('[')[1].split(']')[0].strip('\'"')
                             anim_bones.add(bone_name)
                         except Exception:
                             pass
 
-                # The template animation contains the full body, but FACS is only for the face.
-                # Ignore missing standard R15 body parts.
+                # The template holds a full R15 body; FACS only needs the face
+                # joints, so ignore standard body/root parts when checking gaps.
                 ignored_parts = {
                     "LeftUpperArm", "LeftLowerArm", "LeftHand",
                     "RightUpperArm", "RightLowerArm", "RightHand",
                     "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
                     "RightUpperLeg", "RightLowerLeg", "RightFoot",
-                    "UpperTorso", "LowerTorso", "Head", "HumanoidRootPart"
+                    "UpperTorso", "LowerTorso", "Head", "HumanoidRootPart",
+                    "HumanoidRootNode", "Root",
                 }
 
-                missing_bones = set()
-                for b in anim_bones:
-                    if b not in target_rig.pose.bones and b not in ignored_parts:
-                        missing_bones.add(b)
-                
-                # We only count FACS bones.
-                facs_bones_expected = len([b for b in anim_bones if b not in ignored_parts])
-                
-                if len(missing_bones) > 0:
-                    # If ALL FACS bones in the animation are missing from the rig, the names are fundamentally wrong/different
-                    if len(missing_bones) == facs_bones_expected and facs_bones_expected > 0:
-                        glob_vars.rbx_facs_anim_error = "Bones in face armature have wrong names."
-                    else:
-                        # Only SOME FACS bones are missing
-                        glob_vars.rbx_facs_anim_error = "Some bones are missing in face armature."
-                    print(f"DEBUG FACS ANIMATION: Missing bones: {missing_bones}")
-                else:
-                    glob_vars.rbx_facs_anim_error = None
-                
-                # Create a fresh action to avoid inherited Action Slot binding issues in Blender 4.3+
-                new_action = bpy.data.actions.new(name="FACS_Animation")
-                
-                # Copy only bone poses and custom properties directly to fresh F-Curves
-                for fc in template_action.fcurves:
-                    if fc.data_path.startswith("pose.bones") or fc.data_path.startswith('["'):
-                        new_fc = new_action.fcurves.new(data_path=fc.data_path, index=fc.array_index)
-                        
-                        # Copy keyframes
-                        for kp in fc.keyframe_points:
-                            new_kp = new_fc.keyframe_points.insert(kp.co.x, kp.co.y, options={'FAST'})
-                            new_kp.interpolation = kp.interpolation
-                            new_kp.handle_left = kp.handle_left
-                            new_kp.handle_left_type = kp.handle_left_type
-                            new_kp.handle_right = kp.handle_right
-                            new_kp.handle_right_type = kp.handle_right_type
-                new_action.fcurves.update()
+                facs_bones = {b for b in anim_bones if b not in ignored_parts}
+                missing_bones = {b for b in facs_bones if b not in target_rig.pose.bones}
 
-                # Assign the action to the target rig
+                # Validate: the selected armature must actually carry FACS joints.
+                # Surface this as a UI error/banner instead of a Python traceback.
+                if facs_bones and missing_bones == facs_bones:
+                    glob_vars.rbx_facs_anim_error = "Selected armature has no FACS bones. Wrong rig or bone names."
+                    _cleanup_appended()
+                    _reselect_target()
+                    self.report({'ERROR'}, "No matching FACS bones on the selected armature.")
+                    return {'FINISHED'}
+
+                # Copy the template action (correctly reproduces the slotted
+                # structure on any Blender 4.5+), then drop object-level curves so
+                # only the pose/custom-prop data is applied to the target rig.
+                new_action = template_action.copy()
+                new_action.name = "FACS_Animation"
+                _prune_object_level_fcurves(new_action)
+
+                # Assign the action (and its slot) to the target rig
                 if not target_rig.animation_data:
                     target_rig.animation_data_create()
                 else:
-                    # Clear any NLA tracks to ensure the active action plays instantly
-                    if target_rig.animation_data.nla_tracks:
-                        for track in list(target_rig.animation_data.nla_tracks):
-                            target_rig.animation_data.nla_tracks.remove(track)
-                            
+                    for track in list(target_rig.animation_data.nla_tracks):
+                        target_rig.animation_data.nla_tracks.remove(track)
+
                 target_rig.animation_data.action = new_action
-                
-                self.report({'INFO'}, "FACS Animation applied!")
-            else:
-                self.report({'ERROR'}, "Could not find animation data in template")
-                
-            # Clean up the appended items
-            bpy.ops.object.select_all(action='DESELECT')
-            for obj in new_objs:
-                bpy.data.objects.remove(obj, do_unlink=True)
-                
-            new_colls = set(bpy.data.collections) - colls_before
-            for coll in new_colls:
-                bpy.data.collections.remove(coll)
-                
-            # Reselect target
-            target_rig.select_set(True)
-            bpy.context.view_layer.objects.active = target_rig
-            bpy.context.view_layer.update()
+                # Bind the action slot so the animation actually evaluates
+                # (slotted actions, Blender 4.4+).
+                slots = getattr(new_action, "slots", None)
+                if slots and len(slots) > 0:
+                    try:
+                        target_rig.animation_data.action_slot = slots[0]
+                    except Exception:
+                        pass
+
+                if missing_bones:
+                    glob_vars.rbx_facs_anim_error = "Some FACS bones are missing in the face armature."
+                    self.report({'WARNING'}, "FACS applied, but some face bones are missing.")
+                else:
+                    glob_vars.rbx_facs_anim_error = None
+                    self.report({'INFO'}, "FACS Animation applied!")
+
+            except Exception as e:
+                _cleanup_appended()
+                _reselect_target()
+                self.report({'ERROR'}, f"Add FACS failed: {e}")
+                return {'FINISHED'}
+
+            # Success: remove the appended template, keep the new action, reselect.
+            _cleanup_appended()
+            _reselect_target()
+            context.view_layer.update()
 
 
         if rbx_ava == 'rename':

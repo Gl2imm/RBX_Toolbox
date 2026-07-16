@@ -2,8 +2,8 @@ import bpy
 import os
 import requests
 from bpy_extras.object_utils import AddObjectHelper
-from RBX_Toolbox import glob_vars # type: ignore
-from glob_vars import addon_path
+from .. import glob_vars # type: ignore
+from ..glob_vars import addon_path
 import asyncio
 import time
 import re
@@ -36,7 +36,7 @@ def replace_restricted_char(str: str = None):
 # This asynchronous method is invoked as a separate coroutine from the main thread
 async def renew_token(context):
     """Refreshes Auth Token"""
-    from oauth.lib.oauth2_client import RbxOAuth2Client
+    from ..oauth.lib.oauth2_client import RbxOAuth2Client
     window_manager = context.window_manager
     rbx = window_manager.rbx
     oauth2_client = RbxOAuth2Client(rbx)

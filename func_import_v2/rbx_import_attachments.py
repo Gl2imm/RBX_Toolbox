@@ -1,7 +1,7 @@
 import bpy
 import os
 import importlib
-from RBX_Toolbox import glob_vars
+from .. import glob_vars
 from typing import TYPE_CHECKING, List, Any, Dict, Union
 
 ### Debug prints

@@ -4,8 +4,8 @@ import asyncio
 import requests
 import json
 import importlib
-from RBX_Toolbox import glob_vars
-from glob_vars import addon_path
+from .. import glob_vars
+from ..glob_vars import addon_path
 
 
 # code here runs only in editor
@@ -396,7 +396,7 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
             row = box.row()
             row.enabled = rbx_prefs.rbx_dyn_heads_choice_add_meshes or rbx_prefs.rbx_dyn_heads_choice_add_cages
             row.prop(rbx_prefs, 'rbx_dyn_heads_choice_add_ver_col')
-            
+
             box.prop(rbx_prefs, 'rbx_dyn_heads_choice_clean_tmp_meshes')
 
         if category == "Accessory":
@@ -480,6 +480,13 @@ class RBX_OT_import_discovery_options(bpy.types.Operator):
         if category == "Armature":
             box.prop(rbx_prefs, 'rbx_bndl_char_choice_armature_at_origin') # Reusing bundle origin pref
             box.prop(rbx_prefs, 'rbx_bndl_char_choice_armature_link_meshes')
+
+            box.separator()
+            box.prop(rbx_prefs, 'rbx_dyn_heads_choice_add_facs')
+            if rbx_prefs.rbx_dyn_heads_choice_add_facs:
+                col_info = box.column(align=True)
+                col_info.label(text="Applies a Dynamic Head's own facial", icon='INFO')
+                col_info.label(text="expressions to this Armature.")
 
         if category == "Models":
             box.prop(rbx_prefs, 'rbx_model_choice_at_origin')

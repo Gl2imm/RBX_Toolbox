@@ -41,7 +41,7 @@ def restart_blender(self):
 async def oauth_logout(context):
     """oAuth Logout"""
     need_restart_blender = False
-    from oauth.lib.oauth2_client import RbxOAuth2Client
+    from .oauth.lib.oauth2_client import RbxOAuth2Client
     window_manager = context.window_manager
     rbx = window_manager.rbx
     oauth2_client = RbxOAuth2Client(rbx)

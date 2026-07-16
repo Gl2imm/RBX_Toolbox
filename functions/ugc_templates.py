@@ -1,6 +1,6 @@
 import bpy
 import mathutils
-from RBX_Toolbox import glob_vars
+from .. import glob_vars
 
 # Name given to the fur particle system added to a mesh, used to detect/convert it.
 FUR_PS_NAME = "RBX Fur"

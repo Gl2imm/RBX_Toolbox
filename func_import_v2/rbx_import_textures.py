@@ -3,7 +3,7 @@ import importlib
 from . import func_rbx_cloud_api
 from . import func_rbx_other
 from . import func_blndr_api
-from RBX_Toolbox import glob_vars
+from .. import glob_vars
 
 # Reload modules if needed, though usually handled by caller or auto-reload
 importlib.reload(func_rbx_cloud_api)

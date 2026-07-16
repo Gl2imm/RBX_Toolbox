@@ -1,5 +1,5 @@
 import bpy
-from RBX_Toolbox import glob_vars
+from .. import glob_vars
 
 
 ######### Hair Buttons ###########    

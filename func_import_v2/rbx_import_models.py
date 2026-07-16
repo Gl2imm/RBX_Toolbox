@@ -2,7 +2,7 @@ import bpy
 import os
 import math
 import importlib
-from RBX_Toolbox import glob_vars
+from .. import glob_vars
 from typing import Any, Dict, List
 
 ### Debug prints

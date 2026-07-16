@@ -240,6 +240,12 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     default = False
     ) # type: ignore
 
+    rbx_dyn_heads_choice_add_facs : bpy.props.BoolProperty(
+    name="Import FACS Animation",
+    description="Build an animation of the head's own FACS facial expressions on the imported armature, with each expression on its own frame",
+    default = False
+    ) # type: ignore
+
     ### Accessory Properties ###
     def update_accessory_dependencies(self, context):
         """
@@ -787,6 +793,13 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     rbx_import_beta_active : bpy.props.BoolProperty(
     name="Import Beta Active",
     description="Import Beta Active property",
+    default = False
+    ) # type: ignore
+
+    ### Import My Avatar ###
+    rbx_avatar_separate_by_material : bpy.props.BoolProperty(
+    name="Separate by Material",
+    description="Separate the imported avatar into one object per material",
     default = False
     ) # type: ignore
 

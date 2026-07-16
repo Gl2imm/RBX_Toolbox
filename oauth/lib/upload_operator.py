@@ -121,7 +121,7 @@ class RBX_OT_upload(Operator):
         rbx = context.window_manager.rbx
         rbx.num_objects_uploading = len(selected_objects)
 
-        import RBX_Toolbox.glob_vars as glob_vars
+        from ... import glob_vars as glob_vars
         glob_vars.rbx_last_mesh_upload_url = None
         glob_vars.rbx_last_mesh_upload_id = None
 
@@ -272,7 +272,7 @@ class RBX_OT_upload(Operator):
                     "CHECKMARK",
                 )
 
-                import RBX_Toolbox.glob_vars as glob_vars
+                from ... import glob_vars as glob_vars
                 glob_vars.rbx_last_mesh_upload_url = f"https://www.roblox.com/library/{operation.response.asset_id}"
                 glob_vars.rbx_last_mesh_upload_id = str(operation.response.asset_id)
             else:  # No error, no response, but is done. We don't expect this to happen

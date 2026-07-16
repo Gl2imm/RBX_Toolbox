@@ -2,6 +2,33 @@
                                                       Version History:
                                             ####################################
 
+v.7.8:
+    Feature Back: Import My Avatar
+    - The highly requested Import My Avatar feature is back! You can once again import your own
+      Roblox avatar straight into Blender, complete with its materials and textures.
+      Find it in the "Import from Roblox" tab.
+    - New "Separate by Material" option splits the imported avatar into separate parts.
+    - Note: if you are still logged in to Roblox after updating, log out and log back in, otherwise
+      this feature will not work. The login now asks for one extra permission that older logins were
+      never granted, and only a fresh login picks it up.
+
+    New Feature: Import FACS Animation (Dynamic Heads)
+    - Dynamic Heads can now be imported with their own facial expressions.
+    - To use it: in the "Import from Roblox" tab, discover a Dynamic Head, click the gear (Options)
+      next to "Armature", tick "Import FACS Animation", then Download Armature. The expressions are
+      applied to the armature, so the Armature has to be imported for this to do anything.
+
+    Fixes
+    - Fixed the "Add FACS Animation" button (Avatars tab) failing with an error and leaving an extra
+      rig behind on newer Blender versions. It now adds the FACS animation to your selected face rig
+      and cleans up after itself.
+    - Fixed the armature landing in a different collection from the meshes when an item's name
+      contained a space or a special character.
+    - Fixed the addon failing to install with a "No module named 'RBX_Toolbox'" error when the
+      addon folder was named anything other than "RBX_Toolbox" - most commonly when grabbing the
+      code from GitHub with "Download ZIP", which unpacks as "RBX_Toolbox-main". The folder can
+      now be named anything. Existing installs are unaffected and keep their settings.
+
 v.7.7:
     Added
     - New UGC Templates menu, which contains starter packs for new UGC creators. They can also be

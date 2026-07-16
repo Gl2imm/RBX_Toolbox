@@ -18,11 +18,12 @@
 
 # SPDX-License-Identifier: MIT
 
-# The add on is named after the root folder, so we need to step up the tree
-ADDON_NAME = "RBX_Toolbox"
+from ... import glob_vars
 
 
 def get_add_on_preferences(preferences):
     """Returns the preferences object for the add-on"""
-    # FIX: Use the hardcoded, correct addon name.
-    return preferences.addons[ADDON_NAME].preferences
+    # Resolved from the addon root package, so this keeps working whatever the
+    # install folder is called. This module is nested two levels down, so its own
+    # __package__ is "<addon>.oauth.lib" — it can't derive the addon name alone.
+    return preferences.addons[glob_vars.ADDON_ID].preferences

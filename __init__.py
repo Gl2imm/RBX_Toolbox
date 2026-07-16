@@ -19,8 +19,8 @@ import traceback
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (7, 7, 0),
-    "blender": (4, 1, 0),
+    "version": (7, 8, 0),
+    "blender": (4, 5, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
     "warning": "Subscribe to NYTV :)",
@@ -31,14 +31,13 @@ bl_info = {
 addon_version = "v." + ".".join(str(x) for x in bl_info["version"][:2])
 addon_label = f"Roblox Toolbox ({addon_version})"
 
-# Addon path and package name for installed addon
+# Addon path and package name for installed addon.
+# package_name comes from __package__, not the folder basename: the two differ
+# when the addon is installed as an extension (bl_ext.<repo>.<name>), and only
+# __package__ is the name Python and Blender actually key off.
 addon_path = os.path.dirname(os.path.abspath(__file__))
-package_name = os.path.basename(addon_path)
+package_name = __package__
 
-# Add addon path to sys.path if not already present
-if addon_path not in sys.path:
-    sys.path.append(addon_path)
-    
 all_modules_names = [
     "glob_vars",
     "prefs",
@@ -64,6 +63,7 @@ all_modules_names = [
     "functions.menu_pie",
     "functions.menu_ui",
     "func_import_v2.rbx_import_discovery",
+    "func_import_v2.rbx_import_user_avatar",
 ]
 
 # When bpy is already in local, reload modules for iterative testing
@@ -107,6 +107,7 @@ from .functions.menu_pie import RBX_MT_MENU3
 from .functions.menu_pie import RBX_MT_MENU4
 from .functions.menu_ui import TOOLBOX_MENU, RBX_OT_terms_of_use
 from .func_import_v2.rbx_import_discovery import RBX_OT_import_discovery, RBX_OT_import_reset, RBX_OT_import_discovery_download, RBX_OT_import_discovery_options, RBX_OT_import_discovery_open_folder, RBX_OT_open_tmp_folder, RBX_OT_import_model_summary, RBX_OT_import_discovery_info_popup
+from .func_import_v2.rbx_import_user_avatar import RBX_OT_import_user_avatar
 from . import oauth
 import bpy
 from bpy.types import Scene
@@ -131,6 +132,7 @@ classes = (
     RBX_OT_open_tmp_folder,
     RBX_OT_import_model_summary,
     RBX_OT_import_discovery_info_popup,
+    RBX_OT_import_user_avatar,
     BUTTON_CMR,
     BUTTON_DMMY,
     BUTTON_WEAR,

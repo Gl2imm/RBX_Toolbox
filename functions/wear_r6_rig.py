@@ -47,9 +47,11 @@ class BUTTON_WEAR(bpy.types.Operator):
               
         ##### Create Folders #####
         if rbx_cloth == 'folder':
-            if not os.path.exists(glob_vars.addon_path + '/Imported_Clothes'):
-                os.makedirs(glob_vars.addon_path + '/Imported_Clothes')
-            os.startfile(os.path.dirname(glob_vars.addon_path + '/Imported_Clothes/'))
+            clothes_dir = os.path.join(glob_vars.addon_path, glob_vars.rbx_import_main_folder,
+                                       glob_vars.rbx_imported_clothes_fldr)
+            if not os.path.exists(clothes_dir):
+                os.makedirs(clothes_dir)
+            os.startfile(clothes_dir)
 
         ### Check selected objects ###
         if rbx_cloth == 'mod':
@@ -118,7 +120,8 @@ class BUTTON_WEAR(bpy.types.Operator):
         
         def make_folder(data):
             error = None
-            path = os.path.join(glob_vars.addon_path, 'Imported_Clothes' + glob_vars.fbs + data)
+            path = os.path.join(glob_vars.addon_path, glob_vars.rbx_import_main_folder,
+                                glob_vars.rbx_imported_clothes_fldr, data)
             if not os.path.exists(path):
                 try:
                     os.makedirs(path)
@@ -349,7 +352,11 @@ class BUTTON_WEAR(bpy.types.Operator):
         class_name = "Shirt" if type == "shirt" else "Pants"
         prop_name = "ShirtTemplate" if type == "shirt" else "PantsTemplate"
 
-        tmp_dir = os.path.join(glob_vars.addon_path, 'Imported_Clothes', 'tmp')
+        # Scratch .rbxm: written, parsed, then thrown away. Goes in the shared
+        # junk folder the "Open Junk (tmp) Folder" button shows, so it's not
+        # left loose in the addon directory.
+        tmp_dir = os.path.join(glob_vars.addon_path, glob_vars.rbx_import_main_folder,
+                               glob_vars.rbx_import_tmp_rbxm)
         if not os.path.exists(tmp_dir):
             os.makedirs(tmp_dir)
         tmp_file = os.path.join(tmp_dir, f"classic_{type}.rbxm")

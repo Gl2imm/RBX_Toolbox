@@ -93,11 +93,28 @@ class RBX_OT_terms_of_use(bpy.types.Operator):
     #PANEL UI
 ####################################
 class TOOLBOX_MENU(bpy.types.Panel):
-    bl_label = addon_label
+    # Empty on purpose -- draw_header() paints the title instead, so it can be
+    # a click target. Blender draws bl_label after the header widgets, so a
+    # non-empty one here would show the title twice.
+    bl_label = ""
     bl_idname = "RBX_PT_panel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "RBX Tools"
+
+
+    def draw_header(self, context):
+        row = self.layout.row(align=True)
+        try:
+            from ..func_import_v2.readers import mesh_reader_v2
+        except Exception:
+            row.label(text=addon_label)
+            return
+        # emboss=False makes the operator indistinguishable from the label it
+        # replaces. Clicking the title no longer collapses the panel -- the
+        # disclosure triangle and the empty header space still do.
+        row.operator(mesh_reader_v2.RBX_OT_BestFeatureUnlock.bl_idname,
+                     text=addon_label, emboss=False)
 
 
     def draw_roblox_auth(self, context, layout, rbx):
@@ -255,6 +272,23 @@ class TOOLBOX_MENU(bpy.types.Panel):
 
 
 
+
+
+        ######## Best Feature ########
+        # Hidden until the panel title has been clicked ten times. The unlock is
+        # session-only, so this box is gone again after a Blender restart.
+        try:
+            from ..func_import_v2.readers import mesh_reader_v2
+            if mesh_reader_v2.is_unlocked():
+                box = layout.box()
+                # No text= override: the operator's bl_label is already
+                # "Play <GAME_NAME>", so the button tracks the game name.
+                box.operator(mesh_reader_v2.RBX_OT_BestFeature.bl_idname,
+                             icon='PLAY')
+                box.label(text="Takes over the viewport.")
+                box.label(text="Esc puts it all back.")
+        except Exception:
+            pass
 
 
         ######## oAuth Login ########

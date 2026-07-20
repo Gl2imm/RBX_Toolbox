@@ -27,7 +27,7 @@ def _delete_sphere():
             bpy.data.meshes.remove(mesh)
 
 
-def _create_sphere(context, arm, root_name):
+def _create_sphere(context):
     import bmesh as _bmesh
     _delete_sphere()
 
@@ -40,23 +40,35 @@ def _create_sphere(context, arm, root_name):
     sphere = bpy.data.objects.new(SPHERE_NAME, mesh)
     sphere.display_type = "WIRE"
     sphere.hide_render = True
+    sphere.hide_select = True  # Reference gizmo — must not be dragged or picked up by upload
     context.scene.collection.objects.link(sphere)
-
-    con = sphere.constraints.new("COPY_LOCATION")
-    con.target = arm
-    con.subtarget = root_name
     return sphere
+
+
+def _root_location_at_start(context, arm, root_name):
+    """World-space location of the rig's root bone on the action's first frame."""
+    scene = context.scene
+    action = arm.animation_data.action if arm.animation_data else None
+    if action is None:
+        return (arm.matrix_world @ arm.pose.bones[root_name].head).copy()
+
+    original_frame = scene.frame_current
+    try:
+        scene.frame_set(int(action.frame_range[0]))
+        return (arm.matrix_world @ arm.pose.bones[root_name].head).copy()
+    finally:
+        scene.frame_set(original_frame)
 
 
 def _update_safe_zone(self, context):
     """BoolProperty update callback for Scene.rbx_show_safe_zone."""
     show = self.rbx_show_safe_zone
-    sphere = bpy.data.objects.get(SPHERE_NAME)
 
     if not show:
-        if sphere:
-            sphere.hide_viewport = True
+        _delete_sphere()  # Remove from scene entirely, not just hide it
         return
+
+    sphere = bpy.data.objects.get(SPHERE_NAME)
 
     # Find the selected armature that has a valid root bone.
     arm = None
@@ -73,15 +85,15 @@ def _update_safe_zone(self, context):
         return  # No valid armature — leave checkbox on but do nothing
 
     if sphere is None:
-        _create_sphere(context, arm, root_name)
-    else:
-        # Update the constraint target in case the armature changed.
-        con = next((c for c in sphere.constraints if c.type == "COPY_LOCATION"), None)
-        if con is None:
-            con = sphere.constraints.new("COPY_LOCATION")
-        con.target = arm
-        con.subtarget = root_name
-        sphere.hide_viewport = False
+        sphere = _create_sphere(context)
+
+    # Pin the sphere to where the rig starts, so playing the animation shows
+    # whether the character leaves the bounds. Constraints are cleared to undo
+    # the follow-the-rig behaviour from spheres saved by older versions.
+    sphere.constraints.clear()
+    sphere.hide_select = True
+    sphere.location = _root_location_at_start(context, arm, root_name)
+    sphere.hide_viewport = False
 
 
 class RBX_OT_check_animation_emote(bpy.types.Operator):

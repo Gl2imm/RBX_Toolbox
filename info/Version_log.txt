@@ -2,6 +2,18 @@
                                                       Version History:
                                             ####################################
 
+v.7.9:
+    Fixes
+    - R6 clothes import was saving downloaded shirts and pants into the addon's own folder
+      ("Imported_Clothes"), which got wiped every time the addon updated - taking your downloaded
+      clothes with it. They are now saved to "RBX_Import/Imported_Clothes", which is kept across
+      updates, and the folder button opens the new location.
+    - The "Show Safe Zone" sphere (Upload to Roblox tab, Animation) followed the character around as
+      the animation played, so the rig could never leave it and nothing was ever out of bounds. The
+      sphere now appears at the character's origin on the animation's first frame and stays put, so
+      playing the animation shows whether the character leaves the safe zone. It is also no longer
+      selectable, so it can't be dragged out of place by accident.
+
 v.7.8:
     Feature Back: Import My Avatar
     - The highly requested Import My Avatar feature is back! You can once again import your own

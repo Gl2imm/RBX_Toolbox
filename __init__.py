@@ -19,7 +19,7 @@ import traceback
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (7, 8, 0),
+    "version": (7, 9, 0),
     "blender": (4, 5, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -64,6 +64,7 @@ all_modules_names = [
     "functions.menu_ui",
     "func_import_v2.rbx_import_discovery",
     "func_import_v2.rbx_import_user_avatar",
+    "func_import_v2.readers.mesh_reader_v2",
 ]
 
 # When bpy is already in local, reload modules for iterative testing
@@ -108,6 +109,7 @@ from .functions.menu_pie import RBX_MT_MENU4
 from .functions.menu_ui import TOOLBOX_MENU, RBX_OT_terms_of_use
 from .func_import_v2.rbx_import_discovery import RBX_OT_import_discovery, RBX_OT_import_reset, RBX_OT_import_discovery_download, RBX_OT_import_discovery_options, RBX_OT_import_discovery_open_folder, RBX_OT_open_tmp_folder, RBX_OT_import_model_summary, RBX_OT_import_discovery_info_popup
 from .func_import_v2.rbx_import_user_avatar import RBX_OT_import_user_avatar
+from .func_import_v2.readers import mesh_reader_v2
 from . import oauth
 import bpy
 from bpy.types import Scene
@@ -174,6 +176,14 @@ def register():
     for c in classes:
         bpy.utils.register_class(c)
 
+    # Registers its own classes rather than joining `classes`: it also has to
+    # shut down any game still running from a previous registration.
+    try:
+        mesh_reader_v2.register()
+    except Exception as e:
+        traceback.print_exc()
+        print(f"Error during mesh_reader_v2 registration: {e}")
+
     bpy.types.Scene.rbx_prefs = bpy.props.PointerProperty(type=PROPERTIES_RBX)
     Scene.show_auth_box = BoolProperty(default=True)
     Scene.subpanel_readme = BoolProperty(default=False)
@@ -236,10 +246,16 @@ def unregister():
     except Exception as e:
         traceback.print_exc()
         print(f"Error during OAuth unregistration: {e}")
-        
+
+    try:
+        mesh_reader_v2.unregister()
+    except Exception as e:
+        traceback.print_exc()
+        print(f"Error during mesh_reader_v2 unregistration: {e}")
+
     for c in classes:
         bpy.utils.unregister_class(c)
-        
+
     del bpy.types.Scene.rbx_prefs
     del Scene.show_auth_box
     del Scene.subpanel_readme

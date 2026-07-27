@@ -10,6 +10,12 @@ dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 ANIM_COLLECTION_NAME = "LC_Animation_Test"
 
+# Max Z difference between the source rig's and the test rig's bone rest heights
+# that is treated as a rig-convention difference rather than a real vertical
+# offset of the source rig.  Observed conventions differ by ~0.041 (blocky) and
+# ~0.031 (woman); 0.25 leaves a wide margin without swallowing a deliberate move.
+RIG_CONVENTION_Z_TOLERANCE = 0.25
+
 
 def _update_frame_scrub(self, context):
     """Map the 0-100 scrub slider to the animation's frame range."""
@@ -262,16 +268,6 @@ class RBX_OT_LC_ANIM_V2(bpy.types.Operator):
             self.report({'ERROR'}, "Rig collection could not be appended.")
             return {'CANCELLED'}
 
-        # Move rig +5 X beside original
-        bpy.ops.view3d.snap_selected_to_cursor(use_offset=False)
-        bpy.ops.transform.translate(
-            value=(5, 0, 0),
-            orient_type='GLOBAL',
-            orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
-            orient_matrix_type='GLOBAL',
-            constraint_axis=(False, False, True),
-        )
-
         # Identify the spawned rig collection & armature
         rig_collection = appended_objs[0].users_collection[0]
         spawned_armature = None
@@ -283,6 +279,20 @@ class RBX_OT_LC_ANIM_V2(bpy.types.Operator):
         if spawned_armature is None:
             self.report({'ERROR'}, "No armature found in spawned rig collection.")
             return {'CANCELLED'}
+
+        # Move rig +5 X beside original.
+        # Move only the hierarchy ROOTS and let parenting carry the children.
+        # Do NOT use view3d.snap_selected_to_cursor here: as of Blender 5.x it
+        # snaps every selected object individually - including children whose
+        # parent is also selected - which folds the entire rig into a single
+        # point at the cursor.
+        target = context.scene.cursor.location + mathutils.Vector((5.0, 0.0, 0.0))
+        appended_set = set(appended_objs)
+        for obj in appended_objs:
+            if obj.parent in appended_set:
+                continue
+            obj.matrix_world.translation = target
+        context.view_layer.update()
 
         # 4. Create working collection
         anim_collection = bpy.data.collections.new(ANIM_COLLECTION_NAME)
@@ -327,6 +337,18 @@ class RBX_OT_LC_ANIM_V2(bpy.types.Operator):
             # Fallback: just X offset
             visual_offset = spawned_armature.location - src_armature.location
             visual_offset.z = 0  # don't shift Z
+
+        # A Roblox-exported R15 armature and the appended test rig do NOT put their
+        # bone rest positions at the same height: the exported blocky rig sits ~0.041
+        # lower and the exported woman rig ~0.031 lower than the corresponding test rig,
+        # even though both characters' GEOMETRY is authored in the same world space
+        # (soles on the same plane).  Taking Z straight from the bones therefore lifts
+        # every item by that rig-convention constant.  Anything under the threshold is
+        # convention noise, not a real vertical move of the source rig, so drop it;
+        # a genuinely raised/lowered source rig (a user parking it at Z=3) is larger
+        # than the threshold and is still followed.
+        if abs(visual_offset.z) < RIG_CONVENTION_Z_TOLERANCE:
+            visual_offset.z = 0.0
 
         for child, dup in linked_dups:
             parent_bone_name = child.parent_bone

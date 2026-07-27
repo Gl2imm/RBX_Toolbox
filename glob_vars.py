@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import bpy
 import platform
 
@@ -35,6 +36,31 @@ need_restart_blender = False
 # and never take __package__.split('.')[0] — under the extensions system that
 # yields "bl_ext", not the addon.
 ADDON_ID = __package__
+
+
+## Version comparison ##
+def version_tuple(ver):
+    """Parse a version string into a tuple of ints for comparison.
+
+    Comparing version STRINGS breaks as soon as a component reaches two digits:
+    "v.7.9" > "v.7.10" is True lexicographically ('9' > '1'), which made 7.10
+    offer 7.9 as an update. float() is no better -- it reads "7.10" as 7.1.
+
+    Accepts "v.7.10", "7.10", "v7.10.1"; any non-digit text is ignored. An
+    unparseable value yields (0,) rather than raising, because these comparisons
+    run inside draw() where an exception blanks the whole panel.
+    """
+    parts = re.findall(r"\d+", str(ver or ""))
+    return tuple(int(p) for p in parts) if parts else (0,)
+
+
+def is_newer_version(candidate, current):
+    """True when `candidate` is a strictly newer version than `current`.
+
+    Shorter versions sort first, so 7.10 beats 7.10-with-nothing-after and
+    7.10.1 beats 7.10 -- which is what release tags mean.
+    """
+    return version_tuple(candidate) > version_tuple(current)
 
 
 ## Client Info ##

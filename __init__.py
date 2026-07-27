@@ -19,7 +19,7 @@ import traceback
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (7, 9, 0),
+    "version": (7, 10, 0),
     "blender": (4, 5, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -64,6 +64,7 @@ all_modules_names = [
     "functions.menu_ui",
     "func_import_v2.rbx_import_discovery",
     "func_import_v2.rbx_import_user_avatar",
+    "func_import_v2.rbx_build_keyframesequence",
     "func_import_v2.readers.mesh_reader_v2",
 ]
 
@@ -109,6 +110,7 @@ from .functions.menu_pie import RBX_MT_MENU4
 from .functions.menu_ui import TOOLBOX_MENU, RBX_OT_terms_of_use
 from .func_import_v2.rbx_import_discovery import RBX_OT_import_discovery, RBX_OT_import_reset, RBX_OT_import_discovery_download, RBX_OT_import_discovery_options, RBX_OT_import_discovery_open_folder, RBX_OT_open_tmp_folder, RBX_OT_import_model_summary, RBX_OT_import_discovery_info_popup
 from .func_import_v2.rbx_import_user_avatar import RBX_OT_import_user_avatar
+from .func_import_v2.rbx_build_keyframesequence import RBX_OT_generate_keyframes, RBX_OT_adv_upload_info_popup
 from .func_import_v2.readers import mesh_reader_v2
 from . import oauth
 import bpy
@@ -135,6 +137,8 @@ classes = (
     RBX_OT_import_model_summary,
     RBX_OT_import_discovery_info_popup,
     RBX_OT_import_user_avatar,
+    RBX_OT_generate_keyframes,
+    RBX_OT_adv_upload_info_popup,
     BUTTON_CMR,
     BUTTON_DMMY,
     BUTTON_WEAR,
@@ -252,6 +256,15 @@ def unregister():
     except Exception as e:
         traceback.print_exc()
         print(f"Error during mesh_reader_v2 unregistration: {e}")
+
+    # A pending "Copied to Clipboard" timer would otherwise outlive the addon
+    # and fire against a dead module.
+    try:
+        from .func_import_v2 import rbx_build_keyframesequence as _kfs
+        if bpy.app.timers.is_registered(_kfs._clear_copied_flag):
+            bpy.app.timers.unregister(_kfs._clear_copied_flag)
+    except Exception:
+        pass
 
     for c in classes:
         bpy.utils.unregister_class(c)

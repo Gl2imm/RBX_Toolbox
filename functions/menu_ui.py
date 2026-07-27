@@ -244,7 +244,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
         #print("lts_ver: ", glob_vars.lts_ver)
         #print("addon_version: ", addon_version)
         if glob_vars.lts_ver is not None:
-            if glob_vars.lts_ver > addon_version:
+            if glob_vars.is_newer_version(glob_vars.lts_ver, addon_version):
                 box = layout.box()
                 box.label(text = "Update Available: " + glob_vars.lts_ver)
                 box.operator('object.url_handler', text = "Release Notes " + glob_vars.lts_ver, icon='DOCUMENTS').rbx_link = "update"
@@ -760,7 +760,7 @@ class TOOLBOX_MENU(bpy.types.Panel):
                 ######## Update Notifier ########
                 if glob_vars.aepbr_lts_ver is not None:
                     aepbr_cur_ver = get_aepbr_cur_ver()
-                    if glob_vars.aepbr_lts_ver > aepbr_cur_ver:
+                    if glob_vars.is_newer_version(glob_vars.aepbr_lts_ver, aepbr_cur_ver):
                         box.label(text = '')
                         box.label(text = '- - - - - - - ')
                         box.label(text = f"Update Available:  ({aepbr_cur_ver} -> {glob_vars.aepbr_lts_ver})")
@@ -1552,6 +1552,27 @@ class TOOLBOX_MENU(bpy.types.Panel):
 
                     if not is_armature_selected:
                         upload_section_box.label(text="Select an armature to upload animation", icon='INFO')
+
+                    ### Advanced Upload (KeyframeSequence pasted into Studio) ###
+                    from ..func_import_v2 import rbx_build_keyframesequence as _adv  # Local import
+
+                    upload_section_box.separator(type='LINE')
+
+                    adv_row = upload_section_box.row(align=True)
+                    adv_row.prop(rbx_prefs, "rbx_adv_upload")
+                    adv_row.operator('object.rbx_adv_upload_info_popup', text="", icon='INFO', emboss=False)
+
+                    if rbx_prefs.rbx_adv_upload:
+                        adv_box = upload_section_box.box()
+                        adv_box.prop(rbx_prefs, "rbx_adv_anim_name", text="Name")
+
+                        gen_row = adv_box.row()
+                        gen_row.enabled = is_armature_selected
+                        if _adv.copied_recently():
+                            gen_row.operator("rbx.generate_keyframes",
+                                             text="Copied to Clipboard", icon='CHECKMARK')
+                        else:
+                            gen_row.operator("rbx.generate_keyframes", icon='COPYDOWN')
 
                     status_indicators.draw_statuses(context.window_manager, upload_section_box)
 

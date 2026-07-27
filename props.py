@@ -789,6 +789,22 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
     ) # type: ignore
 
 
+    ### Advanced Upload (KeyframeSequence via Studio) ###
+    rbx_adv_upload: bpy.props.BoolProperty(
+        name="Advanced Upload",
+        description="Transfer the animation to Roblox exactly as made in Blender, "
+                    "keeping bone movement that the standard upload strips off",
+        default=False,
+    ) # type: ignore
+
+    rbx_adv_anim_name: bpy.props.StringProperty(
+        name="Animation Name",
+        description="Name for the generated KeyframeSequence (leave empty to use the action name)",
+        default="",
+        maxlen=100,
+    ) # type: ignore
+
+
     ### Import Beta (Discovery) ###
     rbx_import_beta_active : bpy.props.BoolProperty(
     name="Import Beta Active",

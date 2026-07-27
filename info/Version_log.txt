@@ -2,6 +2,29 @@
                                                       Version History:
                                             ####################################
 
+v.7.10:
+    New Feature: Advanced Upload (Upload to Roblox -> Upload Animation)
+    - Uploading an animation with the standard Roblox tools strips off bone movement: any bone that
+      was moved away from its original location snaps back, because Roblox's own importer keeps the
+      rotation only. Advanced Upload transfers the animation to Roblox exactly as it was made in
+      Blender, position included.
+    - How to use it: select the armature with the animation, tick "Advanced Upload", optionally give
+      the animation a name, then press "Generate Keyframes". The animation is copied to your
+      clipboard. In Roblox Studio, paste it into the console field (usually at the bottom) and press
+      Enter or Run - this creates a KeyframeSequence asset in ServerStorage, ready to publish or test.
+    - How to test it: spawn a rig from the Avatars tab and open the Animation Editor in the same tab.
+      A "RBX_ANIMSAVES" folder appears in ServerStorage with a folder named after your rig inside it.
+      Move the created KeyframeSequence into that folder, then in the Animation Editor click "..."
+      and select Load, and pick your animation.
+    - The info icon next to the checkbox repeats all of these steps at any time.
+
+    Fixes
+    - Fixed "Spawn Rig" (LC Animation Test) spawning rigs folded into a single lump at the scene
+      origin on Blender 5.0 and newer. Blender changed the way it snaps a selection to the 3D
+      cursor: it now moves every part on its own instead of moving the rig as one piece, so the
+      whole character collapsed onto one spot. The rig is now positioned as a unit and spawns
+      correctly again. Blender 4.5 is unaffected and keeps behaving exactly as before.
+
 v.7.9:
     Fixes
     - R6 clothes import was saving downloaded shirts and pants into the addon's own folder

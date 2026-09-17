@@ -11,6 +11,80 @@ DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
 
+# Standard Roblox avatar skeleton: which bone each part normally hangs off.
+# Values are candidates in priority order so one table covers R15/Rthro and R6.
+#
+# Every MeshPart's .mesh carries only its OWN bone table, and a bone whose
+# parent lives in another part is written with parent_index 0xFFFF (root). So a
+# Dynamic Head imported next to a body arrives with "Head" as a root of its own
+# and the merged armature ends up with two disconnected hierarchies.
+RBX_BONE_PARENTS = {
+    # R15 / Rthro
+    "HumanoidRootNode": ("Root",),
+    "LowerTorso":       ("HumanoidRootNode", "Root"),
+    "UpperTorso":       ("LowerTorso",),
+    "Head":             ("UpperTorso", "Torso"),
+    "DynamicHead":      ("Head",),
+    "LeftUpperArm":     ("UpperTorso",),
+    "LeftLowerArm":     ("LeftUpperArm",),
+    "LeftHand":         ("LeftLowerArm",),
+    "RightUpperArm":    ("UpperTorso",),
+    "RightLowerArm":    ("RightUpperArm",),
+    "RightHand":        ("RightLowerArm",),
+    "LeftUpperLeg":     ("LowerTorso",),
+    "LeftLowerLeg":     ("LeftUpperLeg",),
+    "LeftFoot":         ("LeftLowerLeg",),
+    "RightUpperLeg":    ("LowerTorso",),
+    "RightLowerLeg":    ("RightUpperLeg",),
+    "RightFoot":        ("RightLowerLeg",),
+    # R6
+    "Torso":            ("HumanoidRootNode", "Root"),
+    "Left Arm":         ("Torso",),
+    "Right Arm":        ("Torso",),
+    "Left Leg":         ("Torso",),
+    "Right Leg":        ("Torso",),
+}
+
+
+def _would_loop(all_bones_data, bone_name, candidate):
+    """True if parenting bone_name under candidate closes a cycle."""
+    node = candidate
+    guard = 0
+    while node and guard < 512:
+        if node == bone_name:
+            return True
+        parent = all_bones_data.get(node, {}).get("parent")
+        node = parent["name"] if parent else None
+        guard += 1
+    return False
+
+
+def reconnect_orphan_bones(all_bones_data):
+    """
+    Re-link bones that arrived as their own root onto the standard skeleton.
+
+    Only bones with no parent of their own are touched, and only when their
+    standard parent is actually present in the merged set. Data-driven
+    parenting always wins, so single-asset imports and non-standard rigs come
+    out exactly as they did before.
+
+    Returns the list of (bone, new_parent) pairs it re-linked.
+    """
+    relinked = []
+    for bone_name, bd in all_bones_data.items():
+        if bd.get("parent"):
+            continue  # the mesh already told us where this bone belongs
+        for candidate in RBX_BONE_PARENTS.get(bone_name, ()):
+            if candidate == bone_name or candidate not in all_bones_data:
+                continue
+            if _would_loop(all_bones_data, bone_name, candidate):
+                continue
+            bd["parent"] = {"name": candidate}
+            relinked.append((bone_name, candidate))
+            break
+    return relinked
+
+
 def apply_skin_weights(imported_meshes_data, arm_obj):
     """
     Applies skin weights from parsed mesh data to Blender mesh objects.
@@ -298,6 +372,13 @@ def import_bones(imported_meshes_data, mesh_reader, funct, rbx_at_origin, asset_
     if not all_bones_data:
         print("No bones found in imported data.")
         return
+
+    # Stitch separately-sourced parts (body + dynamic head) into one hierarchy
+    # before any bone is created, so PASS 2 sees the completed parent links.
+    relinked = reconnect_orphan_bones(all_bones_data)
+    if relinked:
+        dprint("import_bones: reconnected orphan bones -> " +
+               ", ".join(f"{c} under {p}" for c, p in relinked))
 
     # Find a reference mesh to align with (prefer Torso/Root)
     target_info = None

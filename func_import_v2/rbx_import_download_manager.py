@@ -12,6 +12,33 @@ from typing import TYPE_CHECKING
 DEBUG = False
 dprint = lambda *args, **kwargs: print(*args, **kwargs) if DEBUG else None
 
+# Categories served by the MeshPart serialization of an asset.
+#
+# Without the "avatar_meshpart_accessory" format the asset-delivery API returns a
+# legacy compatibility build: Roblox downgrades MeshPart -> Part + SpecialMesh and
+# collapses the whole PBR stack into a single SpecialMesh.TextureId. The PBR data
+# is stripped server-side, so no reader can recover it. Plain accessories are now
+# routinely authored with PBR (and Roblox offers an emissive map on every item),
+# so they need the same treatment Layered Cloth already got.
+#
+# Assets with no MeshPart build still answer 200 but without a download location;
+# ensure_local_asset falls back to the default format for those, so requesting it
+# for a plain non-PBR accessory is safe.
+#
+# Deliberately NOT included: "Gear" (Tools, not accessories), "Classics"
+# (ClassicShirt/ClassicPants) and "Face Parts" (handled by the head flow).
+RBX_MESHPART_ACCESSORY_CATEGORIES = {"Accessory", "Layered Cloth"}
+
+
+def resolve_asset_format(category_name):
+    """Return the Roblox-AssetFormat header value for a discovery category, or None."""
+    if category_name == "Dynamic Head":
+        return "avatar_meshpart_head"
+    if category_name in RBX_MESHPART_ACCESSORY_CATEGORIES:
+        return "avatar_meshpart_accessory"
+    return None
+
+
 def ensure_local_asset(asset_id, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=None):
     """
     Downloads the asset if not present, checking for Dynamic Head status and upgrading if necessary.
@@ -19,11 +46,20 @@ def ensure_local_asset(asset_id, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_
         bool: True if file exists (or was downloaded/upgraded successfully), False otherwise.
     """
     rbx_tmp_rbxm_file = os.path.join(rbx_tmp_rbxm_filepath, str(asset_id) + ".rbxm")
-    
+
     # Always download to ensure freshness (matching previous behavior)
     # But now we do it ONCE here.
     asset_data, rbx_imp_error = func_rbx_cloud_api.get_asset_data(asset_id, headers, RobloxAssetFormat=RobloxAssetFormat)
-    
+
+    # Not every asset has a build in the requested format. When that happens the
+    # asset-delivery API still answers 200, but with an "errors" array and no
+    # "location", so get_asset_data hands back no data and no error string.
+    # Retry once with the default serialization so an asset that simply has no
+    # MeshPart build still imports instead of being skipped.
+    if RobloxAssetFormat and not asset_data:
+        dprint(f"Asset {asset_id} unavailable as '{RobloxAssetFormat}', retrying default format.")
+        asset_data, rbx_imp_error = func_rbx_cloud_api.get_asset_data(asset_id, headers)
+
     if rbx_imp_error or not asset_data:
         dprint(f"Error downloading asset {asset_id}: {rbx_imp_error}")
         glob_vars.rbx_imp_error = f"Error downloading {asset_id}: {rbx_imp_error}"
@@ -220,8 +256,8 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         }
     elif category_name == "Armature":
         # Armature Import Logic:
-        # Respect selected_item_id which now contains prefix "BODYPART_" or "DYNHEAD_"
-        # followed by the ID. 
+        # Respect selected_item_id which now contains prefix "BODYPART_", "DYNHEAD_",
+        # "LAYEREDCLOTH_" or "FACEPART_" followed by the ID.
         # If Logic fails or is generic, fallback (though new props.py logic shouldn't fail).
         
         target_id_str = str(selected_item_id)
@@ -233,10 +269,16 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         
         if target_id_str.startswith("BODYPART_"):
             strict_cat = "Body Parts"
-            strict_id = int(target_id_str.split("_")[1])
+            strict_id = int(target_id_str.split("_", 1)[1])
         elif target_id_str.startswith("DYNHEAD_"):
             strict_cat = "Dynamic Head"
-            strict_id = int(target_id_str.split("_")[1])
+            strict_id = int(target_id_str.split("_", 1)[1])
+        elif target_id_str.startswith("LAYEREDCLOTH_"):
+            strict_cat = "Layered Cloth"
+            strict_id = int(target_id_str.split("_", 1)[1])
+        elif target_id_str.startswith("FACEPART_"):
+            strict_cat = "Face Parts"
+            strict_id = int(target_id_str.split("_", 1)[1])
         else:
             # Fallback (old behavior or check all?)
             # If user somehow selected something else or error.
@@ -251,16 +293,18 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         primary_asset_name = "R15_Character" # Default
         found_target = False
 
+        # Determine Suffix for Armature Name
+        # Instead of being empty, pass the category so it reads "Armature_{Name}_dynamic_head".
+        # Hoisted out of the scan loop: it only depends on strict_cat, and leaving it
+        # inside risked a NameError if the loop body never ran.
+        armature_suffix = ""
+        if strict_cat and strict_cat != "Body Parts":
+            armature_suffix = strict_cat.lower().replace(" ", "_")
+
         for cat in categories_to_scan:
             if cat in glob_vars.discovered_items_data:
                 cat_items = glob_vars.discovered_items_data[cat]
-                
-                # Determine Suffix for Armature Name
-                # Instead of being empty, pass the category so it reads "Armature_{Name}_dynamic_head"
-                armature_suffix = ""
-                if strict_cat and strict_cat != "Body Parts":
-                    armature_suffix = strict_cat.lower().replace(" ", "_")
-                
+
                 for item in cat_items:
                     asset_id = item['id']
                     
@@ -282,10 +326,8 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
                     
                     # Ensure Asset Local (Download if needed)
                     # Use appropriate format if known, else default
-                    asset_format = None
-                    if cat == "Dynamic Head": asset_format = "avatar_meshpart_head"
-                    elif cat == "Layered Cloth": asset_format = "avatar_meshpart_accessory"
-                    
+                    asset_format = resolve_asset_format(cat)
+
                     success = ensure_local_asset(asset_id, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=asset_format)
                     if not success: continue
 
@@ -367,12 +409,8 @@ def download_body_parts(context, category_name="Body Parts", download_all=False)
         
         # Centralized Download Step
         # Determine format based on category
-        asset_format = None
-        if category_name == "Dynamic Head":
-            asset_format = "avatar_meshpart_head"
-        elif category_name == "Layered Cloth":
-            asset_format = "avatar_meshpart_accessory" # Layered Cloth are accessories
-            
+        asset_format = resolve_asset_format(category_name)
+
         success = ensure_local_asset(asset_id, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other, RobloxAssetFormat=asset_format)
         if not success:
             dprint(f"Skipping {asset_name} due to download failure.")

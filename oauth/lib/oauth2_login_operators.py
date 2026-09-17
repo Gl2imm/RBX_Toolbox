@@ -49,6 +49,7 @@ class RBX_OT_oauth2_login(Operator):
 
     def execute(self, context):
         from . import event_loop
+        from . import oauth2_client as oauth2_client_module
         from .oauth2_client import RbxOAuth2Client
 
         global ongoing_login_task
@@ -64,6 +65,7 @@ class RBX_OT_oauth2_login(Operator):
         def on_login_complete(task):
             global ongoing_login_task
             ongoing_login_task = None
+            oauth2_client_module.tag_redraw()
 
             try:
                 task.result()
@@ -75,6 +77,7 @@ class RBX_OT_oauth2_login(Operator):
         def on_refresh_complete(task):
             global ongoing_login_task
             ongoing_login_task = None
+            oauth2_client_module.tag_redraw()
 
             # Attempted a refresh for the remembered session
             try:
@@ -98,6 +101,7 @@ class RBX_OT_oauth2_login(Operator):
             finally:
                 # Prompt a new login since the refresh failed and logout is complete
                 ongoing_login_task = event_loop.submit(oauth2_client.login(), on_login_complete)
+                oauth2_client_module.tag_redraw()
 
         if oauth2_client.token_data.get("refresh_token"):
             # Remembered session exists. Refresh using that token
@@ -124,9 +128,12 @@ class RBX_OT_oauth2_cancel_login(Operator):
     bl_description = "Stop waiting for the browser to return login info"
 
     def execute(self, context):
+        from . import oauth2_client as oauth2_client_module
+
         global ongoing_login_task
         ongoing_login_task.cancel()
         ongoing_login_task = None
+        oauth2_client_module.tag_redraw()
 
         return {"FINISHED"}
 
@@ -154,6 +161,8 @@ class RBX_OT_oauth2_logout(Operator):
                 user_thumbnail.clear()
                 from . import supporter_status
                 supporter_status.clear()
+                from . import oauth2_client as oauth2_client_module
+                oauth2_client_module.tag_redraw()
 
         from . import event_loop
         from .oauth2_client import RbxOAuth2Client

@@ -104,6 +104,17 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
         dprint(f"Error checking SpecialMesh for {mesh_name}: {e}")
         special_mesh = None
 
+    # ── Emissive parameters ───────────────────────────────────────────────
+    # Collected alongside the PBR maps and handed to the material builder so the
+    # emissive node chain can be wired up. Roblox now offers an emissive map on
+    # every item, so any SurfaceAppearance may carry one.
+    #   EmissiveMaskContent -> the mask texture (grayscale: black = no emission,
+    #                          white = full emission), collected into rbx_textures
+    #                          under the internal name "Emission"
+    #   EmissiveStrength    -> multiplier, drives the BSDF Emission Strength
+    #   EmissiveTint        -> Color3 tint Roblox applies to the emission
+    rbx_emissive = None
+
     if rbx_SurfaceAppearance:
         dprint(f"Found SurfaceAppearance for {mesh_name}")
         for tex_name in glob_vars.rbx_pbr_materials:
@@ -112,23 +123,41 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
                 val_raw = rbx_SurfaceAppearance.get(tex_name)
                 val = func_rbx_other.resolve_content_uri(val_raw)
                 part_TextureID = func_rbx_other.strip_rbxassetid(val)
-                
+
                 if part_TextureID == "" or part_TextureID == "None":
                     continue
-                
+
                 # Name mapping logic
                 internal_name = tex_name
                 if internal_name == "MetalnessMap":
                     internal_name = "MetallicMap"
-                
+                # The emissive mask is Content-typed and has no "Map" suffix to
+                # strip, so map it explicitly onto the "Emission" node name.
+                elif internal_name == "EmissiveMaskContent":
+                    internal_name = "Emission"
+
                 # Remove "Map" suffix
                 if internal_name.endswith("Map"):
                     internal_name = internal_name[:-3]
-                    
+
                 rbx_textures[internal_name] = part_TextureID
             except Exception as e:
                 dprint(f"Error accessing property {tex_name}: {e}")
                 continue
+
+        # ── Emissive: read strength/tint once the mask is known to exist ──
+        if "Emission" in rbx_textures:
+            try:
+                strength = rbx_SurfaceAppearance.get("EmissiveStrength")
+                tint = rbx_SurfaceAppearance.get("EmissiveTint")
+                rbx_emissive = {
+                    "strength": float(strength) if strength is not None else 1.0,
+                    "tint": tuple(tint) if tint else (1.0, 1.0, 1.0),
+                }
+                dprint(f"Emissive for {mesh_name}: {rbx_emissive}")
+            except Exception as e:
+                dprint(f"Error reading emissive parameters: {e}")
+                rbx_emissive = {"strength": 1.0, "tint": (1.0, 1.0, 1.0)}
 
     else:
         # Classic Textures
@@ -235,8 +264,11 @@ def download_and_apply_textures(mesh_part, mesh_name, bundle_own_folder, headers
 
     if rbx_textures:
         # Apply Material (Restored)
+        # rbx_emissive is None unless this SurfaceAppearance carried an emissive
+        # mask; the material builder wires the emission chain only when it is set.
         func_blndr_api.blender_api_assets_new_material(
-            rbx_obj, mesh_part, rbx_textures, asset_clean_name, bool(rbx_SurfaceAppearance)
+            rbx_obj, mesh_part, rbx_textures, asset_clean_name, bool(rbx_SurfaceAppearance),
+            rbx_emissive=rbx_emissive
         )
 
 def classic_shirt_import(asset_id, asset_name, bundles_folder, headers, rbx_tmp_rbxm_filepath, func_rbx_cloud_api, func_rbx_other):

@@ -39,7 +39,13 @@ import aiohttp
 class JWTHTTPClient(HTTPClient):
     """
     A client for JWT AsyncKeyFetcher implemented using aiohttp that uses certifi SSL context.
+
+    An existing ClientSession can be passed in to reuse its connections — the certs API lives on
+    the same host as the rest of the login calls, so this saves a DNS lookup and a TLS handshake.
     """
+
+    def __init__(self, session=None):
+        self._session = session
 
     async def get_json(self, url: str):
         """
@@ -53,20 +59,26 @@ class JWTHTTPClient(HTTPClient):
             raise JWTHTTPFetchError("Unsupported protocol in 'iss'")
 
         try:
+            if self._session is not None:
+                return await self.__get_json_with_session(self._session, url)
+
             from .create_http_client import create_http_client
 
             async with create_http_client() as session:
-                async with session.get(url) as response:
-                    try:
-                        response_data = await response.json()  # Raises json.JSONDecodeError
-                        response.raise_for_status()  # Raises ClientResponseError or other ClientError
-                        return response_data
-                    except aiohttp.ClientResponseError as exception:
-                        error_description = response_data.get("error_description", None)
-                        if error_description:
-                            exception.message = error_description
-                        raise JWTHTTPFetchError(
-                            f"Failed to fetch or decode {url}:\n{error_description or str(exception)}"
-                        ) from exception
+                return await self.__get_json_with_session(session, url)
         except (aiohttp.ClientError, JSONDecodeError) as e:
             raise JWTHTTPFetchError(f"Failed to fetch or decode {url}:\n{str(e)}") from e
+
+    async def __get_json_with_session(self, session, url: str):
+        async with session.get(url) as response:
+            try:
+                response_data = await response.json()  # Raises json.JSONDecodeError
+                response.raise_for_status()  # Raises ClientResponseError or other ClientError
+                return response_data
+            except aiohttp.ClientResponseError as exception:
+                error_description = response_data.get("error_description", None)
+                if error_description:
+                    exception.message = error_description
+                raise JWTHTTPFetchError(
+                    f"Failed to fetch or decode {url}:\n{error_description or str(exception)}"
+                ) from exception

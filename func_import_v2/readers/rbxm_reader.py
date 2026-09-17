@@ -837,6 +837,69 @@ def read_prop_font(data: bytes, count: int, offset: int) -> tuple[list[dict], in
     return values, offset
 
 
+# ─────────────────────────────────────────────
+#  Content SourceType tag resolution
+#
+#  This block exists to make SurfaceAppearance.EmissiveMaskContent (the
+#  emissive mask texture) readable, and any other Content-typed property that
+#  carries an asset URI — MeshPart.MeshContent / TextureContent,
+#  SurfaceAppearance.ColorMapContent / NormalMapContent / RoughnessMapContent /
+#  MetalnessMapContent, MaterialVariant.EmissiveMaskContent, and so on.
+#
+#  Why it is not a plain lookup table:
+#  The rbx-dom spec (docs/binary.md) and Enum.ContentSourceType both document
+#      0 = None, 1 = Uri, 2 = Object, 3 = Opaque
+#  but Roblox's own serializer writes **2 for a Uri**. Verified across 10
+#  freshly downloaded accessory files: every Content whose tag was 2 had
+#  UriCount == 1 / ObjectCount == 0, and every tag 0 had UriCount == 0. Tag 1
+#  never appeared. Trusting the documented table turns a perfectly good URI
+#  into {"type": "Object", "ref": None} and silently drops the texture.
+#
+#  So instead of hard-coding either mapping, bind each tag to a pool using the
+#  counts the file itself declares, and only fall back to the documented order
+#  when the counts are ambiguous. That stays correct whichever way Roblox or
+#  rbx-dom writes the tag.
+# ─────────────────────────────────────────────
+
+#: Documented rbx-dom / Enum.ContentSourceType order, used only as a fallback.
+_CONTENT_TAG_FALLBACK = {1: "Uri", 2: "Object", 3: "ExternalObject"}
+
+
+def _resolve_content_source_roles(
+    source_types: "list[int]", uri_count: int, obj_count: int, ext_count: int
+) -> dict:
+    """Map each non-zero SourceType tag to the pool it draws from.
+
+    Tag 0 always means "empty" and is never included here. For the rest, a tag
+    that occurs exactly as many times as one pool's declared length — and does
+    not equally match another pool — must be that pool.
+    """
+    tally: dict = {}
+    for tag in source_types:
+        if tag != 0:
+            tally[tag] = tally.get(tag, 0) + 1
+
+    roles: dict = {}
+    for tag, seen in tally.items():
+        matches = [
+            name
+            for name, total in (
+                ("Uri", uri_count),
+                ("Object", obj_count),
+                ("ExternalObject", ext_count),
+            )
+            if total == seen
+        ]
+        # Only trust the count when it points at exactly one pool.
+        if len(matches) == 1:
+            roles[tag] = matches[0]
+
+    # Anything still unresolved falls back to the documented tag order.
+    for tag in tally:
+        roles.setdefault(tag, _CONTENT_TAG_FALLBACK.get(tag, "Unknown"))
+    return roles
+
+
 def read_prop_content(data: bytes, count: int, offset: int) -> tuple[list[Any], int]:
     """Read an array of Content values (Type ID 0x22).
     Layout: SourceTypes (Enum array) + UriCount + Uris + ObjectCount + ObjectRefs +
@@ -855,17 +918,25 @@ def read_prop_content(data: bytes, count: int, offset: int) -> tuple[list[Any], 
     ext_count, offset = read_u32_le(data, offset)
     ext_refs, offset  = read_prop_referent(data, ext_count, offset)
 
-    # Reconstruct per-instance Content values from source_types
+    # Reconstruct per-instance Content values from source_types.
+    # See _resolve_content_source_roles above for why the tag meaning is
+    # derived from the declared counts rather than assumed.
+    roles = _resolve_content_source_roles(source_types, uri_count, obj_count, ext_count)
     uri_iter = iter(uris)
     obj_iter = iter(obj_refs)
+    ext_iter = iter(ext_refs)
     values = []
     for stype in source_types:
         if stype == 0:
             values.append({"type": "None"})
-        elif stype == 1:
+            continue
+        role = roles.get(stype, "Unknown")
+        if role == "Uri":
             values.append({"type": "Uri", "uri": next(uri_iter, None)})
-        elif stype == 2:
+        elif role == "Object":
             values.append({"type": "Object", "ref": next(obj_iter, None)})
+        elif role == "ExternalObject":
+            values.append({"type": "ExternalObject", "ref": next(ext_iter, None)})
         else:
             values.append({"type": "Unknown", "raw": stype})
     return values, offset

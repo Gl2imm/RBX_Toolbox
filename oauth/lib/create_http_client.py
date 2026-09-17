@@ -65,12 +65,32 @@ def _make_fallback_resolver():
         return None
 
 
+_ssl_context = None
+
+
+def _get_ssl_context():
+    """
+    Returns a shared SSL context built from the certifi CA bundle.
+
+    Building it parses certifi's ~300KB cacert.pem from disk, which is wasted work when
+    every request creates its own client — and noticeably slow when the add-on lives on a
+    cloud-synced or network drive. The context is immutable in our usage, so one instance
+    is safe to share across sessions.
+    """
+    global _ssl_context
+
+    if _ssl_context is None:
+        import certifi
+
+        _ssl_context = ssl.create_default_context(cafile=certifi.where())
+    return _ssl_context
+
+
 def create_http_client():
     """Returns a new aiohttp ClientSession that uses certifi SSL context"""
-    import certifi
     import aiohttp
 
-    ssl_context = ssl.create_default_context(cafile=certifi.where())
+    ssl_context = _get_ssl_context()
     resolver = _make_fallback_resolver()
     connector = aiohttp.TCPConnector(ssl=ssl_context, **({'resolver': resolver} if resolver else {}))
 

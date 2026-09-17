@@ -19,7 +19,7 @@ import traceback
 bl_info = {
     "name": "RBX Toolbox",
     "author": "Papa_Boss332",
-    "version": (7, 10, 0),
+    "version": (7, 11, 0),
     "blender": (4, 5, 0),
     "location": "Operator",
     "description": "Roblox UGC models toolbox",
@@ -54,6 +54,7 @@ all_modules_names = [
     "functions.hair_buttons",
     "functions.ugc_templates",
     "functions.dmy_lc_buttons",
+    "functions.attach_parent",
 
     "functions.avatar_buttons",
     "functions.armature_buttons",
@@ -94,6 +95,11 @@ from .functions.wear_r6_rig import BUTTON_WEAR
 from .functions.hair_buttons import BUTTON_HAIR
 from .functions.ugc_templates import RBX_OT_ugc_template, fluff_update
 from .functions.dmy_lc_buttons import RBX_BUTTON_LC
+from .functions.attach_parent import (
+    RBX_OT_attach_to_attachment,
+    RBX_OT_attach_to_mesh,
+    RBX_OT_attach_to_bone,
+)
 
 from .func_import_v2.func_lc_animations import RBX_OT_LC_ANIM_V2, RBX_OT_LC_ANIM_V2_ADD_ANIM, RBX_OT_LC_ANIM_V2_PLAY, RBX_OT_LC_ANIM_V2_STOP, RBX_OT_LC_ANIM_V2_DELETE, RBX_OT_LC_ANIM_V2_SPEED, RBX_OT_lc_anim_test_info_popup
 from .functions.avatar_buttons import RBX_BUTTON_AVA
@@ -145,6 +151,9 @@ classes = (
     BUTTON_HAIR,
     RBX_OT_ugc_template,
     RBX_BUTTON_LC,
+    RBX_OT_attach_to_attachment,
+    RBX_OT_attach_to_mesh,
+    RBX_OT_attach_to_bone,
 
     RBX_OT_LC_ANIM_V2,
     RBX_OT_LC_ANIM_V2_ADD_ANIM,
@@ -198,6 +207,7 @@ def register():
     Scene.subpanel_supported = BoolProperty(default=False)
     Scene.subpanel_dummy = BoolProperty(default=False)
     Scene.subpanel_rigs = BoolProperty(default=False)
+    Scene.subpanel_attach = BoolProperty(default=False)
     Scene.subpanel_hair = BoolProperty(default=False)
     Scene.subpanel_ugc = BoolProperty(default=False)
     Scene.subpanel_chain = BoolProperty(default=False)
@@ -279,6 +289,7 @@ def unregister():
     del Scene.subpanel_supported
     del Scene.subpanel_dummy
     del Scene.subpanel_rigs
+    del Scene.subpanel_attach
     del Scene.subpanel_hair
     del Scene.subpanel_ugc
     del Scene.subpanel_chain

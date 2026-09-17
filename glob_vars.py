@@ -431,6 +431,19 @@ regex_values_rbxmx = {
 }
 
 
-rbx_pbr_materials = ["ColorMap","MetalnessMap","NormalMap","RoughnessMap"]
+# SurfaceAppearance texture properties. This list IS the node layout order: each
+# entry becomes one image texture node, stacked top to bottom in the Blender
+# material (see func_blndr_api.blender_api_assets_new_material).
+#
+# Row order: Color -> Metallic -> Roughness -> Emission -> Normal
+#
+# "EmissiveMaskContent" is the emissive mask. Roblox now offers an emissive map
+# on every item, so any asset may carry one. Note it is Content-typed, not
+# ContentId like the other four — it is the only PBR map with no legacy
+# ContentId twin, so reading it depends on the Content fix in
+# readers/rbxm_reader.read_prop_content.
+#
+# Reorder this list to change the node layout; nothing else needs touching.
+rbx_pbr_materials = ["ColorMap","MetalnessMap","RoughnessMap","EmissiveMaskContent","NormalMap"]
 
 

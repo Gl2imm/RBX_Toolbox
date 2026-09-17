@@ -6,6 +6,7 @@ import bmesh
 from .. import glob_vars
 from ..glob_vars import addon_path
 from . import menu_pie
+from . import attach_parent
 from .. import update
 from .. import update_aepbr
 from .. import props
@@ -713,10 +714,13 @@ class TOOLBOX_MENU(bpy.types.Panel):
             box.label(text = 'Dummies')
             box.prop(rbx_prefs, 'rbx_dum_enum', text ='')
             split = box.split(factor = 0.5)
-            col = split.column(align = True)            
-            col.label(text = "")            
+            col = split.column(align = True)
+            col.label(text = "")
             split.operator('object.button_dmmy', text = "Spawn").dmy = 'Dummy'
-            
+
+            ######### Attach & Parent #########
+            attach_parent.draw_attach_parent(layout, context)
+
 
 
 
@@ -1023,14 +1027,15 @@ class TOOLBOX_MENU(bpy.types.Panel):
 
 
 
-            #### Chain ####
+            #### Chains ####
             row = ugc_box.row()
             icon = 'DOWNARROW_HLT' if context.scene.subpanel_chain else 'RIGHTARROW'
             row.prop(context.scene, 'subpanel_chain', icon=icon, icon_only=True)
-            row.label(text='Chain', icon='LINKED')
+            row.label(text='Chains', icon='LINKED')
             if context.scene.subpanel_chain:
                 box = ugc_box.box()
-                box.operator('object.rbx_ugc_template', text="Spawn Chain Template", icon='ADD').action = 'chain'
+                box.operator('object.rbx_ugc_template', text="Spawn Chain 1", icon='ADD').action = 'chain_1'
+                box.operator('object.rbx_ugc_template', text="Spawn Chain 2", icon='ADD').action = 'chain_2'
                 box.separator()
                 box.label(text="1. Adjust chain")
                 box.label(text="2. Apply modifiers")

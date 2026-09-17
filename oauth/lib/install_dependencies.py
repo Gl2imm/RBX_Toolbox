@@ -34,6 +34,7 @@ import subprocess
 import os
 import ensurepip
 import shutil
+import stat
 import hashlib
 from pathlib import Path
 import traceback
@@ -47,6 +48,14 @@ project_root_dir = Path(__file__).parent.parent
 
 # Set the path to the dependencies_public directory
 dependencies_public_directory = project_root_dir / "dependencies_public"
+
+# pip installs here instead of straight into dependencies_public. The running Blender
+# session has modules imported from dependencies_public, and Windows won't let anything
+# delete a loaded .pyd or its __pycache__ — pip's own "replace the target dir" step dies
+# on that with a PermissionError and leaves the folder half-deleted. Nothing ever imports
+# from the staging folder, so installing into it can't hit a lock; oauth/__init__.py
+# promotes it on the next startup, before any dependency has been imported.
+staging_directory = project_root_dir / "dependencies_public_new"
 
 _requirements_file = project_root_dir / "requirements.txt"
 
@@ -69,6 +78,26 @@ def _mark_pending_wipe():
         pass
 
 
+def force_remove(func, path, _exc):
+    """rmtree error handler: clears the read-only bit and retries, ignoring what still fails."""
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
+
+def _write_stamps(directory):
+    """Writes the staleness stamps into an installed dependency folder."""
+    version = _get_addon_version()
+    if version:
+        (directory / "_installed_version").write_text(version, encoding="utf-8")
+    req_hash = _get_requirements_hash()
+    if req_hash:
+        (directory / "_installed_requirements_hash").write_text(req_hash, encoding="utf-8")
+    (directory / "_installed_python_version").write_text(_get_python_version(), encoding="utf-8")
+
+
 def _get_addon_version():
     """Returns the current addon version string, e.g. '7.2.0'."""
     pkg_name = project_root_dir.parent.name  # e.g. 'RBX_Toolbox'
@@ -89,6 +118,38 @@ def _get_requirements_hash():
 def _get_python_version():
     """Returns the current Python version string, e.g. '3.11' or '3.13'."""
     return f"{sys.version_info.major}.{sys.version_info.minor}"
+
+
+# Packages the add-on cannot run without. Checked for actual module files, not just
+# for the directory existing.
+_CRITICAL_PACKAGES = ("aiohttp", "aiohappyeyeballs", "multidict", "yarl", "jwt", "aiolimiter", "certifi")
+
+
+def _deps_look_intact():
+    """
+    Returns True if every critical package directory actually contains module files.
+
+    A wipe that runs while Blender holds files open (or a pip install that skipped
+    packages because their .dist-info survived) leaves package folders behind with no
+    .py/.pyd in them. They still "import" as empty namespace packages, so the failure
+    surfaces much later as a confusing ImportError deep inside aiohttp instead of as a
+    missing dependency.
+    """
+    for name in _CRITICAL_PACKAGES:
+        package_directory = dependencies_public_directory / name
+        if not package_directory.is_dir():
+            return False
+        try:
+            has_modules = any(
+                entry.is_file() and entry.suffix in (".py", ".pyd")
+                for entry in package_directory.iterdir()
+            )
+        except OSError:
+            return False
+        if not has_modules:
+            print(f"[RBX Toolbox] Dependency package '{name}' is missing its modules.")
+            return False
+    return True
 
 
 def needs_restart_before_install():
@@ -151,6 +212,14 @@ def deps_are_current():
         _mark_pending_wipe()
         return False
 
+    if not _deps_look_intact():
+        # Deliberately no _mark_pending_wipe() here: the add-on may live in a cloud-synced
+        # folder (Google Drive, OneDrive) where files can be momentarily absent while the
+        # client re-downloads them. Offering the Install button is recoverable; wiping the
+        # folder on a false positive is not.
+        print("[RBX Toolbox] Dependencies look incomplete — reinstall them if the add-on fails to load.")
+        return False
+
     return True
 
 
@@ -170,9 +239,15 @@ def _run_pip_install():
     # suppress the brief console window pip would otherwise flash on Windows
     no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     try:
-        if dependencies_public_directory.exists():
-            shutil.rmtree(str(dependencies_public_directory), ignore_errors=True)
-        dependencies_public_directory.mkdir(exist_ok=True)
+        # Install into the staging folder, never into the one Blender is importing from.
+        if staging_directory.exists():
+            shutil.rmtree(str(staging_directory), onerror=force_remove)
+        if staging_directory.exists():
+            raise RuntimeError(
+                f"Could not clear the staging folder:\n{staging_directory}\n"
+                "Close Blender, delete it manually, then try again."
+            )
+        staging_directory.mkdir(parents=True)
 
         try:
             subprocess.run([sys.executable, "-m", "pip", "--version"], check=True,
@@ -185,7 +260,15 @@ def _run_pip_install():
             [
                 sys.executable, "-m", "pip", "install",
                 "-r", str(project_root_dir / "requirements.txt"),
-                "--target", str(dependencies_public_directory),
+                # Never let pip fall back to building cryptography from source. Without this
+                # it downloads a Rust toolchain and compiles for minutes before dying on a
+                # missing OpenSSL, burying the real problem under 200 lines of cargo output.
+                # Failing immediately with "no matching distribution" is the readable error.
+                "--only-binary=cryptography",
+                # The staging folder is empty, so pip has nothing to replace and --upgrade
+                # is unnecessary — passing it would make pip rmtree existing target dirs,
+                # which is exactly what fails on locked files.
+                "--target", str(staging_directory),
             ],
             capture_output=True,
             creationflags=no_window,
@@ -255,19 +338,16 @@ class RBX_OT_install_dependencies(Operator):
         rbx.dep_install_progress = 0.0
 
         if _install_error is None:
-            # Stamp version, requirements hash and Python version for staleness checks
-            version = _get_addon_version()
-            if version:
-                _VERSION_STAMP.write_text(version, encoding="utf-8")
-            req_hash = _get_requirements_hash()
-            if req_hash:
-                _REQUIREMENTS_STAMP.write_text(req_hash, encoding="utf-8")
-            _PYTHON_STAMP.write_text(_get_python_version(), encoding="utf-8")
+            # Stamp version, requirements hash and Python version for staleness checks.
+            # They go into the staging folder and travel with it when it is promoted.
+            _write_stamps(staging_directory)
             _PENDING_WIPE.unlink(missing_ok=True)
             rbx.is_finished_installing_dependencies = True
             rbx.needs_restart = True
         else:
-            shutil.rmtree(str(dependencies_public_directory), ignore_errors=True)
+            # Only the staged copy is discarded. The folder Blender is currently running
+            # from is left alone — deleting it here would break a working session.
+            shutil.rmtree(str(staging_directory), onerror=force_remove)
             traceback.print_exception(_install_error)
             self.report({'ERROR'}, f"Dependency install failed: {_install_error}")
 

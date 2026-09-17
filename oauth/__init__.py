@@ -23,25 +23,98 @@ import sys
 import shutil
 import os
 import stat
+import time
 from pathlib import Path
 from .lib.oauth2_client import RbxOAuth2Client
 from .lib import oauth2_client
 # Get the directory path of the current script
 add_on_directory = Path(__file__).parent
 
-# Wipe dependencies_public if a pending-wipe marker exists from a previous session.
-# This runs before sys.path is updated so no files in the folder are imported yet,
-# meaning Windows file locks are not an issue.
+def _force_remove(func, path, _exc):
+    # Handle read-only files/dirs on Windows by making them writable first
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
+
+# Everything below runs before sys.path is updated, so nothing in either dependency
+# folder has been imported yet and no file in them is locked by this session.
+_dependencies_directory = add_on_directory / "dependencies_public"
+_staging_directory = add_on_directory / "dependencies_public_new"
+# The old folder is renamed to this instead of being deleted up front, so a swap that
+# fails halfway still leaves a working dependency folder to fall back on.
+_retired_directory = add_on_directory / "dependencies_public_old"
 _pending_wipe = add_on_directory / "_pending_dep_wipe"
-if _pending_wipe.exists():
-    def _force_remove(func, path, _exc):
-        # Handle read-only files/dirs on Windows by making them writable first
+
+
+def _rename_with_retry(source, destination, attempts=6):
+    """os.rename with backoff. Returns None on success, else the last OSError.
+
+    A pip install writes ~2000 files, and for a while afterwards Google Drive, the
+    indexer and Defender still hold handles inside that tree. Windows refuses to rename
+    a directory while files under it are open ([WinError 5] Access is denied), and the
+    same applies to a folder that was just deleted but is still pending close. The locks
+    are short-lived, so spaced-out retries clear them.
+    """
+    delay = 0.1
+    last_exception = None
+    for attempt in range(attempts):
         try:
-            os.chmod(path, stat.S_IWRITE)
-            func(path)
+            os.rename(str(source), str(destination))
+            return None
+        except OSError as exception:
+            last_exception = exception
+            if attempt < attempts - 1:
+                time.sleep(delay)
+                delay *= 2
+    return last_exception
+
+
+# Leftovers from a swap that was interrupted by a crash or a forced quit. If the swap
+# died after the old folder was moved aside, it is the only copy left — restore it.
+if _retired_directory.is_dir() and not _dependencies_directory.exists():
+    _rename_with_retry(_retired_directory, _dependencies_directory)
+if _retired_directory.is_dir() and _dependencies_directory.is_dir():
+    shutil.rmtree(str(_retired_directory), onerror=_force_remove)
+
+if _staging_directory.is_dir():
+    # Promote a dependency install staged by a previous session. Installing writes to
+    # dependencies_public_new because pip cannot replace modules the running Blender has
+    # imported; the swap happens here instead, where nothing is loaded yet.
+    _retired = False
+    _error = None
+    if _dependencies_directory.exists():
+        _error = _rename_with_retry(_dependencies_directory, _retired_directory)
+        _retired = _error is None
+    if _error is None:
+        _error = _rename_with_retry(_staging_directory, _dependencies_directory)
+        if _error is not None and _retired:
+            # Put the old folder back: broken-but-old dependencies still beat none at all.
+            _rename_with_retry(_retired_directory, _dependencies_directory)
+
+    if _error is None:
+        print("[RBX Toolbox] Installed dependencies are now active.")
+        try:
+            _pending_wipe.unlink()
         except Exception:
             pass
-    shutil.rmtree(str(add_on_directory / "dependencies_public"), onerror=_force_remove)
+    else:
+        # The staged folder is left untouched, so the next start simply tries again.
+        print(
+            f"[RBX Toolbox] Could not activate the installed dependencies yet: {_error}\n"
+            "[RBX Toolbox] Something is still holding those files open (cloud sync or "
+            "antivirus). They will be activated the next time Blender starts."
+        )
+
+    # Only drop the old copy once a folder is actually in place — if the rollback above
+    # failed too, this is the last set of dependencies the add-on has.
+    if _retired_directory.is_dir() and _dependencies_directory.is_dir():
+        shutil.rmtree(str(_retired_directory), onerror=_force_remove)
+elif _pending_wipe.exists():
+    # Wipe dependencies_public if a pending-wipe marker exists from a previous session.
+    shutil.rmtree(str(_dependencies_directory), onerror=_force_remove)
     # Always remove the marker — even if some empty dirs remain, a fresh pip install
     # will work correctly and won't be blocked by leftover empty folders.
     try:

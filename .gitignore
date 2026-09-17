@@ -22,3 +22,6 @@ tmp/
 temp/
 RBX_Import/
 oauth/dependencies_public/
+oauth/dependencies_public_new/
+oauth/dependencies_public_old/
+_pending_dep_wipe

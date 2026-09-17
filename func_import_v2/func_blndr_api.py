@@ -234,9 +234,12 @@ def blender_api_collapse_outliner():
     bpy.app.timers.register(_do_collapse, first_interval=0.1)
 
 
-def blender_api_assets_new_material(rbx_obj, mesh_part, rbx_textures, rbx_asset_name_clean, rbx_SurfaceAppearance):
+def blender_api_assets_new_material(rbx_obj, mesh_part, rbx_textures, rbx_asset_name_clean, rbx_SurfaceAppearance, rbx_emissive=None):
 	### Creating new Material ###
-	
+	# rbx_emissive: optional {"strength": float, "tint": (r, g, b)} read from the
+	# SurfaceAppearance. Only set when the item carries an emissive mask; see the
+	# "Emission" branch in the texture loop below.
+
 	if rbx_obj.material_slots:
 		bpy.ops.object.material_slot_remove()
 	mat = bpy.data.materials.new(name=f"{rbx_asset_name_clean}_{mesh_part.name}_mat")
@@ -265,9 +268,31 @@ def blender_api_assets_new_material(rbx_obj, mesh_part, rbx_textures, rbx_asset_
 				blender_api_transparent_textures()
 				return
 	
+		### Emissive textures ###
+		# Roblox drives emission from SurfaceAppearance.EmissiveMaskContent: a
+		# grayscale mask where black = no emissivity and white = full emissivity,
+		# scaled by SurfaceAppearance.EmissiveStrength.
+		#
+		# The mask node sits in the row straight after Metallic (its position in
+		# glob_vars.rbx_pbr_materials), which pushes Normal and Roughness one row
+		# further down. Mask -> Emission Color, EmissiveStrength -> Emission
+		# Strength. Every item inherits this automatically, since any Roblox item
+		# may now carry an emissive map.
+		elif tex_name == "Emission":
+			# Blender 4.x+ names the socket "Emission Color"; older builds "Emission".
+			emission_input = bsdf.inputs.get("Emission Color")
+			if emission_input is None:
+				emission_input = bsdf.inputs.get("Emission")
+			if emission_input is not None:
+				mat.node_tree.links.new(rbxtexNode.outputs[0], emission_input)
+
+			strength_input = bsdf.inputs.get("Emission Strength")
+			if strength_input is not None and rbx_emissive:
+				strength_input.default_value = rbx_emissive.get("strength", 1.0)
+
 		elif tex_name == "Normal":
 			norm_node = nodes.new(type="ShaderNodeNormalMap")
-			norm_node.location = (-400,300-300 * node_y_index)        
+			norm_node.location = (-400,300-300 * node_y_index)
 			mat.node_tree.links.new(rbxtexNode.outputs[0], norm_node.inputs[1])
 			mat.node_tree.links.new(norm_node.outputs[0], bsdf.inputs[tex_name])
 			norm_node.space = 'TANGENT'

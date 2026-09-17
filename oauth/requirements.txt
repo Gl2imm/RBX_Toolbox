@@ -7,6 +7,13 @@ urllib3 ~= 1.26.15
 aiohttp >= 3.10.0
 aiolimiter ~= 1.0.0
 pyjwt[crypto] ~= 2.6.0
+# Deliberately left without an upper bound. cryptography 49.0.0 removed x86_64 macOS wheels
+# (arm64 only from then on), which breaks Intel Macs and Apple Silicon machines running an
+# x86_64 Blender under Rosetta. The fix is the --only-binary=cryptography flag in
+# install_dependencies.py, not a pin here: it makes pip skip wheel-less versions and settle on
+# the newest one that has a wheel — 48.x on those Macs, current everywhere else. A hard pin
+# would freeze every platform on a release that gets no further security fixes, since PyCA
+# only patches the latest version.
 cryptography >= 42.0.0
 pyjwt-key-fetcher >= 0.4.0
 

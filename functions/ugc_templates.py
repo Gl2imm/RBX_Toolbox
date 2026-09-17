@@ -56,8 +56,10 @@ class RBX_OT_ugc_template(bpy.types.Operator):
 
     def execute(self, context):
         action = self.action
-        if action == 'chain':
-            return self._spawn_collection('Chain template', "Chain Template")
+        if action == 'chain_1':
+            return self._spawn_collection('Chain template 1', "Chain 1")
+        if action == 'chain_2':
+            return self._spawn_collection('Chain template 2', "Chain 2")
         if action == 'fur_sample':
             return self._spawn_collection('Fur template', "Fur Sample")
         if action == 'apply_fur':

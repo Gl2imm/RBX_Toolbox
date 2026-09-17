@@ -58,22 +58,32 @@ def fetch_data_custom_ssl_context(self):
         return json.load(response)
 
 
-async def request_login_details(token_data):
+async def request_login_details(token_data, session=None):
     """Fetches authorized resources for the access token, fetches group names for each authorized group ID,
     sets the token data in state, verifies and decodes the id token and stores the username in state.
+
+    Pass an existing aiohttp ClientSession to reuse its connections. Most of these calls go to
+    apis.roblox.com, so sharing one session collapses several TLS handshakes into one — worth a lot
+    here because the event loop is stepped by a Blender timer, making every round trip expensive.
     """
+    if session is None:
+        from .create_http_client import create_http_client
+
+        async with create_http_client() as own_session:
+            return await request_login_details(token_data, own_session)
+
     # Use access token to fetch authorized resources
     # Raises ClientResponseError, ClientError, or JSONDecodeError
-    authorized_resources = await __request_authorized_resources(token_data.get("access_token"))
+    authorized_resources = await __request_authorized_resources(token_data.get("access_token"), session)
 
     # Read creator ids from resources and fetch group names for each group ID
     # Raises ClientResponseError, ClientError, or JSONDecodeError
     creator_ids = __get_creator_ids_from_resources(authorized_resources)
-    group_names_by_id = await __request_group_names_for_group_ids(creator_ids["groups"])
+    group_names_by_id = await __request_group_names_for_group_ids(creator_ids["groups"], session)
 
     # Decode the ID token into profile data, fetching the matching signature from the certs API under the hood
     # Raises jwt.exceptions.DecodeError
-    profile_data = await __decode_id_token(token_data.get("id_token"))
+    profile_data = await __decode_id_token(token_data.get("id_token"), session)
 
     # Raises KeyError if missing name
     name = profile_data["name"]
@@ -88,7 +98,7 @@ async def request_login_details(token_data):
     return creator_ids, name, group_names_by_id, token_data
 
 
-async def __request_authorized_resources(access_token):
+async def __request_authorized_resources(access_token, session):
     from . import constants
 
     authorized_resources_request_data = {
@@ -97,28 +107,25 @@ async def __request_authorized_resources(access_token):
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
-    from .create_http_client import create_http_client
+    async with session.post(
+        constants.AUTHORIZED_RESOURCES_ENDPOINT,
+        headers=headers,
+        data=authorized_resources_request_data,
+    ) as response:
+        import aiohttp
 
-    async with create_http_client() as session:
-        async with session.post(
-            constants.AUTHORIZED_RESOURCES_ENDPOINT,
-            headers=headers,
-            data=authorized_resources_request_data,
-        ) as response:
-            import aiohttp
-
-            try:
-                response_data = await response.json(content_type=None)  # Raises json.JSONDecodeError
-                response.raise_for_status()  # Raises ClientResponseError or other ClientError
-                return response_data
-            except aiohttp.ClientResponseError as exception:
-                error_description = response_data.get("error_description", None)
-                if error_description:
-                    exception.message = error_description
-                raise exception
+        try:
+            response_data = await response.json(content_type=None)  # Raises json.JSONDecodeError
+            response.raise_for_status()  # Raises ClientResponseError or other ClientError
+            return response_data
+        except aiohttp.ClientResponseError as exception:
+            error_description = response_data.get("error_description", None)
+            if error_description:
+                exception.message = error_description
+            raise exception
 
 
-async def __decode_id_token(id_token):
+async def __decode_id_token(id_token, session=None):
     """Decodes a jwt token. Fetches the signature from the certs api and checks the token's
     contents against the signature."""
 
@@ -128,7 +135,9 @@ async def __decode_id_token(id_token):
     import jwt
 
     try:
-        fetcher = pyjwt_key_fetcher.AsyncKeyFetcher(http_client=JWTHTTPClient(), valid_issuers=[constants.ISSUER])
+        fetcher = pyjwt_key_fetcher.AsyncKeyFetcher(
+            http_client=JWTHTTPClient(session), valid_issuers=[constants.ISSUER]
+        )
         key_entry = await fetcher.get_key(id_token)
         return jwt.decode(jwt=id_token, audience=constants.CLIENT_ID, leeway=180, **key_entry)
     except Exception as primary_exc:
@@ -181,7 +190,7 @@ def __get_creator_ids_from_resources(authorized_resources):
     return creator_ids
 
 
-async def __request_group_names_for_group_ids(group_ids):
+async def __request_group_names_for_group_ids(group_ids, session):
     """Makes an http GET request to fetch the names of the groups, and returns a dictionary of group names by string id"""
     if not group_ids:
         return {}
@@ -192,17 +201,14 @@ async def __request_group_names_for_group_ids(group_ids):
     full_url = f"{constants.GROUPS_ENDPOINT}?{query_params}"
     headers = {"Accept": "application/json"}
 
-    from .create_http_client import create_http_client
+    async with session.get(full_url, headers=headers) as response:
+        import aiohttp
 
-    async with create_http_client() as session:
-        async with session.get(full_url, headers=headers) as response:
-            import aiohttp
-
-            try:
-                response_data = await response.json(content_type=None)  # Raises json.JSONDecodeError
-                response.raise_for_status()  # Raises ClientResponseError or other ClientError
-                return {str(group_data["id"]): group_data["name"] for group_data in response_data["data"]}
-            except aiohttp.ClientResponseError as exception:
-                for error in response_data.get("errors", []):
-                    exception.message += f"{error['userFacingMessage']}\n"
-                raise exception
+        try:
+            response_data = await response.json(content_type=None)  # Raises json.JSONDecodeError
+            response.raise_for_status()  # Raises ClientResponseError or other ClientError
+            return {str(group_data["id"]): group_data["name"] for group_data in response_data["data"]}
+        except aiohttp.ClientResponseError as exception:
+            for error in response_data.get("errors", []):
+                exception.message += f"{error['userFacingMessage']}\n"
+            raise exception

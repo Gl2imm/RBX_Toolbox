@@ -122,6 +122,26 @@ def generate_state():
     return new_state
 
 
+def tag_redraw():
+    """
+    Repaints the panels that show login state.
+
+    The login/logout coroutines finish on the stepped asyncio event loop, not from a UI
+    event, so Blender never repaints the panel on its own — it keeps drawing the stale
+    "Logging in..." state until the user happens to interact with the area (which can be
+    minutes later if they are still in the browser). Every place that changes login state
+    must call this.
+    """
+    try:
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type in {"VIEW_3D", "PREFERENCES"}:
+                    area.tag_redraw()
+    except AttributeError:
+        # No window manager (e.g. background mode) — nothing to repaint
+        pass
+
+
 class LoginError(Exception):
     """
     Raised when an error occurs during the login process.
@@ -268,28 +288,37 @@ class RbxOAuth2Client:
         if (not self.rbx.is_logged_in) or RbxOAuth2Client.token_data.get("refresh_after") < time():
             # Raises ClientResponseError, ClientError, or JSONDecodeError
             async with self.__set_is_processing_login():
-                try:
-                    new_token_data = await self.__refresh_tokens(refresh_token)
-                except Exception as exc:
-                    import aiohttp
-                    if isinstance(exc, aiohttp.ClientResponseError) and exc.status == 400:
-                        # Token revoked or invalidated by Roblox — force a clean logout so the
-                        # user sees the login button again instead of an unhandled HTTP error.
-                        RbxOAuth2Client.token_data = {}
-                        self.rbx.is_logged_in = False
-                        from . import creator_details
-                        creator_details.save_creator_details(
-                            bpy.context.window_manager, bpy.context.preferences)
-                        print(f"[RBX Auth] Token revoked/invalid ({exc.message}). Logged out.")
-                        raise NotLoggedInError(
-                            f"Session expired: {exc.message}. Please log in again."
-                        ) from exc
-                    raise
+                from .create_http_client import create_http_client
 
-                # Raises ClientResponseError, ClientError, JSONDecodeError, AttributeError, ValueError, or jwt.exceptions.DecodeError
-                from .request_login_details import request_login_details
+                # One session for the refresh and the follow-up profile calls — see the note in
+                # auth_callback_request_handler.handle_request
+                async with create_http_client() as session:
+                    await self.__refresh_and_complete_login(refresh_token, session)
 
-                self.__complete_login(*await request_login_details(new_token_data))
+    async def __refresh_and_complete_login(self, refresh_token, session):
+        try:
+            new_token_data = await self.__refresh_tokens(refresh_token, session)
+        except Exception as exc:
+            import aiohttp
+            if isinstance(exc, aiohttp.ClientResponseError) and exc.status == 400:
+                # Token revoked or invalidated by Roblox — force a clean logout so the
+                # user sees the login button again instead of an unhandled HTTP error.
+                RbxOAuth2Client.token_data = {}
+                self.rbx.is_logged_in = False
+                from . import creator_details
+                creator_details.save_creator_details(
+                    bpy.context.window_manager, bpy.context.preferences)
+                tag_redraw()
+                print(f"[RBX Auth] Token revoked/invalid ({exc.message}). Logged out.")
+                raise NotLoggedInError(
+                    f"Session expired: {exc.message}. Please log in again."
+                ) from exc
+            raise
+
+        # Raises ClientResponseError, ClientError, JSONDecodeError, AttributeError, ValueError, or jwt.exceptions.DecodeError
+        from .request_login_details import request_login_details
+
+        self.__complete_login(*await request_login_details(new_token_data, session))
 
     def __complete_login(self, creator_ids, name, group_names_by_id, token_data):
         # Set state values in rbx from the data fetched and processed above
@@ -306,6 +335,7 @@ class RbxOAuth2Client:
         from . import creator_details
         creator_details.save_creator_details(
             context.window_manager, context.preferences)
+        tag_redraw()
         print("User logged in and session state saved.")
 
     @staticmethod
@@ -336,11 +366,13 @@ class RbxOAuth2Client:
     async def __set_is_processing_login(self):
         try:
             self.rbx.is_processing_login_or_logout = True
+            tag_redraw()
             yield
         finally:
             self.rbx.is_processing_login_or_logout = False
+            tag_redraw()
 
-    async def __refresh_tokens(self, refresh_token):
+    async def __refresh_tokens(self, refresh_token, session):
         """
         Requests new tokens with an existing refresh token. Raises aiohttp.ClientResponseError,
         aiohttp.ClientError, or json.JSONDecodeError if any errors occur. Returns the response data in JSON format.
@@ -353,27 +385,24 @@ class RbxOAuth2Client:
             "client_id": constants.CLIENT_ID,
         }
 
-        from .create_http_client import create_http_client
-
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        async with create_http_client() as session:
-            async with session.post(
-                constants.REFRESH_TOKEN_ENDPOINT,
-                headers=headers,
-                data=access_token_request_data,
-            ) as response:
-                import aiohttp
+        async with session.post(
+            constants.REFRESH_TOKEN_ENDPOINT,
+            headers=headers,
+            data=access_token_request_data,
+        ) as response:
+            import aiohttp
 
-                try:
-                    # Raises json.JSONDecodeError
-                    response_data = await response.json()
-                    response.raise_for_status()  # Raises ClientResponseError or other ClientError
-                    return response_data
-                except aiohttp.ClientResponseError as exception:
-                    error_description = response_data.get("error_description", None)
-                    if error_description:
-                        exception.message = error_description
-                    raise exception
+            try:
+                # Raises json.JSONDecodeError
+                response_data = await response.json()
+                response.raise_for_status()  # Raises ClientResponseError or other ClientError
+                return response_data
+            except aiohttp.ClientResponseError as exception:
+                error_description = response_data.get("error_description", None)
+                if error_description:
+                    exception.message = error_description
+                raise exception
 
     def __set_creators_from_ids(self, creator_ids, name, group_names_by_id):
         """Populates a CollectionProperty with RbxCreatorData objects containing creator types, ids, and names

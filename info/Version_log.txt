@@ -2,6 +2,27 @@
                                                       Version History:
                                             ####################################
 
+v.7.11:
+    New Feature: Better Accessory Textures
+    - Accessories now import with full PBR textures, including glow/emissive maps, so glowing
+      accessories glow automatically.
+
+    New Feature: Attach & Parent
+    - New "Attach & Parent" panel (Avatars tab, under Dummy) to attach any item to another object:
+      by attachment point, directly to a mesh, or to an armature bone.
+
+    New Feature: Second Chain Template
+    - Added a second chain template, spawn either one from UGC Templates > Chains.
+
+    Fixes
+    - Fixed a texture sometimes missing after import.
+    - Fixed a dependency installation error on Intel Macs mentioning "cryptography", "Rust", or
+      "OpenSSL".
+    - Mac tip: if you have an Apple Silicon Mac (M1/M2/M3/M4) but run the Intel version of Blender,
+      installing the Apple Silicon build from blender.org avoids the issue entirely and runs
+      considerably faster.
+    - Various bug fixes.
+
 v.7.10:
     New Feature: Advanced Upload (Upload to Roblox -> Upload Animation)
     - Uploading an animation with the standard Roblox tools strips off bone movement: any bone that

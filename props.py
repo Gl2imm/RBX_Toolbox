@@ -864,9 +864,28 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
                     desc = f"Generate Armature from Dynamic Head: {item['name']}"
                     items.append((identifier, name, desc))
             
-            # No aggregation of Layered Cloth/Accessories as standalone armature sources usually
-            # unless requested. Focusing on Body Parts and Heads as requested.
-        
+            # 3. Layered Cloth / Face Parts
+            # These are skinned meshes too, and menu_ui shows the Armature box when
+            # either of them is present. Without entries here a standalone layered
+            # clothing or face part asset left the dropdown empty ("None").
+            # Appended AFTER Body Parts/Dynamic Head so the default selection of a
+            # character bundle stays the Body Parts entry.
+            for src_cat, prefix in (("Layered Cloth", "LAYEREDCLOTH"), ("Face Parts", "FACEPART")):
+                if src_cat in glob_vars.discovered_items_data:
+                    seen_ids = set() # Reset for new category
+                    for item in glob_vars.discovered_items_data[src_cat]:
+                        if item['id'] in seen_ids:
+                            continue
+                        seen_ids.add(item['id'])
+
+                        # ID format: "LAYEREDCLOTH_AssetID" / "FACEPART_AssetID"
+                        identifier = f"{prefix}_{item['id']}"
+                        name = f"{item['name']} - Armature"
+                        desc = f"Generate Armature from {src_cat}: {item['name']}"
+                        items.append((identifier, name, desc))
+
+            # Accessories are not aggregated as standalone armature sources.
+
         elif category in glob_vars.discovered_items_data:
             for item in glob_vars.discovered_items_data[category]:
                 # Identifier (Asset ID), Name (Asset Name), Description
@@ -957,6 +976,45 @@ class PROPERTIES_RBX(bpy.types.PropertyGroup):
         description = "Select armature to apply animation to",
         type = bpy.types.Object,
         poll = poll_armature
+    ) # type: ignore
+
+
+    ### Attach & Parent (Dummy tab) ###
+
+    def _attach_target_update(self, context):
+        """Drop a bone name that no longer belongs to the picked target."""
+        target = self.rbx_attach_target
+        if target is None or target.type != 'ARMATURE':
+            if self.rbx_attach_bone:
+                self.rbx_attach_bone = ""
+        elif self.rbx_attach_bone and self.rbx_attach_bone not in target.data.bones:
+            self.rbx_attach_bone = ""
+
+    rbx_attach_target : bpy.props.PointerProperty(
+        name = "Attach To",
+        description = "Object to attach the selected item to "
+                      "(an attachment, a mesh, or an armature)",
+        type = bpy.types.Object,
+        update = _attach_target_update
+    ) # type: ignore
+
+    rbx_attach_bone : bpy.props.StringProperty(
+        name = "Bone",
+        description = "Bone of the target armature to attach the item to",
+        default = ""
+    ) # type: ignore
+
+    rbx_attach_bone_mode : bpy.props.EnumProperty(
+        name = "Parent As",
+        description = "How the item should follow the bone",
+        default = 'OBJECT',
+        items = [
+            ('OBJECT', "Object",
+             "Bone-parent the item. It follows the bone rigidly and the mesh is not deformed"),
+            ('WEIGHTS', "Weights",
+             "Add an Armature modifier and a full-weight vertex group for the bone, "
+             "so the mesh deforms with it"),
+        ]
     ) # type: ignore
 
     def get_anim_sub_callback(self, context):

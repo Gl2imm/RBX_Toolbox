@@ -83,14 +83,20 @@ class AuthCallbackRequestHandler:
             query_params = self.__get_query_params(request)
             self.__validate_query_params(query_params)
 
-            # Use auth code to fetch tokens
-            # Raises ClientResponseError, ClientError, or JSONDecodeError
-            token_data = await self.__request_tokens(query_params.get("code"))
-
             # Raises ClientResponseError, ClientError, JSONDecodeError, or jwt.exceptions.DecodeError
             from .request_login_details import request_login_details
+            from .create_http_client import create_http_client
 
-            event.login_details = await request_login_details(token_data)
+            # One session for the whole exchange: the token, resources and certs endpoints are all
+            # on apis.roblox.com, so they share a single connection instead of doing a DNS lookup
+            # and TLS handshake each. That matters here because the event loop only advances once
+            # per Blender timer tick, making every extra round trip cost real seconds.
+            async with create_http_client() as session:
+                # Use auth code to fetch tokens
+                # Raises ClientResponseError, ClientError, or JSONDecodeError
+                token_data = await self.__request_tokens(query_params.get("code"), session)
+
+                event.login_details = await request_login_details(token_data, session)
 
             # Tell the user via browser that all the login steps succeeded
             return self.__get_success_response()
@@ -172,7 +178,7 @@ class AuthCallbackRequestHandler:
         if not code:
             raise MissingAuthCodeError("Missing code in query parameters")
 
-    async def __request_tokens(self, auth_code):
+    async def __request_tokens(self, auth_code, session):
         """
         Requests the access token from the provider using the auth code received. Raises aiohttp.ClientResponseError,
         aiohttp.ClientError, or json.JSONDecodeError if any errors occur. Returns the response data in JSON format.
@@ -187,28 +193,26 @@ class AuthCallbackRequestHandler:
         }
 
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        from .create_http_client import create_http_client
 
-        async with create_http_client() as session:
-            async with session.post(
-                constants.ACCESS_TOKEN_ENDPOINT,
-                headers=headers,
-                data=access_token_request_data,
-            ) as response:
-                import aiohttp
+        async with session.post(
+            constants.ACCESS_TOKEN_ENDPOINT,
+            headers=headers,
+            data=access_token_request_data,
+        ) as response:
+            import aiohttp
 
-                try:
-                    response_data = await response.json()  # Raises json.JSONDecodeError
-                    response.raise_for_status()  # Raises ClientResponseError or other ClientError
-                    return response_data
-                except aiohttp.ClientResponseError as exception:
-                    error_description = response_data.get(
-                        "error_description",
-                        None,
-                    )
-                    if error_description:
-                        exception.message = error_description
-                    raise exception
+            try:
+                response_data = await response.json()  # Raises json.JSONDecodeError
+                response.raise_for_status()  # Raises ClientResponseError or other ClientError
+                return response_data
+            except aiohttp.ClientResponseError as exception:
+                error_description = response_data.get(
+                    "error_description",
+                    None,
+                )
+                if error_description:
+                    exception.message = error_description
+                raise exception
 
     def __get_success_response(self):
         """
